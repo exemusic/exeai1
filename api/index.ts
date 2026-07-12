@@ -1,6 +1,8 @@
 import express from "express";
 import dotenv from "dotenv";
-import admin from "firebase-admin";
+import { getApps, initializeApp, cert } from "firebase-admin/app";
+import { getAuth } from "firebase-admin/auth";
+import { getDatabase } from "firebase-admin/database";
 
 // Load environment variables
 dotenv.config();
@@ -19,8 +21,9 @@ let adminAuth: any = null;
 let adminDb: any = null;
 
 try {
-  if (admin.apps.length > 0) {
-    adminApp = admin.apps[0];
+  const currentApps = getApps();
+  if (currentApps.length > 0) {
+    adminApp = currentApps[0];
   } else {
     const appOptions: any = { databaseURL };
     let hasCredentials = false;
@@ -28,7 +31,7 @@ try {
     if (process.env.FIREBASE_SERVICE_ACCOUNT_KEY) {
       try {
         const sa = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY);
-        appOptions.credential = admin.credential.cert(sa);
+        appOptions.credential = cert(sa);
         hasCredentials = true;
         console.log("Firebase Admin initialized via FIREBASE_SERVICE_ACCOUNT_KEY");
       } catch (e: any) {
@@ -36,7 +39,7 @@ try {
       }
     } else if (process.env.FIREBASE_PRIVATE_KEY && process.env.FIREBASE_CLIENT_EMAIL) {
       const privateKey = process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n');
-      appOptions.credential = admin.credential.cert({
+      appOptions.credential = cert({
         projectId,
         clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
         privateKey,
@@ -48,22 +51,19 @@ try {
     }
     
     if (hasCredentials) {
-      adminApp = admin.initializeApp(appOptions);
+      adminApp = initializeApp(appOptions);
     } else {
       console.warn("Firebase Admin NOT initialized because no credentials were provided.");
     }
   }
   
   if (adminApp) {
-    adminAuth = admin.auth(adminApp);
-    adminDb = admin.database(adminApp);
+    adminAuth = getAuth(adminApp);
+    adminDb = getDatabase(adminApp);
   }
 } catch (error: any) {
   console.error("CRITICAL: Gagal menginisialisasi Firebase Admin SDK:", error);
 }
-
-// Server-side in-memory credit store for guests (IP-based) to prevent local storage modifications
-const ipCreditStore: Record<string, number> = {};
 
 // Helper to calculate credit cost based on message length
 function getCreditCost(text: string): number {
@@ -106,18 +106,6 @@ app.get("/api/health", (req, res) => {
     status: "ok",
     hasApiKey: !!getCerebrasApiKey()
   });
-});
-
-// Secure endpoint to get or create guest credits
-app.post("/api/user/get-or-create-credits", (req, res) => {
-  const rawIp = req.headers["x-forwarded-for"] || req.socket?.remoteAddress || "anonymous";
-  const ip = Array.isArray(rawIp) ? rawIp[0] : rawIp;
-  const cleanIp = ip.trim();
-
-  if (ipCreditStore[cleanIp] === undefined) {
-    ipCreditStore[cleanIp] = 5; // default guest credits
-  }
-  return res.json({ credits: ipCreditStore[cleanIp] });
 });
 
 // Secure endpoint to register a new user with 50 credits
@@ -308,47 +296,64 @@ app.post("/api/chat/stream", async (req, res) => {
       return res.end();
     }
 
-    // Secure Credit Check & Deduction (Optional/Bypassed if Firebase is not fully configured)
-    let isUserLoggedIn = false;
+    // Secure Credit Check & Deduction (Firebase Auth strictly required)
+    if (!uid || !idToken) {
+      res.write(`data: ${JSON.stringify({ error: "Sesi tidak ditemukan atau kedaluwarsa. Silakan masuk dengan Google terlebih dahulu." })}\n\n`);
+      return res.end();
+    }
+
+    if (!adminAuth || !adminDb) {
+      res.write(`data: ${JSON.stringify({ error: "Firebase Admin belum dikonfigurasi di server." })}\n\n`);
+      return res.end();
+    }
+
     let verifiedUid = "";
     let userCredits = 0;
 
-    if (adminAuth && adminDb && uid && idToken) {
-      try {
-        const decodedToken = await adminAuth.verifyIdToken(idToken);
-        if (decodedToken.uid === uid) {
-          isUserLoggedIn = true;
-          verifiedUid = uid;
-        }
-      } catch (err) {
-        console.error("Gagal memverifikasi ID Token pada stream:", err);
+    try {
+      const decodedToken = await adminAuth.verifyIdToken(idToken);
+      if (decodedToken.uid === uid) {
+        verifiedUid = uid;
+      } else {
+        res.write(`data: ${JSON.stringify({ error: "Akses tidak sah." })}\n\n`);
+        return res.end();
       }
+    } catch (err: any) {
+      console.error("Gagal memverifikasi ID Token pada stream:", err);
+      res.write(`data: ${JSON.stringify({ error: "Sesi Anda tidak valid atau kedaluwarsa. Silakan login kembali." })}\n\n`);
+      return res.end();
     }
 
     // Get length of the user's latest prompt to determine cost
     const lastUserMessage = messages.length > 0 ? messages[messages.length - 1]?.content || "" : "";
     const cost = getCreditCost(lastUserMessage);
 
-    if (isUserLoggedIn && adminDb) {
-      try {
-        const userRef = adminDb.ref(`users/${verifiedUid}`);
-        const userSnap = await userRef.once("value");
-        if (userSnap.exists()) {
-          const userData = userSnap.val() as any;
-          userCredits = Number(userData.credits !== undefined ? userData.credits : 50);
-
-          if (userCredits >= cost) {
-            // Deduct credits on database
-            userCredits = Math.max(0, userCredits - cost);
-            await userRef.update({
-              credits: userCredits,
-              updatedAt: Date.now()
-            });
-          }
-        }
-      } catch (dbErr) {
-        console.warn("Database credit update ignored:", dbErr);
+    try {
+      const userRef = adminDb.ref(`users/${verifiedUid}`);
+      const userSnap = await userRef.once("value");
+      if (!userSnap.exists()) {
+        res.write(`data: ${JSON.stringify({ error: "Profil akun tidak ditemukan di database." })}\n\n`);
+        return res.end();
       }
+
+      const userData = userSnap.val() as any;
+      userCredits = Number(userData.credits !== undefined ? userData.credits : 0);
+
+      if (userCredits < cost) {
+        res.write(`data: ${JSON.stringify({ error: `Kredit tidak mencukupi! Pertanyaan ini memerlukan ${cost} kredit (sisa Anda: ${userCredits}).` })}\n\n`);
+        return res.end();
+      }
+
+      // Deduct credits on database
+      userCredits = Math.max(0, userCredits - cost);
+      await userRef.update({
+        credits: userCredits,
+        updatedAt: Date.now()
+      });
+    } catch (dbErr: any) {
+      console.error("Database credit error:", dbErr);
+      res.write(`data: ${JSON.stringify({ error: "Gagal memproses kredit di database." })}\n\n`);
+      return res.end();
     }
 
     // Format messages into Cerebras (OpenAI-compatible) format
