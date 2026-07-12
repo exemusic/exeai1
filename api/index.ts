@@ -75,6 +75,20 @@ function getCerebrasApiKey() {
   return process.env.CEREBRAS_API_KEY || "csk-t4v6w2fwymkv2n6n24rm2j2xy9fh4pff59f5wcfjn5jkwepn";
 }
 
+// Helper to map UI model ID to actual Cerebras model ID
+function getCerebrasModel(uiModel: string): string {
+  switch (uiModel) {
+    case "gemma-4-31b":
+      return "llama3.1-8b";
+    case "zai-glm-4.7":
+      return "llama3.1-70b";
+    case "gpt-oss-120b":
+      return "llama-3.3-70b";
+    default:
+      return "llama3.1-8b";
+  }
+}
+
 // Health check endpoint
 app.get("/api/health", (req, res) => {
   res.json({
@@ -346,7 +360,7 @@ app.post("/api/chat/stream", async (req, res) => {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: model,
+        model: getCerebrasModel(model),
         messages: allMessages,
         temperature: temperature !== undefined ? Number(temperature) : 0.7,
         stream: true,
