@@ -77,16 +77,7 @@ function getCerebrasApiKey() {
 
 // Helper to map UI model ID to actual Cerebras model ID
 function getCerebrasModel(uiModel: string): string {
-  switch (uiModel) {
-    case "gemma-4-31b":
-      return "llama3.1-8b";
-    case "zai-glm-4.7":
-      return "llama3.1-70b";
-    case "gpt-oss-120b":
-      return "llama-3.3-70b";
-    default:
-      return "llama3.1-8b";
-  }
+  return uiModel || "gemma-4-31b";
 }
 
 // Health check endpoint
