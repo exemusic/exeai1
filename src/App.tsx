@@ -80,13 +80,6 @@ export default function App() {
     }
     return null;
   });
-
-  const parseSavedCredits = (saved: string | null): number => {
-    if (saved === null) return 5;
-    const numeric = Number(saved);
-    return Number.isFinite(numeric) ? numeric : 5;
-  };
-
   // Welcome Greetings & Memories
   const [welcomeGreeting, setWelcomeGreeting] = useState("Ada ide baru untuk dieksplorasi?");
   const [memories, setMemories] = useState<string[]>(() => {
@@ -216,8 +209,7 @@ export default function App() {
     textContent?: string;
   } | null>(null);
 
-  // Credits are persisted in Firebase RTDB for logged-in users, and in localStorage for guest mode.
-  // Avoid overriding the saved Firebase credits with the transient backend credit store.
+  // Credits are persisted strictly in Firebase Realtime Database.
 
   // Editing Session Title States
   const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
