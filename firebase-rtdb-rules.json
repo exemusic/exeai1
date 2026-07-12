@@ -1,0 +1,40 @@
+{
+  "rules": {
+    "users": {
+      ".indexOn": ["email"],
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        "username": {
+          ".write": "auth != null && auth.uid === $uid",
+          ".validate": "newData.isString() && newData.val().matches(/^[a-zA-Z0-9 _-]{3,20}$/)"
+        },
+        "displayName": {
+          ".write": "auth != null && auth.uid === $uid",
+          ".validate": "newData.isString() && newData.val().matches(/^.{1,50}$/)"
+        },
+        "email": {
+          ".write": "auth != null && auth.uid === $uid",
+          ".validate": "newData.isString() && newData.val().matches(/^[^@]+@[^@]+\\.[^@]+$/)"
+        },
+        "updatedAt": {
+          ".write": "auth != null && auth.uid === $uid",
+          ".validate": "newData.isNumber()"
+        }
+      }
+    },
+    "redeemCodes": {
+      ".read": "auth != null",
+      ".write": "false"
+    },
+    "userRedeems": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": "false"
+      }
+    },
+    "redeemedCodes": {
+      ".read": "auth != null",
+      ".write": "false"
+    }
+  }
+}
