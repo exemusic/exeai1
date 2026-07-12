@@ -168,11 +168,9 @@ export default function App() {
     }
   }, [resolvedTheme]);
 
-  // Credits & Account States
-  const [credits, setCredits] = useState<number>(() => {
-    const saved = localStorage.getItem("exechat_credits");
-    return parseSavedCredits(saved);
-  });
+  // Credits & Account States - loaded strictly from Firebase Realtime Database
+  const [credits, setCredits] = useState<number>(0);
+  const [authLoading, setAuthLoading] = useState<boolean>(true);
 
   // User feedback and action states for assistant messages
   const [likedMessages, setLikedMessages] = useState<Record<string, boolean>>({});
@@ -388,11 +386,6 @@ export default function App() {
 
   // Theme persistence removed per new requirements.
 
-  // Sync credits to localStorage
-  useEffect(() => {
-    localStorage.setItem("exechat_credits", String(credits));
-  }, [credits]);
-
   // Sync login state to localStorage
   useEffect(() => {
     localStorage.setItem("exechat_logged_in", String(isLoggedIn));
@@ -488,57 +481,61 @@ export default function App() {
 
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       console.debug("onAuthStateChanged fired. user:", user);
-      if (user && user.uid && user.email) {
-        try {
-          // debug: print current id token length to validate auth token is available
+      try {
+        if (user && user.uid && user.email) {
           try {
-            const token = await user.getIdToken();
-            console.debug("current user id token length:", token ? token.length : 0);
-          } catch (tErr) {
-            console.warn("Failed to fetch id token for debug:", tErr);
+            // debug: print current id token length to validate auth token is available
+            try {
+              const token = await user.getIdToken();
+              console.debug("current user id token length:", token ? token.length : 0);
+            } catch (tErr) {
+              console.warn("Failed to fetch id token for debug:", tErr);
+            }
+            const snapshot = await get(ref(db, `users/${user.uid}`));
+            if (snapshot.exists()) {
+              const data = snapshot.val();
+              const displayNameValue = data.username || data.displayName || user.displayName || user.email.split("@")[0] || "";
+              const resolvedCredits = typeof data.credits === "number" ? data.credits : 50;
+              setUserId(user.uid);
+              setUserEmail(user.email);
+              setUserDisplayName(displayNameValue);
+              setUserName(displayNameValue);
+              setCredits(resolvedCredits);
+              setLastClaimAt(typeof data.lastClaimAt === "number" ? data.lastClaimAt : null);
+              setIsLoggedIn(true);
+              setShowAuthOverlay(false);
+              setAuthStep("choose");
+              setPendingAuthUser(null);
+              setAuthMessage(null);
+            } else {
+              setPendingAuthUser({
+                uid: user.uid,
+                email: user.email,
+                displayName: user.displayName,
+              });
+              setNewUsernameInput(user.displayName || user.email.split("@")[0] || "");
+              setAuthStep("register");
+              setAuthMessage("Akun belum terdaftar. Silakan buat nama akun untuk melanjutkan.");
+              setShowAuthOverlay(true);
+              setIsLoggedIn(false);
+            }
+          } catch (err: any) {
+            console.error("Gagal memuat data pengguna dari Firebase:", err);
+            if (err && err.code && err.code.includes("permission-denied") || (err && String(err).toLowerCase().includes("permission denied"))) {
+              setErrorText("Akses database ditolak (PERMISSION_DENIED). Pastikan user sudah login dan aturan RTDB mengizinkan akses untuk user yang terautentikasi.");
+            }
           }
-          const snapshot = await get(ref(db, `users/${user.uid}`));
-          if (snapshot.exists()) {
-            const data = snapshot.val();
-            const displayNameValue = data.username || data.displayName || user.displayName || user.email.split("@")[0] || "";
-            const resolvedCredits = typeof data.credits === "number" ? data.credits : 50;
-            setUserId(user.uid);
-            setUserEmail(user.email);
-            setUserDisplayName(displayNameValue);
-            setUserName(displayNameValue);
-            setCredits(resolvedCredits);
-            setLastClaimAt(typeof data.lastClaimAt === "number" ? data.lastClaimAt : null);
-            setIsLoggedIn(true);
-            setShowAuthOverlay(false);
-            setAuthStep("choose");
-            setPendingAuthUser(null);
-            setAuthMessage(null);
-          } else {
-            setPendingAuthUser({
-              uid: user.uid,
-              email: user.email,
-              displayName: user.displayName,
-            });
-            setNewUsernameInput(user.displayName || user.email.split("@")[0] || "");
-            setAuthStep("register");
-            setAuthMessage("Akun belum terdaftar. Silakan buat nama akun untuk melanjutkan.");
-            setShowAuthOverlay(true);
-            setIsLoggedIn(false);
-          }
-        } catch (err: any) {
-          console.error("Gagal memuat data pengguna dari Firebase:", err);
-          if (err && err.code && err.code.includes("permission-denied") || (err && String(err).toLowerCase().includes("permission denied"))) {
-            setErrorText("Akses database ditolak (PERMISSION_DENIED). Pastikan user sudah login dan aturan RTDB mengizinkan akses untuk user yang terautentikasi.");
-          }
+        } else {
+          setIsLoggedIn(false);
+          setUserEmail(null);
+          setUserId(null);
+          setUserName("");
+          setUserDisplayName("");
+          setCredits(0);
+          setLastClaimAt(null);
         }
-      } else {
-        setIsLoggedIn(false);
-        setUserEmail(null);
-        setUserId(null);
-        setUserName("");
-        setUserDisplayName("");
-        setCredits(parseSavedCredits(localStorage.getItem("exechat_credits")));
-        setLastClaimAt(null);
+      } finally {
+        setAuthLoading(false);
       }
     });
 
@@ -690,7 +687,7 @@ export default function App() {
       const currentCredits =
         typeof existing.credits === "number"
           ? existing.credits
-          : parseSavedCredits(localStorage.getItem("exechat_credits"));
+          : 50;
       const profileUpdate: Record<string, any> = {
         email,
         displayName: usernameValue,
@@ -1034,16 +1031,13 @@ export default function App() {
     // 3. Credit deduction check
     const cost = getCreditCost(text);
     if (credits < cost) {
-      setErrorText(`Kredit tidak mencukupi! Pertanyaan ini memerlukan ${cost} kredit (sisa Anda: ${credits}). Silakan Sign In dengan Google untuk mendapatkan harian 50 kredit.`);
+      setErrorText(`Kredit tidak mencukupi! Pertanyaan ini memerlukan ${cost} kredit (sisa Anda: ${credits}). Anda dapat mengklaim 50 kredit harian di panel Pengaturan.`);
       return;
     }
 
     // Deduct credits locally (optimistic update)
     const newCredits = Math.max(0, credits - cost);
     setCredits(newCredits);
-    if (!isLoggedIn) {
-      localStorage.setItem("exechat_credits", String(newCredits));
-    }
 
     // Capture any selected file attachment before resetting the state
     const attachmentObj = selectedFile ? {
@@ -1748,6 +1742,107 @@ export default function App() {
       </div>
     </div>
   );
+
+  if (authLoading) {
+    return (
+      <div className="flex h-screen w-full flex-col items-center justify-center bg-zinc-950 font-sans text-zinc-100 antialiased">
+        <div className="relative flex flex-col items-center">
+          <div className="mb-6 p-1 hover:scale-105 transition-transform">
+            <svg className="h-16 w-16 animate-[spin_6s_linear_infinite]" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M12 3Q12 12 21 12Q12 12 12 21Q12 12 3 12Q12 12 12 3Z" fill="url(#loadingGrad)" />
+              <defs>
+                <linearGradient id="loadingGrad" x1="3" y1="3" x2="21" y2="21" gradientUnits="userSpaceOnUse">
+                  <stop offset="0%" stopColor="#59a6ff" />
+                  <stop offset="50%" stopColor="#c084fc" />
+                  <stop offset="100%" stopColor="#ff8da1" />
+                </linearGradient>
+              </defs>
+            </svg>
+          </div>
+          <h2 className="text-lg font-medium tracking-wide animate-pulse">Menghubungkan ke ExeChat...</h2>
+          <p className="mt-2 text-xs text-zinc-500 font-mono">Memverifikasi sesi aman...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isLoggedIn) {
+    return (
+      <div className="flex h-screen w-full items-center justify-center bg-zinc-950 font-sans text-zinc-100 antialiased selection:bg-zinc-700/80 relative overflow-hidden">
+        {/* Background Cybernetic Glow Accent */}
+        <div className={`absolute top-0 left-0 w-full h-[450px] bg-gradient-to-b ${curTheme.gradient} pointer-events-none select-none z-0`} />
+        
+        <div className="w-full max-w-md rounded-3xl border border-zinc-800/70 bg-zinc-950/90 p-8 shadow-2xl z-10 mx-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-[10px] uppercase tracking-[0.3em] text-zinc-500 font-mono">ExeChat Secure Gate</p>
+              <h2 className="mt-1 text-2xl font-bold text-zinc-100">
+                {authStep === "register" ? "Lengkapi Akun Anda" : "Masuk ke ExeChat"}
+              </h2>
+            </div>
+          </div>
+
+          <p className="mt-3 text-sm text-zinc-450 leading-relaxed">
+            {authStep === "register"
+              ? "Akun Google Anda belum terdaftar. Buat nama akun terlebih dahulu untuk melanjutkan pendaftaran aman."
+              : "Silakan masuk dengan akun Google untuk memulai sesi chat aman."}
+          </p>
+
+          {authMessage && (
+            <div className="mt-4 rounded-xl border border-amber-900/40 bg-amber-950/25 px-3 py-2.5 text-xs text-amber-300">
+              {authMessage}
+            </div>
+          )}
+
+          {authStep === "choose" ? (
+            <button
+              onClick={handleGoogleLoginClick}
+              disabled={isLoggingInProcess}
+              className="mt-6 flex w-full items-center justify-center gap-3 rounded-2xl bg-zinc-100 px-4 py-3.5 text-sm font-bold text-zinc-950 hover:bg-zinc-200 active:scale-[0.98] transition-all disabled:opacity-70 cursor-pointer"
+            >
+              <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden="true">
+                <path fill="#4285F4" d="M21.6 12.23c0-.79-.07-1.54-.2-2.27H12v4.3h5.38a4.6 4.6 0 0 1-2 3.02v2.5h3.24c1.9-1.75 2.98-4.33 2.98-7.55Z" />
+                <path fill="#34A853" d="M12 22c2.7 0 4.96-.9 6.62-2.43l-3.24-2.5c-.9.6-2.04.96-3.38.96-2.6 0-4.8-1.76-5.59-4.12H3.07v2.58A10 10 0 0 0 12 22Z" />
+                <path fill="#FBBC05" d="M6.41 13.91A6.02 6.02 0 0 1 6.41 10.1V7.52H3.07a10 10 0 0 0 0 12.78l3.34-2.59Z" />
+                <path fill="#EA4335" d="M12 6.04c1.47 0 2.79.5 3.83 1.48l2.87-2.87A9.98 9.98 0 0 0 3.07 7.52l3.34 2.59C7.2 7.8 9.4 6.04 12 6.04Z" />
+              </svg>
+              {isLoggingInProcess ? "Memproses..." : "Lanjutkan dengan Google"}
+            </button>
+          ) : (
+            <form onSubmit={(e) => handleCompleteRegistration(e)} className="mt-6 space-y-4">
+              <div>
+                <label className="mb-1 block text-xs uppercase tracking-[0.2em] text-zinc-500 font-mono">Nama akun</label>
+                <input
+                  value={newUsernameInput}
+                  onChange={(e) => setNewUsernameInput(e.target.value)}
+                  placeholder="Contoh: Budi123"
+                  className="w-full rounded-2xl border border-zinc-800 bg-zinc-900/80 px-4 py-3 text-sm text-zinc-100 outline-none focus:border-amber-500"
+                />
+              </div>
+
+              <div>
+                <label className="mb-1 block text-xs uppercase tracking-[0.2em] text-zinc-500 font-mono">Kode redeem (opsional)</label>
+                <input
+                  value={pendingRedeemCodeInput}
+                  onChange={(e) => setPendingRedeemCodeInput(e.target.value)}
+                  placeholder="Masukkan kode redeem"
+                  className="w-full rounded-2xl border border-zinc-800 bg-zinc-900/80 px-4 py-3 text-sm text-zinc-100 outline-none focus:border-emerald-500"
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={isLoggingInProcess}
+                className="w-full rounded-2xl bg-amber-500 px-4 py-3.5 text-sm font-bold text-zinc-950 hover:bg-amber-600 active:scale-[0.98] transition-all disabled:opacity-70 cursor-pointer"
+              >
+                {isLoggingInProcess ? "Menyimpan..." : "Selesai dan masuk"}
+              </button>
+            </form>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-screen w-full overflow-hidden bg-zinc-950 font-sans text-zinc-100 antialiased selection:bg-zinc-700/80">
@@ -2689,23 +2784,11 @@ export default function App() {
                     
                     <div className={`flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-xl border ${isDark ? "bg-zinc-900/40 border-zinc-850/60" : "bg-white border-zinc-200"}`}>
                       <div>
-                        {isLoggedIn ? (
-                          <>
-                            <div className="flex items-center gap-2 text-zinc-100 font-semibold text-sm">
-                              <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-                              <span>Sign In sebagai {userEmail}</span>
-                            </div>
-                            <p className="text-xs text-zinc-500 mt-1">Anda berhak mengklaim 50 kredit gratis setiap hari.</p>
-                          </>
-                        ) : (
-                          <>
-                            <div className="flex items-center gap-2 text-zinc-450 font-semibold text-sm">
-                              <span className="h-2 w-2 rounded-full bg-amber-500" />
-                              <span>Mode Guest (Tamu)</span>
-                            </div>
-                            <p className="text-xs text-zinc-500 mt-1">Sisa limit Anda adalah 5 kredit gratis. Hubungkan akun Google untuk mendapatkan 50 kredit harian.</p>
-                          </>
-                        )}
+                        <div className="flex items-center gap-2 text-zinc-100 font-semibold text-sm">
+                          <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                          <span>Sign In sebagai {userEmail}</span>
+                        </div>
+                        <p className="text-xs text-zinc-500 mt-1">Anda berhak mengklaim 50 kredit harian setiap 24 jam.</p>
                       </div>
 
                       <div className="flex flex-col sm:items-end gap-2 shrink-0">
