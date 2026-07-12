@@ -1,8 +1,6 @@
 import express from "express";
 import dotenv from "dotenv";
-import { initializeApp, getApps, cert } from "firebase-admin/app";
-import { getAuth } from "firebase-admin/auth";
-import { getDatabase } from "firebase-admin/database";
+import admin from "firebase-admin";
 
 // Load environment variables
 dotenv.config();
@@ -21,38 +19,44 @@ let adminAuth: any = null;
 let adminDb: any = null;
 
 try {
-  if (getApps().length > 0) {
-    adminApp = getApps()[0];
+  if (admin.apps.length > 0) {
+    adminApp = admin.apps[0];
   } else {
     const appOptions: any = { databaseURL };
+    let hasCredentials = false;
     
     if (process.env.FIREBASE_SERVICE_ACCOUNT_KEY) {
       try {
         const sa = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY);
-        appOptions.credential = cert(sa);
+        appOptions.credential = admin.credential.cert(sa);
+        hasCredentials = true;
         console.log("Firebase Admin initialized via FIREBASE_SERVICE_ACCOUNT_KEY");
       } catch (e: any) {
         console.error("Gagal mendecode FIREBASE_SERVICE_ACCOUNT_KEY:", e.message);
       }
     } else if (process.env.FIREBASE_PRIVATE_KEY && process.env.FIREBASE_CLIENT_EMAIL) {
       const privateKey = process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n');
-      appOptions.credential = cert({
+      appOptions.credential = admin.credential.cert({
         projectId,
         clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
         privateKey,
       });
+      hasCredentials = true;
       console.log("Firebase Admin initialized via FIREBASE_PRIVATE_KEY dan FIREBASE_CLIENT_EMAIL");
     } else {
       console.warn("WARNING: Tidak ada FIREBASE_PRIVATE_KEY atau FIREBASE_SERVICE_ACCOUNT_KEY yang dikonfigurasi.");
-      console.warn("Kami mencoba menggunakan inisialisasi default.");
     }
     
-    adminApp = initializeApp(appOptions);
+    if (hasCredentials) {
+      adminApp = admin.initializeApp(appOptions);
+    } else {
+      console.warn("Firebase Admin NOT initialized because no credentials were provided.");
+    }
   }
   
   if (adminApp) {
-    adminAuth = getAuth(adminApp);
-    adminDb = getDatabase(adminApp);
+    adminAuth = admin.auth(adminApp);
+    adminDb = admin.database(adminApp);
   }
 } catch (error: any) {
   console.error("CRITICAL: Gagal menginisialisasi Firebase Admin SDK:", error);
@@ -106,7 +110,7 @@ app.get("/api/health", (req, res) => {
 
 // Secure endpoint to get or create guest credits
 app.post("/api/user/get-or-create-credits", (req, res) => {
-  const rawIp = req.headers["x-forwarded-for"] || req.socket.remoteAddress || "anonymous";
+  const rawIp = req.headers["x-forwarded-for"] || req.socket?.remoteAddress || "anonymous";
   const ip = Array.isArray(rawIp) ? rawIp[0] : rawIp;
   const cleanIp = ip.trim();
 
