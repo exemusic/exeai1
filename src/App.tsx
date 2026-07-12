@@ -1744,99 +1744,6 @@ export default function App() {
     </div>
   );
 
-  if (!isLoggedIn) {
-    return (
-      <div className="flex min-h-screen w-full flex-col items-center justify-center bg-zinc-950 font-sans text-zinc-100 selection:bg-zinc-700/80 p-4 relative overflow-hidden">
-        {/* Background Accent Gradients */}
-        <div className="absolute top-1/4 left-1/4 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-purple-600/10 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute bottom-1/4 right-1/4 translate-x-1/2 translate-y-1/2 w-96 h-96 bg-blue-600/10 rounded-full blur-3xl pointer-events-none" />
-
-        <div className="w-full max-w-md rounded-3xl border border-zinc-850 bg-zinc-900/20 backdrop-blur-xl p-8 shadow-2xl relative z-10 text-center animate-fadeIn">
-          {/* Logo */}
-          <div className="flex justify-center mb-6">
-            <div className="p-4 rounded-full bg-zinc-900 border border-zinc-850 shadow-inner flex items-center justify-center">
-              <svg className="h-10 w-10 animate-[spin_12s_linear_infinite]" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M12 3Q12 12 21 12Q12 12 12 21Q12 12 3 12Q12 12 12 3Z" fill="url(#loginGrad)" />
-                <circle cx="12" cy="12" r="2.5" fill="#ffffff" className="mix-blend-overlay" />
-                <defs>
-                  <linearGradient id="loginGrad" x1="3" y1="3" x2="21" y2="21" gradientUnits="userSpaceOnUse">
-                    <stop offset="0%" stopColor="#59a6ff" />
-                    <stop offset="50%" stopColor="#c084fc" />
-                    <stop offset="100%" stopColor="#ff8da1" />
-                  </linearGradient>
-                </defs>
-              </svg>
-            </div>
-          </div>
-
-          <p className="text-xs uppercase tracking-[0.25em] text-zinc-500 font-semibold mb-1">Selamat Datang di</p>
-          <h2 className="text-3xl font-display font-extrabold text-white tracking-tight mb-3">
-            ExeChat
-          </h2>
-          <p className="text-sm text-zinc-400 mb-8 leading-relaxed max-w-xs mx-auto">
-            Gunakan akun Google Anda untuk masuk dan mulai berdiskusi dengan AI Assistant cerdas kami secara penuh.
-          </p>
-
-          {authMessage && (
-            <div className="mb-6 rounded-2xl border border-amber-950/50 bg-amber-950/20 px-4 py-3 text-xs text-amber-300 text-left">
-              {authMessage}
-            </div>
-          )}
-
-          {authStep === "choose" ? (
-            <button
-              onClick={handleGoogleLoginClick}
-              disabled={isLoggingInProcess}
-              className="flex w-full items-center justify-center gap-3.5 rounded-2xl bg-white px-5 py-3.5 text-sm font-bold text-zinc-950 hover:bg-zinc-100 disabled:opacity-70 shadow-lg shadow-white/5 active:scale-[0.98] transition-all duration-200"
-            >
-              <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden="true">
-                <path fill="#4285F4" d="M21.6 12.23c0-.79-.07-1.54-.2-2.27H12v4.3h5.38a4.6 4.6 0 0 1-2 3.02v2.5h3.24c1.9-1.75 2.98-4.33 2.98-7.55Z" />
-                <path fill="#34A853" d="M12 22c2.7 0 4.96-.9 6.62-2.43l-3.24-2.5c-.9.6-2.04.96-3.38.96-2.6 0-4.8-1.76-5.59-4.12H3.07v2.58A10 10 0 0 0 12 22Z" />
-                <path fill="#FBBC05" d="M6.41 13.91A6.02 6.02 0 0 1 6.41 10.1V7.52H3.07a10 10 0 0 0 0 12.78l3.34-2.59Z" />
-                <path fill="#EA4335" d="M12 6.04c1.47 0 2.79.5 3.83 1.48l2.87-2.87A9.98 9.98 0 0 0 3.07 7.52l3.34 2.59C7.2 7.8 9.4 6.04 12 6.04Z" />
-              </svg>
-              {isLoggingInProcess ? "Sedang Memproses..." : "Masuk dengan Google"}
-            </button>
-          ) : (
-            <form onSubmit={(e) => handleCompleteRegistration(e)} className="space-y-4 text-left">
-              <div>
-                <label className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500">Nama akun</label>
-                <input
-                  value={newUsernameInput}
-                  onChange={(e) => setNewUsernameInput(e.target.value)}
-                  placeholder="Contoh: Budi123"
-                  className="w-full rounded-2xl border border-zinc-800 bg-zinc-900/80 px-4 py-3 text-sm text-zinc-100 outline-none focus:border-amber-500 transition-all shadow-inner"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500">Kode redeem (opsional)</label>
-                <input
-                  value={pendingRedeemCodeInput}
-                  onChange={(e) => setPendingRedeemCodeInput(e.target.value)}
-                  placeholder="Masukkan kode redeem"
-                  className="w-full rounded-2xl border border-zinc-800 bg-zinc-900/80 px-4 py-3 text-sm text-zinc-100 outline-none focus:border-emerald-500 transition-all shadow-inner"
-                />
-              </div>
-
-              <button
-                type="submit"
-                disabled={isLoggingInProcess}
-                className="w-full rounded-2xl bg-amber-500 px-4 py-3.5 text-sm font-bold text-zinc-950 transition hover:bg-amber-400 disabled:opacity-70 active:scale-[0.98] shadow-lg shadow-amber-500/10"
-              >
-                {isLoggingInProcess ? "Menyimpan Akun..." : "Selesai dan Masuk"}
-              </button>
-            </form>
-          )}
-        </div>
-        <div className="mt-8 text-center text-zinc-600 text-xs font-mono select-none">
-          © 2026 ExeChat • Created by Hexky
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="flex h-screen w-full overflow-hidden bg-zinc-950 font-sans text-zinc-100 antialiased selection:bg-zinc-700/80">
       {/* Hidden file input for file uploads */}
@@ -2237,12 +2144,6 @@ export default function App() {
                             value={currentSession ? currentSession.model : selectedModelId}
                             onChange={(e) => {
                               const val = e.target.value;
-                              const targetModel = MODEL_OPTIONS.find((m) => m.id === val);
-                              const allowedModelId = MODEL_OPTIONS.find((m) => m.name === "exeai-glm-4.7" || m.id === "zai-glm-4.7")?.id;
-                              if (!isLoggedIn && targetModel && targetModel.id !== allowedModelId) {
-                                setErrorText("Tamu hanya boleh menggunakan model exeai-glm-4.7.");
-                                return;
-                              }
                               if (currentSession) {
                                 setSessions((prev) =>
                                   prev.map((s) => (s.id === currentSessionId ? { ...s, model: val } : s))
@@ -2251,25 +2152,17 @@ export default function App() {
                                 setSelectedModelId(val);
                               }
                             }}
-                            disabled={!isLoggedIn}
                             className={`text-[10px] md:text-[11px] rounded-lg py-1 px-1.5 md:px-2.5 max-w-[100px] sm:max-w-none truncate font-sans cursor-pointer focus:outline-none transition-all ${
                               isDark 
                                 ? "bg-zinc-950 hover:bg-zinc-900 text-zinc-400 border-zinc-900" 
                                 : "bg-white hover:bg-zinc-100 text-zinc-600 border-zinc-200"
-                            } ${!isLoggedIn ? "opacity-60 cursor-not-allowed" : ""}`}
-                            title={!isLoggedIn ? "Login untuk mengakses model AI lainnya" : ""}
+                            }`}
                           >
-                            {!isLoggedIn
-                              ? MODEL_OPTIONS.filter((m) => m.name === "exeai-glm-4.7" || m.id === "zai-glm-4.7").map((m) => (
-                                  <option key={m.id} value={m.id} className={isDark ? "bg-zinc-950 text-zinc-300" : "bg-white text-zinc-700"}>
-                                    {m.name}
-                                  </option>
-                                ))
-                              : MODEL_OPTIONS.map((m) => (
-                                  <option key={m.id} value={m.id} className={isDark ? "bg-zinc-950 text-zinc-300" : "bg-white text-zinc-700"}>
-                                    {m.name}
-                                  </option>
-                                ))}
+                            {MODEL_OPTIONS.map((m) => (
+                              <option key={m.id} value={m.id} className={isDark ? "bg-zinc-950 text-zinc-300" : "bg-white text-zinc-700"}>
+                                {m.name}
+                              </option>
+                            ))}
                           </select>
 
                           <select
@@ -2609,12 +2502,6 @@ export default function App() {
                         value={currentSession ? currentSession.model : selectedModelId}
                         onChange={(e) => {
                           const val = e.target.value;
-                          const targetModel = MODEL_OPTIONS.find((m) => m.id === val);
-                          const allowedModelId = MODEL_OPTIONS.find((m) => m.name === "exeai-glm-4.7" || m.id === "zai-glm-4.7")?.id;
-                          if (!isLoggedIn && targetModel && targetModel.id !== allowedModelId) {
-                            setErrorText("Tamu hanya boleh menggunakan model exeai-glm-4.7.");
-                            return;
-                          }
                           if (currentSession) {
                             setSessions((prev) =>
                               prev.map((s) => (s.id === currentSessionId ? { ...s, model: val } : s))
@@ -2623,21 +2510,13 @@ export default function App() {
                             setSelectedModelId(val);
                           }
                         }}
-                        disabled={!isLoggedIn}
-                        className={`bg-zinc-900 hover:bg-zinc-900/80 text-zinc-300 border border-zinc-850 hover:border-zinc-850 text-[10px] md:text-[11px] rounded-lg py-1 px-2 font-mono max-w-[105px] sm:max-w-none truncate cursor-pointer focus:outline-none transition-all shadow-sm ${!isLoggedIn ? "opacity-60 cursor-not-allowed" : ""}`}
-                        title={!isLoggedIn ? "Login untuk mengakses model AI lainnya" : ""}
+                        className="bg-zinc-900 hover:bg-zinc-900/80 text-zinc-300 border border-zinc-850 hover:border-zinc-850 text-[10px] md:text-[11px] rounded-lg py-1 px-2 font-mono max-w-[105px] sm:max-w-none truncate cursor-pointer focus:outline-none transition-all shadow-sm"
                       >
-                        {!isLoggedIn
-                          ? MODEL_OPTIONS.filter((m) => m.name === "exeai-glm-4.7" || m.id === "zai-glm-4.7").map((m) => (
-                              <option key={m.id} value={m.id} className="bg-zinc-950 text-zinc-300">
-                                {m.name}
-                              </option>
-                            ))
-                          : MODEL_OPTIONS.map((m) => (
-                              <option key={m.id} value={m.id} className="bg-zinc-950 text-zinc-300">
-                                {m.name}
-                              </option>
-                            ))}
+                        {MODEL_OPTIONS.map((m) => (
+                          <option key={m.id} value={m.id} className="bg-zinc-950 text-zinc-300">
+                            {m.name}
+                          </option>
+                        ))}
                       </select>
 
                       {/* Preset/Instruction Selector */}
@@ -2910,10 +2789,7 @@ export default function App() {
                       Pilihan Model Engine AI
                     </h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {(isLoggedIn
-                        ? MODEL_OPTIONS
-                        : MODEL_OPTIONS.filter((m) => m.name === "exeai-glm-4.7" || m.id === "zai-glm-4.7")
-                      ).map((m) => {
+                      {MODEL_OPTIONS.map((m) => {
                         const isSelected = currentSession
                           ? currentSession.model === m.id
                           : selectedModelId === m.id;
@@ -2922,11 +2798,6 @@ export default function App() {
                           <div
                             key={m.id}
                             onClick={() => {
-                              const allowedModelId = MODEL_OPTIONS.find((mm) => mm.name === "exeai-glm-4.7" || mm.id === "zai-glm-4.7")?.id;
-                              if (!isLoggedIn && m.id !== allowedModelId) {
-                                setErrorText("Tamu hanya boleh menggunakan model exeai-glm-4.7.");
-                                return;
-                              }
                               if (currentSession) {
                                 setSessions((prev) =>
                                   prev.map((s) => (s.id === currentSessionId ? { ...s, model: m.id } : s))
