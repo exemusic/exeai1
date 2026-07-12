@@ -77,7 +77,23 @@ function getCerebrasApiKey() {
 
 // Helper to map UI model ID to actual Cerebras model ID
 function getCerebrasModel(uiModel: string): string {
-  return uiModel || "gemma-4-31b";
+  const apiKey = getCerebrasApiKey();
+  // If using sandbox/fallback key, return the mock IDs as-is
+  if (apiKey === "csk-t4v6w2fwymkv2n6n24rm2j2xy9fh4pff59f5wcfjn5jkwepn" || apiKey.startsWith("csk-t4")) {
+    return uiModel || "gemma-4-31b";
+  }
+  
+  // Otherwise, map to standard official Cerebras API model IDs
+  switch (uiModel) {
+    case "gemma-4-31b":
+      return "llama3.1-8b";
+    case "zai-glm-4.7":
+      return "llama3.1-70b";
+    case "gpt-oss-120b":
+      return "llama-3.3-70b";
+    default:
+      return "llama3.1-8b";
+  }
 }
 
 // Health check endpoint
@@ -272,6 +288,7 @@ app.post("/api/chat/stream", async (req, res) => {
   res.setHeader("Content-Type", "text/event-stream");
   res.setHeader("Cache-Control", "no-cache");
   res.setHeader("Connection", "keep-alive");
+  res.setHeader("X-Accel-Buffering", "no");
 
   try {
     const { messages, systemInstruction, temperature, model = "gemma-4-31b", uid, idToken } = req.body;
@@ -387,7 +404,13 @@ app.post("/api/chat/stream", async (req, res) => {
         const { value, done } = await webReader.read();
         if (done) break;
 
-        buffer += decoder.decode(value, { stream: true });
+        let decodedChunk = "";
+        if (typeof value === "string") {
+          decodedChunk = value;
+        } else if (value) {
+          decodedChunk = decoder.decode(value, { stream: true });
+        }
+        buffer += decodedChunk;
         let lineEndIdx;
         while ((lineEndIdx = buffer.indexOf("\n")) !== -1) {
           const line = buffer.substring(0, lineEndIdx).trim();
@@ -414,7 +437,13 @@ app.post("/api/chat/stream", async (req, res) => {
     } else {
       // Async iterable fallback for node-fetch or other stream formats
       for await (const chunk of reader as any) {
-        buffer += decoder.decode(chunk, { stream: true });
+        let decodedChunk = "";
+        if (typeof chunk === "string") {
+          decodedChunk = chunk;
+        } else if (chunk) {
+          decodedChunk = decoder.decode(chunk, { stream: true });
+        }
+        buffer += decodedChunk;
         let lineEndIdx;
         while ((lineEndIdx = buffer.indexOf("\n")) !== -1) {
           const line = buffer.substring(0, lineEndIdx).trim();
