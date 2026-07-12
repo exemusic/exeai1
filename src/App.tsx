@@ -467,12 +467,17 @@ export default function App() {
   // Check API Key and backend health on mount
   useEffect(() => {
     fetch("/api/health")
-      .then((res) => res.json())
+      .then((res) => {
+        if (!res.ok) {
+          throw new Error(`HTTP error! status: ${res.status}`);
+        }
+        return res.json();
+      })
       .then((data) => {
         setHasApiKey(data.hasApiKey);
       })
       .catch((err) => {
-        console.error("Failed to check backend health", err);
+        console.error("Failed to check backend health:", err.message || err);
         setHasApiKey(false);
       });
 
