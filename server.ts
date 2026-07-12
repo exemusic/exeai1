@@ -1,13 +1,17 @@
 import app from "./api/index";
 import express from "express";
 import path from "path";
-import { createServer as createViteServer } from "vite";
 
 async function startServer() {
-  const PORT = 3000;
+  const PORT = process.env.PORT ? Number(process.env.PORT) : 3000;
+
+  // Determine production robustly (bundled or explicit NODE_ENV)
+  const isProduction = process.env.NODE_ENV === "production" || 
+    (typeof __filename !== "undefined" ? !__filename.endsWith(".ts") : !import.meta.url.endsWith(".ts"));
 
   // Vite integration
-  if (process.env.NODE_ENV !== "production") {
+  if (!isProduction) {
+    const { createServer: createViteServer } = await import("vite");
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
