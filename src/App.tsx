@@ -38,7 +38,8 @@ import {
   ThumbsUp,
   ThumbsDown,
   MoreHorizontal,
-  RotateCw
+  RotateCw,
+  User
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { Message, ChatSession, SystemPreset, ModelOption } from "./types";
@@ -239,61 +240,7 @@ export default function App() {
     });
   };
 
-  // Supabase config (Public anon key - safe for client-side)
-  const SUPABASE_URL = "https://rirernnkstrjjquvblge.supabase.co";
-  const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJpcmVybm5rc3RyampxdXZibGdlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM0OTYyMzAsImV4cCI6MjA4OTA3MjIzMH0.M2JDFy327Pny7gchW2pZVt5dzNbyw63gebYe_SkP4Mk";
-  const SUPABASE_BUCKET = "music";
 
-  // Upload blob directly to Supabase Storage using anon key
-  // Returns the public URL of the uploaded file
-  const uploadBlobToSupabase = async (blob: Blob, path: string, mime: string, onProgress?: (p: number) => void): Promise<string> => {
-    return new Promise<string>(async (resolve, reject) => {
-      try {
-        // Upload directly to Supabase using REST API with anon key
-        const uploadUrl = `${SUPABASE_URL}/storage/v1/object/${SUPABASE_BUCKET}/${encodeURIComponent(path)}`;
-
-        const response = await fetch(uploadUrl, {
-          method: "PUT",
-          headers: {
-            "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
-            "Content-Type": mime,
-            "x-upsert": "true",
-          },
-          body: blob,
-        });
-
-        if (!response.ok) {
-          const errorText = await response.text();
-          let errorMsg = `Upload gagal dengan status ${response.status}`;
-          
-          try {
-            const errorJson = JSON.parse(errorText);
-            errorMsg = errorJson.message || errorMsg;
-          } catch (e) {
-            // Response bukan JSON
-          }
-
-          if (response.status === 401) {
-            reject(new Error("Autentikasi Supabase gagal - anon key mungkin invalid"));
-          } else if (response.status === 403) {
-            reject(new Error("Akses ditolak - periksa konfigurasi bucket atau RLS policies"));
-          } else if (response.status === 413) {
-            reject(new Error("File terlalu besar"));
-          } else {
-            reject(new Error(errorMsg));
-          }
-          return;
-        }
-
-        // Build public URL
-        const publicUrl = `${SUPABASE_URL}/storage/v1/object/public/${SUPABASE_BUCKET}/${encodeURIComponent(path)}`;
-        onProgress?.(100);
-        resolve(publicUrl); // Return the public URL
-      } catch (err: any) {
-        reject(new Error(`Upload error: ${err?.message || "unknown"}`));
-      }
-    });
-  };
 
   const handleFileSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
     console.log("[File] Handler triggered, files count:", e.target.files ? e.target.files.length : 0);
@@ -471,9 +418,27 @@ export default function App() {
       ttsSynthRef.current = window.speechSynthesis;
     }
 
+    // If logged in as guest previously, restore session instantly
+    const cachedUserId = localStorage.getItem("exechat_user_id");
+    if (cachedUserId === "guest") {
+      setUserId("guest");
+      setUserEmail("guest@exechat.local");
+      setUserName("Tamu");
+      setUserDisplayName("Tamu");
+      setCredits(99999);
+      setIsLoggedIn(true);
+      setAuthLoading(false);
+    }
+
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       console.debug("onAuthStateChanged fired. user:", user);
       try {
+        // If the cached session is guest, do not override with null on sign out from firebase
+        const currentCachedUserId = localStorage.getItem("exechat_user_id");
+        if (!user && currentCachedUserId === "guest") {
+          return;
+        }
+
         if (user && user.uid && user.email) {
           try {
             // debug: print current id token length to validate auth token is available
@@ -487,13 +452,24 @@ export default function App() {
             if (snapshot.exists()) {
               const data = snapshot.val();
               const displayNameValue = data.username || data.displayName || user.displayName || user.email.split("@")[0] || "";
-              const resolvedCredits = typeof data.credits === "number" ? data.credits : 50;
+              
+              // Load credits and claim time from localStorage, fallback to DB, or default to 500
+              const storedCredits = localStorage.getItem(`exechat_credits_${user.uid}`);
+              const resolvedCredits = storedCredits !== null ? Number(storedCredits) : (typeof data.credits === "number" ? data.credits : 500);
+              localStorage.setItem(`exechat_credits_${user.uid}`, String(resolvedCredits));
+
+              const storedLastClaim = localStorage.getItem(`exechat_last_claim_at_${user.uid}`);
+              const resolvedLastClaim = storedLastClaim !== null ? Number(storedLastClaim) : (typeof data.lastClaimAt === "number" ? data.lastClaimAt : null);
+              if (resolvedLastClaim !== null) {
+                localStorage.setItem(`exechat_last_claim_at_${user.uid}`, String(resolvedLastClaim));
+              }
+
               setUserId(user.uid);
               setUserEmail(user.email);
               setUserDisplayName(displayNameValue);
               setUserName(displayNameValue);
               setCredits(resolvedCredits);
-              setLastClaimAt(typeof data.lastClaimAt === "number" ? data.lastClaimAt : null);
+              setLastClaimAt(resolvedLastClaim);
               setIsLoggedIn(true);
               setShowAuthOverlay(false);
               setAuthStep("choose");
@@ -633,6 +609,46 @@ export default function App() {
     handleGoogleLogin();
   };
 
+  // Guest Login handler
+  const handleGuestLogin = () => {
+    setIsLoggedIn(true);
+    setUserId("guest");
+    setUserEmail("guest@exechat.local");
+    setUserName("Tamu");
+    setUserDisplayName("Tamu");
+    setCredits(99999);
+    localStorage.setItem("exechat_logged_in", "true");
+    localStorage.setItem("exechat_email", "guest@exechat.local");
+    localStorage.setItem("exechat_user_id", "guest");
+    localStorage.setItem("exechat_username", "Tamu");
+    localStorage.setItem("exechat_display_name", "Tamu");
+    localStorage.setItem("exechat_credits_guest", "99999");
+    setShowAuthOverlay(false);
+    setErrorText(null);
+  };
+
+  // Logout handler
+  const handleLogout = async () => {
+    try {
+      await auth.signOut();
+    } catch (e) {
+      console.warn("Firebase sign out error:", e);
+    }
+    localStorage.removeItem("exechat_logged_in");
+    localStorage.removeItem("exechat_email");
+    localStorage.removeItem("exechat_user_id");
+    localStorage.removeItem("exechat_username");
+    localStorage.removeItem("exechat_display_name");
+    setIsLoggedIn(false);
+    setUserId(null);
+    setUserEmail(null);
+    setUserName("");
+    setUserDisplayName("");
+    setCredits(0);
+    setLastClaimAt(null);
+    setShowAuthOverlay(true);
+  };
+
   // Claim Daily Credits
   const handleClaimDailyCredits = async () => {
     if (!isLoggedIn || !userId) return;
@@ -643,43 +659,31 @@ export default function App() {
     }
 
     try {
-      const idToken = await auth.currentUser?.getIdToken();
-      if (!idToken) {
-        throw new Error("Sesi tidak ditemukan. Silakan masuk kembali.");
-      }
-
-      const res = await fetch("/api/user/claim-daily", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ uid: userId, idToken }),
-      });
-
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || "Gagal mengklaim kredit harian.");
-      }
-
-      setCredits(data.credits);
-      setLastClaimAt(data.lastClaimAt);
+      const newCredits = credits + 50;
+      setCredits(newCredits);
+      setLastClaimAt(now);
+      localStorage.setItem(`exechat_credits_${userId}`, String(newCredits));
+      localStorage.setItem(`exechat_last_claim_at_${userId}`, String(now));
       setErrorText(null);
     } catch (err: any) {
-      console.error("Gagal mengklaim kredit harian via API:", err);
+      console.error("Gagal mengklaim kredit harian:", err);
       setErrorText(err.message || "Terjadi kesalahan saat mengklaim kredit.");
     }
   };
 
   const saveUserProfile = async (uid: string, email: string, displayName: string | null, requestedUsername?: string, creditsValue?: number) => {
     const userRef = ref(db, `users/${uid}`);
-    const snapshot = await get(userRef);
+    let snapshot;
+    try {
+      snapshot = await get(userRef);
+    } catch (e) {
+      console.warn("Failed to get profile, assuming new user", e);
+    }
     const fallbackName = displayName || email.split("@")[0] || "User";
 
-    if (snapshot.exists()) {
+    if (snapshot && snapshot.exists()) {
       const existing = snapshot.val();
       const usernameValue = requestedUsername || existing.username || fallbackName;
-      const currentCredits =
-        typeof existing.credits === "number"
-          ? existing.credits
-          : 50;
       const profileUpdate: Record<string, any> = {
         email,
         displayName: usernameValue,
@@ -687,11 +691,15 @@ export default function App() {
         updatedAt: Date.now(),
       };
       await update(userRef, profileUpdate);
+
+      // Load credits from localStorage
+      const storedCredits = localStorage.getItem(`exechat_credits_${uid}`);
+      const currentCredits = storedCredits !== null ? Number(storedCredits) : 500;
       return {
         username: usernameValue,
         displayName: usernameValue,
         credits: currentCredits,
-        lastClaimAt: existing.lastClaimAt || null,
+        lastClaimAt: localStorage.getItem(`exechat_last_claim_at_${uid}`) ? Number(localStorage.getItem(`exechat_last_claim_at_${uid}`)) : null,
       };
     }
 
@@ -700,15 +708,16 @@ export default function App() {
       email,
       displayName: usernameValue,
       username: usernameValue,
-      credits: creditsValue !== undefined ? creditsValue : 50,
-      lastClaimAt: null,
       updatedAt: Date.now(),
     };
     await update(userRef, profileUpdate);
+
+    // Initialize credits to 500 in localStorage
+    localStorage.setItem(`exechat_credits_${uid}`, "500");
     return {
       username: usernameValue,
       displayName: fallbackName,
-      credits: profileUpdate.credits,
+      credits: 500,
       lastClaimAt: null,
     };
   };
@@ -728,6 +737,16 @@ export default function App() {
     setNewUsernameInput("");
     setPendingRedeemCodeInput("");
     setErrorText(null);
+
+    localStorage.setItem("exechat_logged_in", "true");
+    localStorage.setItem("exechat_email", email);
+    localStorage.setItem("exechat_user_id", uid);
+    localStorage.setItem("exechat_username", username);
+    localStorage.setItem("exechat_display_name", displayName);
+    localStorage.setItem(`exechat_credits_${uid}`, String(creditsValue));
+    if (lastClaimAtValue !== null) {
+      localStorage.setItem(`exechat_last_claim_at_${uid}`, String(lastClaimAtValue));
+    }
   };
 
   const handleGoogleLogin = async () => {
@@ -751,14 +770,15 @@ export default function App() {
       if (snapshot.exists()) {
         const data = snapshot.val();
         const resolvedUsername = data.username || data.displayName || user.displayName || user.email.split("@")[0] || "User";
-        const resolvedCredits = typeof data.credits === "number" ? data.credits : 50;
+        const storedCredits = localStorage.getItem(`exechat_credits_${user.uid}`);
+        const resolvedCredits = storedCredits !== null ? Number(storedCredits) : 500;
         finalizeUserSession(
           user.uid,
           user.email,
           resolvedUsername,
           resolvedUsername,
           resolvedCredits,
-          typeof data.lastClaimAt === "number" ? data.lastClaimAt : null,
+          localStorage.getItem(`exechat_last_claim_at_${user.uid}`) ? Number(localStorage.getItem(`exechat_last_claim_at_${user.uid}`)) : null,
         );
       } else {
         setPendingAuthUser({
@@ -793,28 +813,15 @@ export default function App() {
 
     setIsLoggingInProcess(true);
     try {
-      const idToken = await auth.currentUser?.getIdToken();
-      if (!idToken) {
-        throw new Error("Sesi Google tidak ditemukan. Silakan login kembali.");
-      }
-
-      const res = await fetch("/api/user/register", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          uid: pendingAuthUser.uid,
-          idToken,
-          email: pendingAuthUser.email,
-          username: trimmedUsername,
-        }),
+      await update(ref(db, `users/${pendingAuthUser.uid}`), {
+        email: pendingAuthUser.email.trim().toLowerCase(),
+        displayName: trimmedUsername,
+        username: trimmedUsername,
+        updatedAt: Date.now(),
       });
 
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || "Gagal membuat akun.");
-      }
-
-      finalizeUserSession(pendingAuthUser.uid, pendingAuthUser.email, trimmedUsername, trimmedUsername, 50, null);
+      localStorage.setItem(`exechat_credits_${pendingAuthUser.uid}`, "500");
+      finalizeUserSession(pendingAuthUser.uid, pendingAuthUser.email, trimmedUsername, trimmedUsername, 500, null);
 
       if (pendingRedeemCodeInput.trim()) {
         await handleRedeemCode(pendingAuthUser.uid, pendingRedeemCodeInput.trim());
@@ -826,6 +833,12 @@ export default function App() {
     } finally {
       setIsLoggingInProcess(false);
     }
+  };
+
+  const REDEEM_CODES: Record<string, number> = {
+    "EXEAI50": 50,
+    "HEHEXKY": 100,
+    "FREEKREDIT": 500,
   };
 
   const handleRedeemCode = async (targetUserId?: string, customCode?: string) => {
@@ -841,35 +854,30 @@ export default function App() {
       return;
     }
 
-    try {
-      const idToken = await auth.currentUser?.getIdToken();
-      if (!idToken) {
-        throw new Error("Sesi Google tidak ditemukan. Silakan login kembali.");
-      }
+    // Check if already redeemed
+    const redeemedCodesKey = `exechat_redeemed_${uid}`;
+    const redeemedListStr = localStorage.getItem(redeemedCodesKey) || "[]";
+    const redeemedList = JSON.parse(redeemedListStr) as string[];
+    
+    if (redeemedList.includes(redemptionCode)) {
+      setRedeemFeedback("Kode ini sudah pernah Anda tukarkan sebelumnya.");
+      return;
+    }
 
-      const res = await fetch("/api/user/redeem", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          uid,
-          idToken,
-          code: redemptionCode,
-        }),
-      });
+    const reward = REDEEM_CODES[redemptionCode];
+    if (reward) {
+      const newCredits = credits + reward;
+      setCredits(newCredits);
+      localStorage.setItem(`exechat_credits_${uid}`, String(newCredits));
+      
+      redeemedList.push(redemptionCode);
+      localStorage.setItem(redeemedCodesKey, JSON.stringify(redeemedList));
 
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || "Gagal menukarkan kode redeem.");
-      }
-
-      setCredits(data.credits);
-      setRedeemFeedback(`Berhasil! Anda menerima ${data.reward} kredit.`);
+      setRedeemFeedback(`Berhasil! Anda menerima ${reward} kredit.`);
       setRedeemCodeInput("");
       setPendingRedeemCodeInput("");
-    } catch (err: any) {
-      console.error("Gagal menukarkan kode redeem via API:", err);
-      const errorMsg = err?.message || "Terjadi kesalahan saat menukarkan kode. Coba lagi nanti.";
-      setRedeemFeedback(errorMsg);
+    } else {
+      setRedeemFeedback("Kode redeem tidak valid atau kedaluwarsa.");
     }
   };
 
@@ -1030,6 +1038,9 @@ export default function App() {
     // Deduct credits locally (optimistic update)
     const newCredits = Math.max(0, credits - cost);
     setCredits(newCredits);
+    if (userId) {
+      localStorage.setItem(`exechat_credits_${userId}`, String(newCredits));
+    }
 
     // Capture any selected file attachment before resetting the state
     const attachmentObj = selectedFile ? {
@@ -1274,7 +1285,7 @@ export default function App() {
                   ...s,
                   messages: s.messages.map((m) =>
                     m.id === assistantMsgId && m.content === ""
-                      ? { ...m, content: "Terjadi kesalahan koneksi atau konfigurasi API Key." }
+                      ? { ...m, content: "Terjadi kesalahan koneksi atau konfigurasi API Key. Silakan muat ulang (refresh) halaman jika masalah berlanjut." }
                       : m
                   ),
                 };
@@ -1287,19 +1298,6 @@ export default function App() {
     } finally {
       setIsGenerating(false);
       abortControllerRef.current = null;
-      if (isLoggedIn && userId) {
-        try {
-          const snapshot = await get(ref(db, `users/${userId}`));
-          if (snapshot.exists()) {
-            const data = snapshot.val();
-            if (typeof data.credits === "number") {
-              setCredits(data.credits);
-            }
-          }
-        } catch (syncErr) {
-          console.error("Gagal sinkronisasi kredit setelah chat:", syncErr);
-        }
-      }
     }
   };
 
@@ -1787,19 +1785,30 @@ export default function App() {
           )}
 
           {authStep === "choose" ? (
-            <button
-              onClick={handleGoogleLoginClick}
-              disabled={isLoggingInProcess}
-              className="mt-6 flex w-full items-center justify-center gap-3 rounded-2xl bg-zinc-100 px-4 py-3.5 text-sm font-bold text-zinc-950 hover:bg-zinc-200 active:scale-[0.98] transition-all disabled:opacity-70 cursor-pointer"
-            >
-              <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden="true">
-                <path fill="#4285F4" d="M21.6 12.23c0-.79-.07-1.54-.2-2.27H12v4.3h5.38a4.6 4.6 0 0 1-2 3.02v2.5h3.24c1.9-1.75 2.98-4.33 2.98-7.55Z" />
-                <path fill="#34A853" d="M12 22c2.7 0 4.96-.9 6.62-2.43l-3.24-2.5c-.9.6-2.04.96-3.38.96-2.6 0-4.8-1.76-5.59-4.12H3.07v2.58A10 10 0 0 0 12 22Z" />
-                <path fill="#FBBC05" d="M6.41 13.91A6.02 6.02 0 0 1 6.41 10.1V7.52H3.07a10 10 0 0 0 0 12.78l3.34-2.59Z" />
-                <path fill="#EA4335" d="M12 6.04c1.47 0 2.79.5 3.83 1.48l2.87-2.87A9.98 9.98 0 0 0 3.07 7.52l3.34 2.59C7.2 7.8 9.4 6.04 12 6.04Z" />
-              </svg>
-              {isLoggingInProcess ? "Memproses..." : "Lanjutkan dengan Google"}
-            </button>
+            <div className="mt-6 space-y-3">
+              <button
+                onClick={handleGoogleLoginClick}
+                disabled={isLoggingInProcess}
+                className="flex w-full items-center justify-center gap-3 rounded-2xl bg-zinc-100 px-4 py-3.5 text-sm font-bold text-zinc-950 hover:bg-zinc-200 active:scale-[0.98] transition-all disabled:opacity-70 cursor-pointer"
+              >
+                <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden="true">
+                  <path fill="#4285F4" d="M21.6 12.23c0-.79-.07-1.54-.2-2.27H12v4.3h5.38a4.6 4.6 0 0 1-2 3.02v2.5h3.24c1.9-1.75 2.98-4.33 2.98-7.55Z" />
+                  <path fill="#34A853" d="M12 22c2.7 0 4.96-.9 6.62-2.43l-3.24-2.5c-.9.6-2.04.96-3.38.96-2.6 0-4.8-1.76-5.59-4.12H3.07v2.58A10 10 0 0 0 12 22Z" />
+                  <path fill="#FBBC05" d="M6.41 13.91A6.02 6.02 0 0 1 6.41 10.1V7.52H3.07a10 10 0 0 0 0 12.78l3.34-2.59Z" />
+                  <path fill="#EA4335" d="M12 6.04c1.47 0 2.79.5 3.83 1.48l2.87-2.87A9.98 9.98 0 0 0 3.07 7.52l3.34 2.59C7.2 7.8 9.4 6.04 12 6.04Z" />
+                </svg>
+                {isLoggingInProcess ? "Memproses..." : "Lanjutkan dengan Google"}
+              </button>
+
+              <button
+                onClick={handleGuestLogin}
+                disabled={isLoggingInProcess}
+                className="flex w-full items-center justify-center gap-3 rounded-2xl border border-zinc-850 bg-zinc-900/60 px-4 py-3.5 text-sm font-bold text-zinc-100 hover:bg-zinc-900 active:scale-[0.98] transition-all cursor-pointer"
+              >
+                <User className="h-5 w-5 text-zinc-400" />
+                Gunakan sebagai Tamu (Guest Mode)
+              </button>
+            </div>
           ) : (
             <form onSubmit={(e) => handleCompleteRegistration(e)} className="mt-6 space-y-4">
               <div>
@@ -1893,19 +1902,30 @@ export default function App() {
               )}
 
               {authStep === "choose" ? (
-                <button
-                  onClick={handleGoogleLoginClick}
-                  disabled={isLoggingInProcess}
-                  className="mt-6 flex w-full items-center justify-center gap-3 rounded-2xl bg-zinc-100 px-4 py-3 text-sm font-semibold text-zinc-950 transition hover:bg-zinc-200 disabled:opacity-70"
-                >
-                  <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden="true">
-                    <path fill="#4285F4" d="M21.6 12.23c0-.79-.07-1.54-.2-2.27H12v4.3h5.38a4.6 4.6 0 0 1-2 3.02v2.5h3.24c1.9-1.75 2.98-4.33 2.98-7.55Z" />
-                    <path fill="#34A853" d="M12 22c2.7 0 4.96-.9 6.62-2.43l-3.24-2.5c-.9.6-2.04.96-3.38.96-2.6 0-4.8-1.76-5.59-4.12H3.07v2.58A10 10 0 0 0 12 22Z" />
-                    <path fill="#FBBC05" d="M6.41 13.91A6.02 6.02 0 0 1 6.41 10.1V7.52H3.07a10 10 0 0 0 0 12.78l3.34-2.59Z" />
-                    <path fill="#EA4335" d="M12 6.04c1.47 0 2.79.5 3.83 1.48l2.87-2.87A9.98 9.98 0 0 0 3.07 7.52l3.34 2.59C7.2 7.8 9.4 6.04 12 6.04Z" />
-                  </svg>
-                  {isLoggingInProcess ? "Memproses..." : "Lanjutkan dengan Google"}
-                </button>
+                <div className="space-y-3">
+                  <button
+                    onClick={handleGoogleLoginClick}
+                    disabled={isLoggingInProcess}
+                    className="mt-6 flex w-full items-center justify-center gap-3 rounded-2xl bg-zinc-100 px-4 py-3 text-sm font-semibold text-zinc-950 transition hover:bg-zinc-200 disabled:opacity-70 cursor-pointer"
+                  >
+                    <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden="true">
+                      <path fill="#4285F4" d="M21.6 12.23c0-.79-.07-1.54-.2-2.27H12v4.3h5.38a4.6 4.6 0 0 1-2 3.02v2.5h3.24c1.9-1.75 2.98-4.33 2.98-7.55Z" />
+                      <path fill="#34A853" d="M12 22c2.7 0 4.96-.9 6.62-2.43l-3.24-2.5c-.9.6-2.04.96-3.38.96-2.6 0-4.8-1.76-5.59-4.12H3.07v2.58A10 10 0 0 0 12 22Z" />
+                      <path fill="#FBBC05" d="M6.41 13.91A6.02 6.02 0 0 1 6.41 10.1V7.52H3.07a10 10 0 0 0 0 12.78l3.34-2.59Z" />
+                      <path fill="#EA4335" d="M12 6.04c1.47 0 2.79.5 3.83 1.48l2.87-2.87A9.98 9.98 0 0 0 3.07 7.52l3.34 2.59C7.2 7.8 9.4 6.04 12 6.04Z" />
+                    </svg>
+                    {isLoggingInProcess ? "Memproses..." : "Lanjutkan dengan Google"}
+                  </button>
+
+                  <button
+                    onClick={handleGuestLogin}
+                    disabled={isLoggingInProcess}
+                    className="flex w-full items-center justify-center gap-3 rounded-2xl border border-zinc-800 bg-zinc-900/40 px-4 py-3 text-sm font-semibold text-zinc-100 transition hover:bg-zinc-900 cursor-pointer"
+                  >
+                    <User className="h-5 w-5 text-zinc-400" />
+                    Gunakan sebagai Tamu (Guest Mode)
+                  </button>
+                </div>
               ) : (
                 <form onSubmit={(e) => handleCompleteRegistration(e)} className="mt-6 space-y-4">
                   <div>
@@ -2797,12 +2817,20 @@ export default function App() {
                               <div className="text-[11px] text-zinc-400">Username</div>
                               <div className="text-[11px] text-zinc-200 text-right">{userName || "Belum diatur"}</div>
                             </div>
-                            <button
-                              onClick={handleClaimDailyCredits}
-                              className="w-full text-xs bg-amber-500 hover:bg-amber-600 text-zinc-950 font-semibold py-1.5 px-4 rounded-lg transition-all"
-                            >
-                              Klaim 50 Kredit Harian
-                            </button>
+                            <div className="flex flex-col gap-2">
+                              <button
+                                onClick={handleClaimDailyCredits}
+                                className="w-full text-xs bg-amber-500 hover:bg-amber-600 text-zinc-950 font-semibold py-1.5 px-4 rounded-lg transition-all cursor-pointer"
+                              >
+                                Klaim 50 Kredit Harian
+                              </button>
+                              <button
+                                onClick={handleLogout}
+                                className="w-full text-xs bg-red-650/25 hover:bg-red-650/40 text-red-200 border border-red-900/30 font-semibold py-1.5 px-4 rounded-lg transition-all cursor-pointer"
+                              >
+                                Keluar (Logout)
+                              </button>
+                            </div>
                           </div>
                         ) : (
                           <button
@@ -3097,3 +3125,4 @@ export default function App() {
     </div>
   );
 }
+
