@@ -1,6 +1,8 @@
 import express from "express";
 import dotenv from "dotenv";
-import admin from "firebase-admin";
+import { getApps, initializeApp, cert } from "firebase-admin/app";
+import { getAuth } from "firebase-admin/auth";
+import { getDatabase } from "firebase-admin/database";
 
 // Load environment variables
 dotenv.config();
@@ -19,8 +21,9 @@ let adminAuth: any = null;
 let adminDb: any = null;
 
 try {
-  if (admin.apps.length > 0) {
-    adminApp = admin.apps[0];
+  const currentApps = getApps();
+  if (currentApps.length > 0) {
+    adminApp = currentApps[0];
   } else {
     const appOptions: any = { databaseURL };
     let hasCredentials = false;
@@ -28,7 +31,7 @@ try {
     if (process.env.FIREBASE_SERVICE_ACCOUNT_KEY) {
       try {
         const sa = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY);
-        appOptions.credential = admin.credential.cert(sa);
+        appOptions.credential = cert(sa);
         hasCredentials = true;
         console.log("Firebase Admin initialized via FIREBASE_SERVICE_ACCOUNT_KEY");
       } catch (e: any) {
@@ -36,7 +39,7 @@ try {
       }
     } else if (process.env.FIREBASE_PRIVATE_KEY && process.env.FIREBASE_CLIENT_EMAIL) {
       const privateKey = process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n');
-      appOptions.credential = admin.credential.cert({
+      appOptions.credential = cert({
         projectId,
         clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
         privateKey,
@@ -48,15 +51,15 @@ try {
     }
     
     if (hasCredentials) {
-      adminApp = admin.initializeApp(appOptions);
+      adminApp = initializeApp(appOptions);
     } else {
       console.warn("Firebase Admin NOT initialized because no credentials were provided.");
     }
   }
   
   if (adminApp) {
-    adminAuth = admin.auth(adminApp);
-    adminDb = admin.database(adminApp);
+    adminAuth = getAuth(adminApp);
+    adminDb = getDatabase(adminApp);
   }
 } catch (error: any) {
   console.error("CRITICAL: Gagal menginisialisasi Firebase Admin SDK:", error);
