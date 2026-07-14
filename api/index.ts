@@ -205,9 +205,50 @@ app.post("/api/chat/stream", async (req, res) => {
     res.write("data: [DONE]\n\n");
   } catch (error: any) {
     console.warn("Cerebras Proxy Error:", error && error.message ? error.message : error);
-    res.write(`data: ${JSON.stringify({ error: "Server mengalami masalah internal. Silakan coba lagi nanti." })}\n\n`);
+    res.write(`data: ${JSON.stringify({ error: "Server sedang sibuk terlalu banyak request." })}\n\n`);
   } finally {
     res.end();
+  }
+});
+
+
+// Image generation endpoint
+app.post("/api/image/generate", async (req, res) => {
+  try {
+    const { prompt, initImage, model = "bytedance:seedream@5.0-pro" } = req.body;
+    const apiKey = process.env.TOGETHER_API_KEY || "1zgCaUUoYZTTaxngLoAZswtUEqMIshMe";
+
+    const body: any = {
+      model,
+      prompt,
+      n: 1,
+      steps: 20
+    };
+
+    if (initImage) {
+      body.image_base64 = initImage;
+    }
+
+    const response = await fetch("https://api.together.xyz/v1/images/generations", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${apiKey}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(body)
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.warn("Together API Error:", response.status, errorText);
+      return res.status(response.status).json({ error: "Server sedang sibuk tidak bisa generate image." });
+    }
+
+    const data = await response.json();
+    res.json(data);
+  } catch (error) {
+    console.error("Together Error:", error);
+    res.status(500).json({ error: "Server sedang sibuk tidak bisa generate image." });
   }
 });
 
