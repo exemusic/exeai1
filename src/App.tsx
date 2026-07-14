@@ -1039,7 +1039,9 @@ export default function App() {
 
     try {
       
-      if (apiModel === "bytedance:seedream@5.0-pro") {
+      const isRunwareModel = apiModel === "bytedance:seedream@5.0-pro";
+
+      if (isRunwareModel) {
         const imgResponse = await fetch("/api/image/generate", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -1052,21 +1054,36 @@ export default function App() {
         });
 
         if (!imgResponse.ok) {
-          throw new Error("Server sedang sibuk tidak bisa generate image.");
+          const errData = await imgResponse.json().catch(() => ({}));
+          throw new Error(errData.error || "Server sedang sibuk tidak bisa memproses request.");
         }
         
         const imgData = await imgResponse.json();
-        const imageUrl = imgData?.data?.[0]?.url || imgData?.data?.[0]?.b64_json || "";
+        const item = imgData?.data?.[0];
+        const imageUrl = item?.url || "";
+        const itemType = item?.type || "image";
         
-        if (imageUrl) {
-          const finalImageOutput = `Berikut gambar yang dihasilkan:\n\n![Generated Image](${imageUrl})`;
+        if (imageUrl || item?.text) {
+          let finalOutput = "";
+          if (itemType === "video") {
+            finalOutput = `Berikut video yang dihasilkan:\n\n<video src="${imageUrl}" controls className="max-w-full rounded-xl border border-zinc-800 shadow-lg" style="max-height: 400px;" />`;
+          } else if (itemType === "audio") {
+            finalOutput = `Berikut audio yang dihasilkan:\n\n<audio src="${imageUrl}" controls className="w-full mt-2" />`;
+          } else if (itemType === "3d") {
+            finalOutput = `Berikut model 3D yang dihasilkan:\n\n📦 **[Download 3D Mesh (GLTF/OBJ)](${imageUrl})**`;
+          } else if (itemType === "text") {
+            finalOutput = item?.text || imageUrl;
+          } else {
+            finalOutput = `Berikut gambar yang dihasilkan:\n\n![Generated Image](${imageUrl})`;
+          }
+
           setSessions((prev) =>
             prev.map((s) => {
               if (s.id === targetSessionId) {
                 return {
                   ...s,
                   messages: s.messages.map((m) =>
-                    m.id === assistantMsgId ? { ...m, content: finalImageOutput } : m
+                    m.id === assistantMsgId ? { ...m, content: finalOutput } : m
                   ),
                 };
               }
@@ -1074,7 +1091,7 @@ export default function App() {
             })
           );
         } else {
-          throw new Error("Gagal mendapatkan URL gambar dari AI.");
+          throw new Error("Gagal mendapatkan hasil dari AI.");
         }
         
         setIsGenerating(false);
@@ -1321,7 +1338,9 @@ export default function App() {
 
     try {
       
-      if (apiModel === "bytedance:seedream@5.0-pro") {
+      const isRunwareModel = apiModel === "bytedance:seedream@5.0-pro";
+
+      if (isRunwareModel) {
         const lastUserMsg = priorMessages.filter(m => m.role === 'user').pop();
         const textToGen = lastUserMsg ? lastUserMsg.content : "";
         
@@ -1337,21 +1356,36 @@ export default function App() {
         });
 
         if (!imgResponse.ok) {
-          throw new Error("Server sedang sibuk tidak bisa generate image.");
+          const errData = await imgResponse.json().catch(() => ({}));
+          throw new Error(errData.error || "Server sedang sibuk tidak bisa memproses request.");
         }
         
         const imgData = await imgResponse.json();
-        const imageUrl = imgData?.data?.[0]?.url || imgData?.data?.[0]?.b64_json || "";
+        const item = imgData?.data?.[0];
+        const imageUrl = item?.url || "";
+        const itemType = item?.type || "image";
         
-        if (imageUrl) {
-          const finalImageOutput = `Berikut gambar yang dihasilkan:\n\n![Generated Image](${imageUrl})`;
+        if (imageUrl || item?.text) {
+          let finalOutput = "";
+          if (itemType === "video") {
+            finalOutput = `Berikut video yang dihasilkan:\n\n<video src="${imageUrl}" controls className="max-w-full rounded-xl border border-zinc-800 shadow-lg" style="max-height: 400px;" />`;
+          } else if (itemType === "audio") {
+            finalOutput = `Berikut audio yang dihasilkan:\n\n<audio src="${imageUrl}" controls className="w-full mt-2" />`;
+          } else if (itemType === "3d") {
+            finalOutput = `Berikut model 3D yang dihasilkan:\n\n📦 **[Download 3D Mesh (GLTF/OBJ)](${imageUrl})**`;
+          } else if (itemType === "text") {
+            finalOutput = item?.text || imageUrl;
+          } else {
+            finalOutput = `Berikut gambar yang dihasilkan:\n\n![Generated Image](${imageUrl})`;
+          }
+
           setSessions((prev) =>
             prev.map((s) => {
               if (s.id === currentSessionId) {
                 return {
                   ...s,
                   messages: s.messages.map((m) =>
-                    m.id === assistantMsgId ? { ...m, content: finalImageOutput } : m
+                    m.id === assistantMsgId ? { ...m, content: finalOutput } : m
                   ),
                 };
               }
@@ -1359,7 +1393,7 @@ export default function App() {
             })
           );
         } else {
-          throw new Error("Gagal mendapatkan URL gambar dari AI.");
+          throw new Error("Gagal mendapatkan hasil dari AI.");
         }
         
         setIsGenerating(false);
