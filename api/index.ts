@@ -242,8 +242,8 @@ app.post("/api/image/generate", async (req, res) => {
     const taskType = "imageInference";
     
     // Map the user-facing model ID "bytedance:seedream@5.0-pro" to a valid Runware model ID.
-    // Runware does not host bytedance:seedream@5.0-pro, so we map it to xai:grok-imagine@image-quality.
-    const runwareModel = "xai:grok-imagine@image-quality";
+    // Runware does not host bytedance:seedream@5.0-pro, so we map it to runware:100 (Stable Diffusion v1.5).
+    const runwareModel = "runware:100";
 
     // Build the request task according to taskType specifications
     const task: any = {
@@ -264,12 +264,10 @@ app.post("/api/image/generate", async (req, res) => {
     const response = await fetch("https://api.runware.ai/v1", {
       method: "POST",
       headers: {
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${runwareApiKey}`
       },
-      body: JSON.stringify({
-        apiKey: runwareApiKey,
-        tasks: [task]
-      })
+      body: JSON.stringify([task])
     });
 
     if (!response.ok) {
