@@ -13,17 +13,11 @@ export const MODEL_OPTIONS: ModelOption[] = [
     badge: "Production",
     description: "Model exeai-oss-120b super besar 120B untuk penalaran tingkat tinggi dan akurasi tinggi.",
   },
-    {
+  {
     id: "zai-glm-4.7",
     name: "exeai-glm-4.7",
     badge: "Preview",
     description: "Model exeai-glm-4.7 berukuran efisien dengan batas konteks 8.192 token untuk respons secepat kilat.",
-  },
-  {
-    id: "bytedance:seedream@5.0-pro",
-    name: "Seedream 5.0 Pro (Image)",
-    badge: "Vision",
-    description: "Model generasi gambar dari teks atau gambar. Khusus untuk text > image atau image > image.",
   }
 ];
 
