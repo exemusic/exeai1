@@ -47,6 +47,7 @@ import {
 import { motion, AnimatePresence } from "motion/react";
 import { Message, ChatSession, SystemPreset, ModelOption } from "./types";
 import { MarkdownRenderer } from "./components/MarkdownRenderer";
+import { CodeEditorMode } from "./components/CodeEditorMode";
 import { GoogleOAuthProvider, GoogleLogin } from "@react-oauth/google";
 import { jwtDecode } from "jwt-decode";
 import { MODEL_OPTIONS, SYSTEM_PRESETS, SUGGESTED_PROMPTS } from "./presets";
@@ -215,6 +216,7 @@ export default function App() {
   
   // Registration Popup states for new user custom names
   const [showRegisterModal, setShowRegisterModal] = useState<boolean>(false);
+  const [showCodeEditor, setShowCodeEditor] = useState(false);
   const [registerModalName, setRegisterModalName] = useState<string>("");
   const [googleDefaultName, setGoogleDefaultName] = useState<string>("");
   
@@ -1019,6 +1021,50 @@ export default function App() {
     abortControllerRef.current = controller;
 
     try {
+      
+      if (apiModel === "bytedance:seedream@5.0-pro") {
+        const imgResponse = await fetch("/api/image/generate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            prompt: finalInstruction + "\nUser prompt: " + text,
+            initImage: attachmentObj?.base64 || null,
+            model: apiModel
+          }),
+          signal: controller.signal,
+        });
+
+        if (!imgResponse.ok) {
+          throw new Error("Server sedang sibuk tidak bisa generate image.");
+        }
+        
+        const imgData = await imgResponse.json();
+        const imageUrl = imgData?.data?.[0]?.url || imgData?.data?.[0]?.b64_json || "";
+        
+        if (imageUrl) {
+          const finalImageOutput = `Berikut gambar yang dihasilkan:\n\n![Generated Image](${imageUrl})`;
+          setSessions((prev) =>
+            prev.map((s) => {
+              if (s.id === targetSessionId) {
+                return {
+                  ...s,
+                  messages: s.messages.map((m) =>
+                    m.id === assistantMsgId ? { ...m, content: finalImageOutput } : m
+                  ),
+                };
+              }
+              return s;
+            })
+          );
+        } else {
+          throw new Error("Gagal mendapatkan URL gambar dari AI.");
+        }
+        
+        setIsGenerating(false);
+        abortControllerRef.current = null;
+        return;
+      }
+
       const response = await fetch("/api/chat/stream", {
         method: "POST",
         headers: {
@@ -1257,7 +1303,53 @@ export default function App() {
     abortControllerRef.current = controller;
 
     try {
-      const response = await fetch("/api/chat/stream", {
+      
+      if (apiModel === "bytedance:seedream@5.0-pro") {
+        const lastUserMsg = priorMessages.filter(m => m.role === 'user').pop();
+        const textToGen = lastUserMsg ? lastUserMsg.content : "";
+        
+        const imgResponse = await fetch("/api/image/generate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            prompt: finalInstruction + "\nUser prompt: " + textToGen,
+            initImage: lastUserMsg?.attachment?.base64 || null,
+            model: apiModel
+          }),
+          signal: controller.signal,
+        });
+
+        if (!imgResponse.ok) {
+          throw new Error("Server sedang sibuk tidak bisa generate image.");
+        }
+        
+        const imgData = await imgResponse.json();
+        const imageUrl = imgData?.data?.[0]?.url || imgData?.data?.[0]?.b64_json || "";
+        
+        if (imageUrl) {
+          const finalImageOutput = `Berikut gambar yang dihasilkan:\n\n![Generated Image](${imageUrl})`;
+          setSessions((prev) =>
+            prev.map((s) => {
+              if (s.id === currentSessionId) {
+                return {
+                  ...s,
+                  messages: s.messages.map((m) =>
+                    m.id === assistantMsgId ? { ...m, content: finalImageOutput } : m
+                  ),
+                };
+              }
+              return s;
+            })
+          );
+        } else {
+          throw new Error("Gagal mendapatkan URL gambar dari AI.");
+        }
+        
+        setIsGenerating(false);
+        abortControllerRef.current = null;
+        return;
+      }
+const response = await fetch("/api/chat/stream", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -1712,7 +1804,9 @@ export default function App() {
   }
 
   return (
-    <div className="flex h-screen w-full overflow-hidden bg-zinc-950 font-sans text-zinc-100 antialiased selection:bg-zinc-700/80">
+    <>
+      {showCodeEditor && <CodeEditorMode onClose={() => setShowCodeEditor(false)} isDark={systemIsDark} />}
+      <div className="flex h-screen w-full overflow-hidden bg-zinc-950 font-sans text-zinc-100 antialiased selection:bg-zinc-700/80">
       {/* Hidden file input for file uploads */}
       <input
         ref={fileInputRef}
@@ -3393,6 +3487,7 @@ export default function App() {
         </main>
       </div>
     </div>
+    </>
   );
 }
 
