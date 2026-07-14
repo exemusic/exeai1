@@ -208,6 +208,11 @@ export default function App() {
   const [pendingRedeemCodeInput, setPendingRedeemCodeInput] = useState("");
   const [authMessage, setAuthMessage] = useState<string | null>(null);
   
+  // Registration Popup states for new user custom names
+  const [showRegisterModal, setShowRegisterModal] = useState<boolean>(false);
+  const [registerModalName, setRegisterModalName] = useState<string>("");
+  const [googleDefaultName, setGoogleDefaultName] = useState<string>("");
+  
   // Selected file for upload (before sending message)
   const [selectedFile, setSelectedFile] = useState<{
     name: string;
@@ -672,19 +677,58 @@ export default function App() {
       const name = decoded.name || decoded.given_name || email.split("@")[0] || "User";
       const picture = decoded.picture || null;
 
+      // Base info
       setUserId(uid);
       setUserEmail(email);
-      setUserName(name);
-      setUserDisplayName(name);
       setUserPhoto(picture);
       setCredits(99999);
-      setIsLoggedIn(true);
       setErrorText(null);
-      playNotifySound();
+
+      // Check if newly registered (has_registered not set in localStorage)
+      const hasRegistered = localStorage.getItem(`exechat_has_registered_${uid}`) === "true";
+      if (!hasRegistered) {
+        setGoogleDefaultName(name);
+        setRegisterModalName(name);
+        setShowRegisterModal(true);
+        // We set username/display_name temporarily to Google name
+        setUserName(name);
+        setUserDisplayName(name);
+        setIsLoggedIn(true);
+      } else {
+        // Retrieve custom username from localStorage or fallback to Google name
+        const storedUsername = localStorage.getItem("exechat_username") || name;
+        const storedDisplayName = localStorage.getItem("exechat_display_name") || name;
+        setUserName(storedUsername);
+        setUserDisplayName(storedDisplayName);
+        setIsLoggedIn(true);
+        playNotifySound();
+      }
+
+      // Persist logged in state details
+      localStorage.setItem("exechat_logged_in", "true");
+      localStorage.setItem("exechat_email", email);
+      localStorage.setItem("exechat_user_id", uid);
+      localStorage.setItem("exechat_user_photo", picture || "");
     } catch (error: any) {
       console.error("Google login decode error:", error);
       setErrorText(error?.message || "Gagal masuk dengan Google.");
     }
+  };
+
+  // Helper to complete registration with custom or skipped name
+  const handleCompleteRegistrationWithChosenName = (finalChosenName: string) => {
+    const finalName = finalChosenName.trim() || googleDefaultName || "User";
+    setUserName(finalName);
+    setUserDisplayName(finalName);
+    
+    localStorage.setItem("exechat_username", finalName);
+    localStorage.setItem("exechat_display_name", finalName);
+    if (userId) {
+      localStorage.setItem(`exechat_has_registered_${userId}`, "true");
+    }
+    
+    setShowRegisterModal(false);
+    playNotifySound();
   };
 
   // Google Login click handler (fallback trigger)
@@ -1571,41 +1615,51 @@ export default function App() {
 
   if (!isLoggedIn) {
     return (
-      <div className="flex h-screen w-full items-center justify-center bg-zinc-950 font-sans text-zinc-100 antialiased selection:bg-zinc-700/80 relative overflow-hidden">
-        {/* Background Cybernetic Glow Accent */}
-        <div className={`absolute top-0 left-0 w-full h-[450px] bg-gradient-to-b ${curTheme.gradient} pointer-events-none select-none z-0`} />
-        
-        <div className="w-full max-w-md rounded-3xl border border-zinc-800/70 bg-zinc-950/90 p-8 shadow-2xl z-10 mx-4 flex flex-col items-center text-center">
-          <div className="mb-5 select-none">
-            <div className="inline-flex h-16 w-16 rounded-2xl bg-zinc-900 border border-zinc-800 flex items-center justify-center shadow-lg">
-              <svg className="h-9 w-9 animate-[spin_12s_linear_infinite]" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M12 3Q12 12 21 12Q12 12 12 21Q12 12 3 12Q12 12 12 3Z" fill="url(#loginGlow)" />
-                <defs>
-                  <linearGradient id="loginGlow" x1="3" y1="3" x2="21" y2="21" gradientUnits="userSpaceOnUse">
-                    <stop offset="0%" stopColor="#59a6ff" />
-                    <stop offset="50%" stopColor="#c084fc" />
-                    <stop offset="100%" stopColor="#ff8da1" />
-                  </linearGradient>
-                </defs>
+      <div className="flex h-screen w-full items-center justify-center bg-zinc-950 font-sans text-zinc-100 antialiased selection:bg-zinc-800 relative overflow-hidden">
+        {/* Soft, natural background radial light - very clean and professional */}
+        <div className="absolute inset-0 bg-radial-[circle_at_center,rgba(39,39,42,0.15),transparent_70%] pointer-events-none" />
+
+        <motion.div
+          initial={{ opacity: 0, y: 12, scale: 0.98 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+          className="w-full max-w-[400px] rounded-2xl border border-zinc-800 bg-zinc-900/40 p-8 sm:p-10 shadow-xl z-10 mx-4 flex flex-col items-center text-center"
+        >
+          {/* Simple, premium chat bubble emblem */}
+          <div className="mb-6 select-none">
+            <div className="h-12 w-12 rounded-xl bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-200 shadow-md">
+              <svg className="h-6 w-6 text-zinc-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
               </svg>
             </div>
           </div>
 
-          <div className="mb-6">
-            <p className="text-[10px] uppercase tracking-[0.3em] text-zinc-500 font-mono">ExeChat Gateway</p>
-            <h2 className="mt-1.5 text-2xl font-bold text-zinc-100">Masuk ke ExeChat</h2>
-            <p className="mt-2.5 text-xs text-zinc-400 max-w-sm leading-relaxed">
-              Selamat datang di ExeChat. Masuk dengan akun Google Anda untuk memulai sesi chat AI berkecepatan tinggi dengan Cerebras secara instan.
+          <div className="mb-8 select-none">
+            <h2 className="text-xl font-semibold tracking-tight text-white">
+              Selamat Datang
+            </h2>
+            <p className="mt-2 text-sm text-zinc-400">
+              Silakan masuk menggunakan akun Google Anda untuk memulai sesi percakapan.
             </p>
           </div>
 
           {errorText && (
-            <div className="w-full mb-5 rounded-xl border border-red-900/40 bg-red-950/20 px-3 py-2.5 text-xs text-red-400">
-              {errorText}
-            </div>
+            <motion.div 
+              initial={{ opacity: 0, y: -4 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="w-full mb-6 rounded-xl border border-red-900/30 bg-red-950/10 px-4 py-3 text-xs text-red-400 text-left flex items-start gap-2.5"
+            >
+              <svg className="h-4 w-4 text-red-400 shrink-0 mt-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10" />
+                <line x1="12" y1="8" x2="12" y2="12" />
+                <line x1="12" y1="16" x2="12.01" y2="16" />
+              </svg>
+              <span>{errorText}</span>
+            </motion.div>
           )}
 
-          <div className="w-full flex justify-center py-4 bg-zinc-900/40 rounded-2xl border border-zinc-850/60 p-4">
+          {/* Google Login Block */}
+          <div className="w-full flex flex-col items-center justify-center p-6 rounded-xl border border-zinc-800 bg-zinc-900/20 backdrop-blur-sm">
             <GoogleLogin
               onSuccess={handleGoogleLoginSuccess}
               onError={() => setErrorText("Gagal masuk dengan Google. Silakan coba lagi.")}
@@ -1615,10 +1669,11 @@ export default function App() {
             />
           </div>
 
-          <div className="mt-6 text-[10px] text-zinc-600 font-mono">
-            Sesi aman terenkripsi • Kredit Tidak Terbatas
-          </div>
-        </div>
+          {/* Secure details at bottom - quiet and neat */}
+          <p className="mt-8 text-[11px] text-zinc-500 font-medium select-none">
+            Sesi obrolan tersimpan secara privat dalam peramban Anda.
+          </p>
+        </motion.div>
       </div>
     );
   }
@@ -1710,13 +1765,24 @@ export default function App() {
           <div className="flex flex-col items-center gap-4">
             <div className="relative">
               {isLoggedIn ? (
-                <div 
-                  onClick={() => setShowSettings(true)}
-                  className="h-8 w-8 rounded-full bg-gradient-to-tr from-sky-400 via-indigo-400 to-rose-400 flex items-center justify-center text-xs font-bold text-white shadow-md border border-white/20 cursor-pointer hover:scale-105 transition-all"
-                  title="Lihat Profil"
-                >
-                  {(userDisplayName || userName || "U").charAt(0).toUpperCase()}
-                </div>
+                userPhoto ? (
+                  <img
+                    onClick={() => setShowSettings(true)}
+                    src={userPhoto}
+                    alt="Profil"
+                    referrerPolicy="no-referrer"
+                    className="h-8 w-8 rounded-full object-cover border border-zinc-800 shadow-md cursor-pointer hover:scale-105 transition-all"
+                    title="Lihat Profil"
+                  />
+                ) : (
+                  <div 
+                    onClick={() => setShowSettings(true)}
+                    className="h-8 w-8 rounded-full bg-gradient-to-tr from-[#59a6ff] to-[#c084fc] flex items-center justify-center text-xs font-bold text-white shadow-md border border-white/20 cursor-pointer hover:scale-105 transition-all"
+                    title="Lihat Profil"
+                  >
+                    {(userDisplayName || userName || "U").charAt(0).toUpperCase()}
+                  </div>
+                )
               ) : (
                 <button
                   onClick={handleGoogleLoginClick}
@@ -1791,29 +1857,14 @@ export default function App() {
                 >
                   <Menu className="h-4.5 w-4.5" />
                 </button>
-                
-                {/* ExeChat Title on Header */}
-                <span className="text-sm font-semibold tracking-wide bg-gradient-to-r from-[#59a6ff] via-[#c084fc] to-[#ff8da1] bg-clip-text text-transparent select-none">
-                  ExeChat Room
-                </span>
               </div>
 
-              {/* Header Right Actions - Profile Picture, Full Name, Email, Logout */}
+              {/* Header Right Actions - Profile Picture (Mobile), Logout */}
               <div className="flex items-center gap-3 select-none">
                 {isLoggedIn && (
                   <div className="flex items-center gap-3 border-l border-zinc-800/60 pl-3 md:pl-4">
-                    {/* User Profile Detail (Desktop only) */}
-                    <div className="hidden md:flex flex-col text-right">
-                      <span className="text-xs font-semibold text-zinc-100 leading-tight">
-                        {userDisplayName || userName}
-                      </span>
-                      <span className="text-[10px] text-zinc-500 font-mono leading-none mt-0.5">
-                        {userEmail}
-                      </span>
-                    </div>
-
-                    {/* Foto Profil */}
-                    <div className="relative group">
+                    {/* Foto Profil (Mobile Only) */}
+                    <div className="relative group md:hidden">
                       {userPhoto ? (
                         <img
                           src={userPhoto}
@@ -3002,6 +3053,75 @@ export default function App() {
                       }`}
                     >
                       Batal
+                    </button>
+                  </div>
+                </motion.div>
+              </div>
+            )}
+          </AnimatePresence>
+
+          {/* REGISTRATION POPUP - ENTER CUSTOM NAME OR SKIP */}
+          <AnimatePresence>
+            {showRegisterModal && (
+              <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 select-none">
+                {/* Backdrop overlay */}
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="absolute inset-0 bg-black/75 backdrop-blur-sm"
+                />
+
+                {/* Modal Container */}
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.98, y: 8 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.98, y: 8 }}
+                  transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+                  className="relative w-full max-w-[380px] rounded-2xl border border-zinc-800 bg-zinc-900 p-6 shadow-xl z-10"
+                >
+                  {/* Header */}
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="h-10 w-10 rounded-xl bg-zinc-800 border border-zinc-700 flex items-center justify-center text-zinc-300">
+                      <User className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <p className="text-[10px] text-zinc-500 font-medium">Langkah Terakhir</p>
+                      <h3 className="font-sans font-semibold text-base text-zinc-100">Siapa Nama Anda?</h3>
+                    </div>
+                  </div>
+
+                  <p className="text-xs text-zinc-400 leading-relaxed mb-5 font-sans">
+                    Pilih nama panggilan yang akan ditampilkan dalam sesi obrolan Anda. Lewati untuk menggunakan nama dari akun Google Anda.
+                  </p>
+
+                  {/* Input field */}
+                  <div className="space-y-1.5 mb-5">
+                    <label className="block text-[10px] text-zinc-500 font-medium uppercase tracking-wider">Nama Panggilan</label>
+                    <input
+                      type="text"
+                      value={registerModalName}
+                      onChange={(e) => setRegisterModalName(e.target.value)}
+                      placeholder="Contoh: Budi Prasetyo"
+                      maxLength={30}
+                      className="w-full rounded-xl border border-zinc-850 bg-zinc-950 px-4 py-2.5 text-sm text-zinc-100 outline-none focus:border-zinc-700 transition-colors placeholder-zinc-700 font-sans"
+                    />
+                  </div>
+
+                  {/* Actions buttons */}
+                  <div className="flex flex-col gap-2.5">
+                    <button
+                      onClick={() => handleCompleteRegistrationWithChosenName(registerModalName)}
+                      className="w-full py-2.5 px-4 rounded-xl bg-white hover:bg-zinc-100 text-zinc-950 font-semibold text-xs transition-colors duration-150 cursor-pointer text-center"
+                    >
+                      Simpan & Lanjutkan
+                    </button>
+                    
+                    <button
+                      onClick={() => handleCompleteRegistrationWithChosenName(googleDefaultName)}
+                      className="w-full py-2.5 px-4 rounded-xl border border-zinc-800 hover:border-zinc-750 bg-transparent hover:bg-zinc-850 text-zinc-400 hover:text-zinc-200 font-medium text-xs transition-colors duration-150 cursor-pointer text-center"
+                    >
+                      Lewati (Gunakan Nama Google)
                     </button>
                   </div>
                 </motion.div>
