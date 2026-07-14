@@ -15,7 +15,7 @@ import {
   ArrowRight,
   Settings,
   Volume2,
-  VolumeX,
+  VolumeX,a
   Copy,
   Download,
   AlertCircle,
