@@ -1,5 +1,6 @@
 import express from "express";
 import dotenv from "dotenv";
+import crypto from "crypto";
 
 // Load environment variables
 dotenv.config();
@@ -212,43 +213,103 @@ app.post("/api/chat/stream", async (req, res) => {
 });
 
 
-// Image generation endpoint
+// Helper to extract result from completed Runware task object
+function extractRunwareResult(task: any) {
+  if (!task) return null;
+  
+  const urlKeys = ["imageURL", "url"];
+  for (const key of urlKeys) {
+    if (task[key]) {
+      return { type: "image", value: task[key] };
+    }
+  }
+  return null;
+}
+
+// Runware AI generation endpoint supporting only Seedream 5.0 Pro image generation
 app.post("/api/image/generate", async (req, res) => {
   try {
     const { prompt, initImage, model = "bytedance:seedream@5.0-pro" } = req.body;
-    const apiKey = process.env.TOGETHER_API_KEY || "1zgCaUUoYZTTaxngLoAZswtUEqMIshMe";
+    const runwareApiKey = process.env.RUNWARE_API_KEY;
 
-    const body: any = {
-      model,
-      prompt,
-      n: 1,
-      steps: 20
+    if (!runwareApiKey) {
+      return res.status(400).json({ 
+        error: "Runware API Key belum dikonfigurasi di secrets. Silakan tambahkan RUNWARE_API_KEY melalui menu Settings." 
+      });
+    }
+
+    const taskUUID = crypto.randomUUID();
+    const taskType = "imageInference";
+    const runwareModel = "bytedance:seedream@5.0-pro";
+
+    // Build the request task according to taskType specifications
+    const task: any = {
+      taskType,
+      taskUUID,
+      model: runwareModel,
+      positivePrompt: prompt,
+      width: 1024,
+      height: 1024
     };
 
     if (initImage) {
-      body.image_base64 = initImage;
+      task.image = initImage;
     }
 
-    const response = await fetch("https://api.together.xyz/v1/images/generations", {
+    console.log("Sending task to Runware:", JSON.stringify(task));
+
+    const response = await fetch("https://api.runware.ai/v1", {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${apiKey}`,
         "Content-Type": "application/json"
       },
-      body: JSON.stringify(body)
+      body: JSON.stringify({
+        apiKey: runwareApiKey,
+        tasks: [task]
+      })
     });
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.warn("Together API Error:", response.status, errorText);
-      return res.status(response.status).json({ error: "Server sedang sibuk tidak bisa generate image." });
+      console.warn("Runware API Error Status:", response.status, errorText);
+      return res.status(response.status).json({ error: `Gagal memproses request dengan Runware API (${response.status})` });
     }
 
-    const data = await response.json();
-    res.json(data);
-  } catch (error) {
-    console.error("Together Error:", error);
-    res.status(500).json({ error: "Server sedang sibuk tidak bisa generate image." });
+    const responseData = await response.json();
+    console.log("Runware Response:", JSON.stringify(responseData));
+
+    // Resolve task results
+    let tasksList = Array.isArray(responseData) ? responseData : (responseData?.data || []);
+    if (tasksList.length === 0 && responseData && responseData.taskUUID) {
+      tasksList = [responseData];
+    }
+
+    if (tasksList.length === 0) {
+      return res.status(500).json({ error: "Runware tidak mengembalikan data task yang valid." });
+    }
+
+    const completedTask = tasksList[0];
+    if (completedTask?.error) {
+      return res.status(500).json({ error: completedTask.errorMessage || "Gagal melakukan generasi di Runware." });
+    }
+
+    const result = extractRunwareResult(completedTask);
+    if (!result) {
+      return res.status(500).json({ error: "Gagal mendapatkan hasil gambar dari response Runware." });
+    }
+
+    res.json({
+      data: [
+        {
+          url: result.value,
+          type: result.type,
+          cost: completedTask.cost || 0
+        }
+      ]
+    });
+  } catch (error: any) {
+    console.error("Runware Generation Error:", error);
+    res.status(500).json({ error: error?.message || "Server sedang sibuk tidak bisa memproses request dengan Runware." });
   }
 });
 
