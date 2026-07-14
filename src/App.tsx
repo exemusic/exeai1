@@ -227,6 +227,7 @@ export default function App() {
     size: number;
     mime?: string;
     textContent?: string;
+    base64?: string;
   } | null>(null);
 
   // Credits are persisted strictly in Firebase Realtime Database.
@@ -300,37 +301,52 @@ export default function App() {
       return false;
     };
 
-    if (isTextFile(file)) {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const textContent = event.target?.result as string;
-        console.log("[File] Plain-text content loaded, size in chars:", textContent.length);
+    // Load base64 content
+    const base64Reader = new FileReader();
+    base64Reader.onload = () => {
+      const base64Str = (base64Reader.result as string).split(",")[1];
+      
+      if (isTextFile(file)) {
+        const textReader = new FileReader();
+        textReader.onload = () => {
+          setSelectedFile({
+            name: file.name,
+            url,
+            size: file.size,
+            mime: file.type || undefined,
+            textContent: textReader.result as string,
+            base64: base64Str,
+          });
+        };
+        textReader.onerror = () => {
+          setSelectedFile({
+            name: file.name,
+            url,
+            size: file.size,
+            mime: file.type || undefined,
+            base64: base64Str,
+          });
+        };
+        textReader.readAsText(file);
+      } else {
         setSelectedFile({
           name: file.name,
           url,
           size: file.size,
           mime: file.type || undefined,
-          textContent: textContent,
+          base64: base64Str,
         });
-      };
-      reader.onerror = () => {
-        console.error("[File] Error reading file as text.");
-        setSelectedFile({
-          name: file.name,
-          url,
-          size: file.size,
-          mime: file.type || undefined,
-        });
-      };
-      reader.readAsText(file);
-    } else {
+      }
+    };
+    base64Reader.onerror = () => {
       setSelectedFile({
         name: file.name,
         url,
         size: file.size,
         mime: file.type || undefined,
       });
-    }
+    };
+    base64Reader.readAsDataURL(file);
 
     console.log("[File] setSelectedFile triggered, should appear in UI now");
     playNotifySound();
@@ -920,6 +936,7 @@ export default function App() {
       size: selectedFile.size,
       mime: selectedFile.mime,
       textContent: selectedFile.textContent,
+      base64: selectedFile.base64,
     } : null;
 
     playNotifySound();
