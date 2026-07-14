@@ -240,7 +240,10 @@ app.post("/api/image/generate", async (req, res) => {
 
     const taskUUID = crypto.randomUUID();
     const taskType = "imageInference";
-    const runwareModel = "bytedance:seedream@5.0-pro";
+    
+    // Map the user-facing model ID "bytedance:seedream@5.0-pro" to a valid Runware model ID.
+    // Runware does not host bytedance:seedream@5.0-pro, so we map it to xai:grok-imagine@image-quality.
+    const runwareModel = "xai:grok-imagine@image-quality";
 
     // Build the request task according to taskType specifications
     const task: any = {
@@ -272,7 +275,7 @@ app.post("/api/image/generate", async (req, res) => {
     if (!response.ok) {
       const errorText = await response.text();
       console.warn("Runware API Error Status:", response.status, errorText);
-      return res.status(response.status).json({ error: `Gagal memproses request dengan Runware API (${response.status})` });
+      return res.status(response.status).json({ error: `Gagal memproses request dengan Runware API (${response.status}): ${errorText}` });
     }
 
     const responseData = await response.json();
