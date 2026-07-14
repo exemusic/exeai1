@@ -7,16 +7,27 @@
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
 }
 
+@variant dark (&:where(.dark, .dark *));
+
 /* Base style overrides */
 body {
-  background-color: #09090b; /* Zinc 950 */
-  color: #f4f4f5; /* Zinc 100 */
   font-family: var(--font-sans);
   font-weight: 500;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   overflow-x: hidden;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+html.dark body {
+  background-color: #09090b; /* Zinc 950 */
+  color: #f4f4f5; /* Zinc 100 */
+}
+
+html:not(.dark) body {
+  background-color: #ffffff;
+  color: #18181b;
 }
 
 body,

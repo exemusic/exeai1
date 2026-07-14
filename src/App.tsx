@@ -125,6 +125,11 @@ export default function App() {
   const [selectedModelId, setSelectedModelId] = useState("gemma-4-31b");
   const [temperature, setTemperature] = useState(0.7);
   const [showSettings, setShowSettings] = useState(false);
+  const [settingsTab, setSettingsTab] = useState<"akun" | "model" | "tampilan" | "ingatan">("akun");
+  const [cookieConsent, setCookieConsent] = useState<string | null>(() => {
+    return localStorage.getItem("exechat_cookie_consent") || null;
+  });
+  const [showCookieDetails, setShowCookieDetails] = useState(false);
   const [showPresetModal, setShowPresetModal] = useState(false);
   const [showModelModal, setShowModelModal] = useState(false);
   const [hasApiKey, setHasApiKey] = useState<boolean | null>(null);
@@ -511,35 +516,35 @@ export default function App() {
   }> = {
     dark: {
       name: "Gelap (Hitam)",
-      outerBg: "bg-[#0b0c0e]",
-      mainBg: "bg-[#0b0c0e]",
-      sidebarBg: "bg-[#131314]",
-      sectionBg: "bg-[#1e1f20]",
-      border: "border-[#2a2b2d]/70",
-      bubbleUser: "bg-[#1e1f20] border border-[#2a2b2d]/60 text-[#e3e3e3]",
-      bubbleAssistant: "bg-transparent border-transparent text-[#e3e3e3]",
-      textMuted: "text-[#9e9e9e]",
-      textBase: "text-[#e3e3e3]",
-      textTitle: "text-white",
-      accentColor: "bg-[#1a73e8] hover:bg-[#1557b0] text-white",
+      outerBg: "bg-zinc-950",
+      mainBg: "bg-zinc-950",
+      sidebarBg: "bg-zinc-900",
+      sectionBg: "bg-zinc-900/60",
+      border: "border-zinc-800/80",
+      bubbleUser: "bg-zinc-900 border border-zinc-800 text-zinc-100",
+      bubbleAssistant: "bg-transparent border-transparent text-zinc-200",
+      textMuted: "text-zinc-500",
+      textBase: "text-zinc-350",
+      textTitle: "text-zinc-100",
+      accentColor: "bg-zinc-800 hover:bg-zinc-750 text-white",
       scrollbarClass: "scrollbar-thin scrollbar-thumb-zinc-800",
-      gradient: "from-[#1a2035]/25 via-[#0b0c0e]/0 to-[#0b0c0e]/0",
+      gradient: "from-zinc-950/25 via-transparent to-transparent",
     },
     light: {
       name: "Terang (Putih)",
-      outerBg: "bg-[#ffffff]",
-      mainBg: "bg-[#ffffff]",
-      sidebarBg: "bg-[#f0f4f9]",
-      sectionBg: "bg-[#e9eef6]",
-      border: "border-[#dee2e6]",
-      bubbleUser: "bg-[#e9eef6] border border-transparent text-[#1f1f1f]",
-      bubbleAssistant: "bg-transparent border-transparent text-[#1f1f1f]",
-      textMuted: "text-[#5f6368]",
-      textBase: "text-[#1f1f1f]",
-      textTitle: "text-[#1f1f1f]",
-      accentColor: "bg-[#1a73e8] hover:bg-[#1557b0] text-white",
+      outerBg: "bg-white",
+      mainBg: "bg-white",
+      sidebarBg: "bg-zinc-50",
+      sectionBg: "bg-zinc-100/60",
+      border: "border-zinc-200",
+      bubbleUser: "bg-zinc-100 border border-zinc-250/60 text-zinc-800",
+      bubbleAssistant: "bg-transparent border-transparent text-zinc-800",
+      textMuted: "text-zinc-500",
+      textBase: "text-zinc-800",
+      textTitle: "text-zinc-900",
+      accentColor: "bg-zinc-900 hover:bg-zinc-850 text-white",
       scrollbarClass: "scrollbar-thin scrollbar-thumb-zinc-300",
-      gradient: "from-[#e8f0fe]/35 via-[#ffffff]/0 to-[#ffffff]/0",
+      gradient: "from-zinc-100/25 via-transparent to-transparent",
     },
   };
 
@@ -723,9 +728,9 @@ export default function App() {
     
     localStorage.setItem("exechat_username", finalName);
     localStorage.setItem("exechat_display_name", finalName);
-    if (userId) {
-      localStorage.setItem(`exechat_has_registered_${userId}`, "true");
-    }
+    
+    const activeUid = localStorage.getItem("exechat_user_id") || userId || "google-user";
+    localStorage.setItem(`exechat_has_registered_${activeUid}`, "true");
     
     setShowRegisterModal(false);
     playNotifySound();
@@ -779,6 +784,14 @@ export default function App() {
 
     setUserName(trimmed);
     setUserDisplayName(trimmed);
+    
+    localStorage.setItem("exechat_username", trimmed);
+    localStorage.setItem("exechat_display_name", trimmed);
+    const activeUid = userId || localStorage.getItem("exechat_user_id");
+    if (activeUid) {
+      localStorage.setItem(`exechat_has_registered_${activeUid}`, "true");
+    }
+
     setErrorText(null);
     setRedeemFeedback("Username berhasil disimpan.");
   };
@@ -1405,14 +1418,14 @@ export default function App() {
   );
 
   const renderSidebarContent = (isMobile = false) => (
-    <div className={`flex flex-col h-full w-full ${curTheme.sidebarBg} text-zinc-100 select-none`}>
+    <div className={`flex flex-col h-full w-full ${curTheme.sidebarBg} ${isDark ? "text-zinc-150" : "text-zinc-800"} select-none`}>
       {/* Brand Identity Header */}
       <div className={`p-5 border-b ${curTheme.border} flex items-center justify-between shrink-0`}>
         <div className="flex items-center gap-3">
           <div>
-            <h1 className="font-display font-bold text-sm text-zinc-100 tracking-tight flex items-center gap-1.5">
+            <h1 className={`font-display font-bold text-sm tracking-tight flex items-center gap-1.5 ${isDark ? "text-zinc-100" : "text-zinc-900"}`}>
               ExeChat
-              <span className="text-[10px] bg-zinc-900 text-zinc-400 px-1.5 py-0.5 rounded-full border border-zinc-850 font-medium">v1</span>
+              <span className={`text-[10px] px-1.5 py-0.5 rounded-full border font-medium ${isDark ? "bg-zinc-950 text-zinc-400 border-zinc-800" : "bg-zinc-200/60 text-zinc-600 border-zinc-300"}`}>v1</span>
             </h1>
           </div>
         </div>
@@ -1426,8 +1439,8 @@ export default function App() {
             }}
             className={`p-1.5 rounded-lg border transition-all duration-200 ${
               showSettings
-                ? "bg-zinc-900 border-zinc-800 text-zinc-100"
-                : "border-zinc-900/60 hover:border-zinc-800 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/40"
+                ? isDark ? "bg-zinc-800 border-zinc-700 text-zinc-150" : "bg-zinc-200 border-zinc-300 text-zinc-900"
+                : isDark ? "border-transparent text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50" : "border-transparent text-zinc-650 hover:text-zinc-900 hover:bg-zinc-200/50"
             }`}
             title="Pengaturan Mode"
           >
@@ -1438,7 +1451,9 @@ export default function App() {
           {!isMobile && (
             <button
               onClick={() => setIsDesktopSidebarOpen(false)}
-              className="p-1.5 rounded-lg border border-zinc-900/60 hover:border-zinc-800 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/40 transition-all duration-200 cursor-pointer"
+              className={`p-1.5 rounded-lg border transition-all duration-200 cursor-pointer ${
+                isDark ? "border-transparent text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50" : "border-transparent text-zinc-650 hover:text-zinc-900 hover:bg-zinc-200/50"
+              }`}
               title="Tutup Riwayat Chat"
             >
               <ChevronLeft className="h-4 w-4" />
@@ -1456,7 +1471,11 @@ export default function App() {
             setShowSettings(false);
             if (isMobile) setIsMobileSidebarOpen(false);
           }}
-          className="w-full flex items-center justify-center gap-2 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-950 font-medium py-2.5 px-4 transition-all duration-200 shadow-md shadow-black/20 text-xs tracking-wide"
+          className={`w-full flex items-center justify-center gap-2 rounded-xl font-semibold py-2.5 px-4 transition-all duration-200 text-xs tracking-wide border ${
+            isDark 
+              ? "bg-zinc-100 hover:bg-zinc-200 text-zinc-950 border-transparent shadow-md shadow-black/20" 
+              : "bg-zinc-900 hover:bg-zinc-800 text-white border-transparent shadow-sm"
+          }`}
         >
           <Plus className="h-3.5 w-3.5 stroke-[2.5]" />
           <span>Chat Baru</span>
@@ -1472,12 +1491,16 @@ export default function App() {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Cari percakapan..."
-            className="w-full pl-9 pr-4 py-2 rounded-xl border border-zinc-900 bg-zinc-900/10 text-xs text-zinc-300 placeholder-zinc-500 focus:outline-none focus:border-zinc-800/80 focus:bg-zinc-900/30 transition-all duration-200"
+            className={`w-full pl-9 pr-4 py-2 rounded-xl text-xs transition-all duration-200 focus:outline-none border ${
+              isDark 
+                ? "border-zinc-800/80 bg-zinc-950/40 text-zinc-300 placeholder-zinc-600 focus:border-zinc-700 focus:bg-zinc-950/70" 
+                : "border-zinc-200 bg-zinc-100/50 text-zinc-850 placeholder-zinc-400 focus:border-zinc-300 focus:bg-white"
+            }`}
           />
           {searchQuery && (
             <button
               onClick={() => setSearchQuery("")}
-              className="absolute right-2.5 top-2.5 hover:text-zinc-300 text-zinc-500"
+              className={`absolute right-2.5 top-2.5 transition-colors ${isDark ? "hover:text-zinc-300 text-zinc-500" : "hover:text-zinc-700 text-zinc-400"}`}
             >
               <X className="h-3.5 w-3.5" />
             </button>
@@ -1489,7 +1512,7 @@ export default function App() {
       <div className="flex-1 overflow-y-auto px-2 py-2 space-y-1 scrollbar-thin">
         <AnimatePresence initial={false}>
           {filteredSessions.length === 0 ? (
-            <div className="text-center py-8 text-zinc-650 text-xs">
+            <div className={`text-center py-8 text-xs ${isDark ? "text-zinc-600" : "text-zinc-400"}`}>
               {searchQuery ? "Tidak ada hasil pencarian." : "Belum ada riwayat chat."}
             </div>
           ) : (
@@ -1512,16 +1535,22 @@ export default function App() {
                       if (isMobile) setIsMobileSidebarOpen(false);
                     }
                   }}
-                  className={`group flex items-center justify-between rounded-xl p-2.5 cursor-pointer text-xs transition-all duration-200 select-none ${
+                  className={`group flex items-center justify-between rounded-xl p-2.5 cursor-pointer text-xs transition-all duration-250 select-none border ${
                     isActive
-                      ? "bg-zinc-900/50 border border-zinc-850 shadow-sm text-zinc-100 font-medium"
-                      : "border border-transparent text-zinc-400 hover:bg-zinc-900/20 hover:text-zinc-200"
+                      ? isDark
+                        ? "bg-zinc-800 border-zinc-750 text-zinc-100 font-medium"
+                        : "bg-white border-zinc-200 shadow-sm text-zinc-900 font-medium"
+                      : isDark
+                        ? "border-transparent text-zinc-400 hover:bg-zinc-800/40 hover:text-zinc-200"
+                        : "border-transparent text-zinc-600 hover:bg-zinc-200/50 hover:text-zinc-900"
                   }`}
                 >
                   <div className="flex items-center gap-2.5 min-w-0 flex-1">
                     <MessageSquare
                       className={`h-4 w-4 shrink-0 transition-colors ${
-                        isActive ? "text-zinc-300" : "text-zinc-500 group-hover:text-zinc-400"
+                        isActive 
+                          ? isDark ? "text-zinc-300" : "text-zinc-700" 
+                          : isDark ? "text-zinc-550 group-hover:text-zinc-400" : "text-zinc-400 group-hover:text-zinc-600"
                       }`}
                     />
                     {isEditing ? (
@@ -1536,7 +1565,11 @@ export default function App() {
                           onChange={(e) => setEditTitleInput(e.target.value)}
                           onBlur={() => saveRenameSession(s.id)}
                           autoFocus
-                          className="w-full bg-zinc-950 border border-zinc-800 rounded px-1.5 py-0.5 text-zinc-100 text-xs focus:outline-none focus:border-zinc-700"
+                          className={`w-full rounded px-1.5 py-0.5 text-xs focus:outline-none border ${
+                            isDark 
+                              ? "bg-zinc-950 border-zinc-850 text-zinc-100 focus:border-zinc-750" 
+                              : "bg-white border-zinc-250 text-zinc-900 focus:border-zinc-400"
+                          }`}
                         />
                       </form>
                     ) : (
@@ -1551,14 +1584,14 @@ export default function App() {
                     <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200 shrink-0">
                       <button
                         onClick={(e) => startRenameSession(s.id, s.title, e)}
-                        className="p-1 rounded hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 transition-colors"
+                        className={`p-1 rounded transition-colors ${isDark ? "hover:bg-zinc-750 text-zinc-500 hover:text-zinc-300" : "hover:bg-zinc-200 text-zinc-400 hover:text-zinc-700"}`}
                         title="Ubah Nama"
                       >
                         <Edit2 className="h-3 w-3" />
                       </button>
                       <button
                         onClick={(e) => deleteSession(s.id, e)}
-                        className="p-1 rounded hover:bg-zinc-800 text-zinc-400 hover:text-red-400 transition-colors"
+                        className={`p-1 rounded transition-colors ${isDark ? "hover:bg-zinc-750 text-zinc-500 hover:text-red-400" : "hover:bg-zinc-200 text-zinc-400 hover:text-red-600"}`}
                         title="Hapus Chat"
                       >
                         <Trash2 className="h-3 w-3" />
@@ -2448,7 +2481,7 @@ export default function App() {
 
           </div>
 
-          {/* RIGHT SETTINGS PANEL (FULL-PAGE OVERLAY) */}
+                    {/* RIGHT SETTINGS PANEL (FULL-PAGE OVERLAY) */}
           <AnimatePresence>
             {showSettings && (
               <motion.div
@@ -2456,12 +2489,12 @@ export default function App() {
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.98 }}
                 transition={{ duration: 0.2 }}
-                className={`absolute inset-0 backdrop-blur-xl flex flex-col z-40 ${isDark ? "bg-[#0b0c0e]/95 text-[#e3e3e3]" : "bg-white/95 text-[#1f1f1f]"}`}
+                className={`absolute inset-0 backdrop-blur-xl flex flex-col z-40 ${isDark ? "bg-zinc-950/98 text-zinc-100" : "bg-zinc-50/98 text-zinc-850"}`}
               >
                 {/* Header */}
-                <div className={`p-6 border-b ${curTheme.border} ${curTheme.sectionBg} flex items-center justify-between shrink-0`}>
+                <div className={`p-5 px-6 border-b ${curTheme.border} ${curTheme.sectionBg} flex items-center justify-between shrink-0`}>
                   <div className="flex items-center gap-3">
-                    <div className={`p-2 rounded-xl ${isDark ? "bg-zinc-900 text-zinc-300" : "bg-zinc-100 text-zinc-600"}`}>
+                    <div className={`p-2 rounded-xl ${isDark ? "bg-zinc-900 text-zinc-300" : "bg-zinc-100 text-zinc-700"}`}>
                       <Settings className="h-5 w-5" />
                     </div>
                     <div>
@@ -2472,312 +2505,469 @@ export default function App() {
                   </div>
                   <button
                     onClick={() => setShowSettings(false)}
-                    className={`p-2 rounded-xl transition-all shadow-sm ${isDark ? "bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200" : "bg-zinc-100 hover:bg-zinc-200 text-zinc-600 hover:text-zinc-900"}`}
+                    className={`p-2 rounded-xl transition-all shadow-sm ${isDark ? "bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200" : "bg-white hover:bg-zinc-100 text-zinc-600 hover:text-zinc-900 border border-zinc-200"}`}
                   >
                     <X className="h-5 w-5" />
                   </button>
                 </div>
 
-                {/* Content */}
-                <div className="flex-1 overflow-y-auto p-6 md:p-10 space-y-8 max-w-4xl mx-auto w-full">
-                  {/* Section 1: Akun (NEW INTEGRATION) */}
-                  <div className={`rounded-2xl p-6 space-y-4 border ${isDark ? "bg-zinc-900/20 border-zinc-900" : "bg-zinc-100/50 border-zinc-200"}`}>
-                    <h3 className="text-xs font-semibold tracking-wider text-zinc-400 font-mono uppercase">
-                      Informasi Akun Pengguna
-                    </h3>
-                    
-                    <div className={`flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-xl border ${isDark ? "bg-zinc-900/40 border-zinc-850/60" : "bg-white border-zinc-200"}`}>
-                      <div>
-                        {isLoggedIn ? (
-                          <div className="flex items-center gap-2 text-zinc-100 font-semibold text-sm">
-                            <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-                            <span>Sign In sebagai {userEmail}</span>
-                          </div>
-                        ) : (
-                          <div className="flex items-center gap-2 text-zinc-100 font-semibold text-sm">
-                            <span className="h-2 w-2 rounded-full bg-amber-500 animate-pulse" />
-                            <span>Menggunakan Mode Tamu (Free & Unlimited AI)</span>
-                          </div>
-                        )}
-                        <p className="text-xs text-zinc-500 mt-1">ExeChat bebas digunakan sepenuhnya tanpa batasan kredit.</p>
-                      </div>
+                {/* Tabs bar */}
+                <div className={`px-6 py-2 border-b ${curTheme.border} flex items-center justify-start gap-1 overflow-x-auto scrollbar-none shrink-0 ${isDark ? "bg-zinc-950/40" : "bg-zinc-100/30"}`}>
+                  {[
+                    { id: "akun", name: "Akun & Profil", icon: User },
+                    { id: "model", name: "Engine & Karakter AI", icon: Cpu },
+                    { id: "tampilan", name: "Tema & Tampilan", icon: Sun },
+                    { id: "ingatan", name: "Ingatan AI", icon: Brain },
+                  ].map((tab) => {
+                    const TabIcon = tab.icon;
+                    const isActive = settingsTab === tab.id;
+                    return (
+                      <button
+                        key={tab.id}
+                        onClick={() => setSettingsTab(tab.id as any)}
+                        className={`flex items-center gap-2 py-2 px-4.5 rounded-xl text-xs font-semibold cursor-pointer transition-all duration-200 whitespace-nowrap shrink-0 ${
+                          isActive
+                            ? isDark
+                              ? "bg-zinc-900 text-white shadow border border-zinc-850"
+                              : "bg-white text-zinc-900 shadow border border-zinc-200"
+                            : isDark
+                              ? "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900/40"
+                              : "text-zinc-550 hover:text-zinc-800 hover:bg-zinc-100/50"
+                        }`}
+                      >
+                        <TabIcon className={`h-4 w-4 ${isActive ? (isDark ? "text-amber-400" : "text-[#1a73e8]") : "text-zinc-500"}`} />
+                        <span>{tab.name}</span>
+                      </button>
+                    );
+                  })}
+                </div>
 
-                      <div className="flex flex-col sm:items-end gap-2 shrink-0">
-                        {isLoggedIn ? (
-                          <div className="space-y-3 w-full sm:w-auto text-left">
-                            <div className="grid grid-cols-2 gap-2">
-                              <div className="text-[11px] text-zinc-400">Nama Akun</div>
-                              <div className="text-[11px] text-zinc-200 text-right">{userDisplayName || userEmail}</div>
-                              <div className="text-[11px] text-zinc-400">Username</div>
-                              <div className="text-[11px] text-zinc-200 text-right">{userName || "Belum diatur"}</div>
+                {/* Tab Content Container */}
+                <div className="flex-1 overflow-y-auto p-6 md:p-8 max-w-4xl mx-auto w-full space-y-6">
+                  
+                  {/* TAB 1: AKUN & PROFIL */}
+                  {settingsTab === "akun" && (
+                    <div className="space-y-6 animate-fadeIn">
+                      <div className={`rounded-2xl p-6 border ${isDark ? "bg-zinc-900/20 border-zinc-850" : "bg-white border-zinc-200 shadow-sm"}`}>
+                        <h3 className={`text-xs font-semibold tracking-wider font-mono uppercase mb-4 ${isDark ? "text-zinc-500" : "text-zinc-400"}`}>
+                          Status Keanggotaan
+                        </h3>
+                        
+                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+                          <div className="flex items-center gap-4">
+                            {userPhoto ? (
+                              <img src={userPhoto} referrerPolicy="no-referrer" alt="Foto Profil" className="h-14 w-14 rounded-full border border-zinc-500/20 shadow-md shrink-0" />
+                            ) : (
+                              <div className={`h-14 w-14 rounded-full border flex items-center justify-center shrink-0 ${isDark ? "bg-zinc-900 border-zinc-800 text-zinc-400" : "bg-zinc-100 border-zinc-200 text-zinc-600"}`}>
+                                <User className="h-7 w-7" />
+                              </div>
+                            )}
+                            <div>
+                              {isLoggedIn ? (
+                                <div className="space-y-1">
+                                  <div className={`flex items-center gap-2 font-bold text-base ${isDark ? "text-zinc-100" : "text-zinc-900"}`}>
+                                    <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                                    <span>Tersambung via Google</span>
+                                  </div>
+                                  <p className={`text-xs ${isDark ? "text-zinc-400" : "text-zinc-550"}`}>{userEmail}</p>
+                                </div>
+                              ) : (
+                                <div className="space-y-1">
+                                  <div className={`flex items-center gap-2 font-bold text-base ${isDark ? "text-zinc-100" : "text-zinc-900"}`}>
+                                    <span className="h-2 w-2 rounded-full bg-amber-500 animate-pulse" />
+                                    <span>Mode Tamu Percuma</span>
+                                  </div>
+                                  <p className={`text-xs ${isDark ? "text-zinc-400" : "text-zinc-550"}`}>Gunakan Google login untuk personalisasi asisten penuh.</p>
+                                </div>
+                              )}
                             </div>
-                            <div className="flex flex-col gap-2">
+                          </div>
+
+                          <div className="shrink-0 flex items-center gap-2">
+                            {isLoggedIn ? (
                               <button
                                 onClick={handleLogout}
-                                className="w-full text-xs bg-red-650/25 hover:bg-red-650/40 text-red-200 border border-red-900/30 font-semibold py-1.5 px-4 rounded-lg transition-all cursor-pointer"
+                                className={`text-xs font-semibold py-2 px-5 rounded-xl border transition-all duration-200 cursor-pointer ${
+                                  isDark 
+                                    ? "bg-red-950/30 hover:bg-red-900/30 text-red-300 border-red-900/40" 
+                                    : "bg-red-50 hover:bg-red-100 text-red-600 border-red-200"
+                                }`}
                               >
                                 Keluar (Logout)
                               </button>
-                            </div>
+                            ) : (
+                              <div className="w-full">
+                                <GoogleLogin
+                                  onSuccess={handleGoogleLoginSuccess}
+                                  onError={() => setErrorText("Gagal masuk dengan Google.")}
+                                  theme={isDark ? "filled_black" : "outline"}
+                                  shape="pill"
+                                />
+                              </div>
+                            )}
                           </div>
-                        ) : (
-                          <button
-                            onClick={handleGoogleLoginClick}
-                            className="w-full sm:w-auto text-xs bg-zinc-100 hover:bg-zinc-200 text-zinc-950 font-semibold py-1.5 px-4 rounded-lg transition-all"
-                          >
-                            Masuk / Daftar dengan Google
-                          </button>
-                        )}
+                        </div>
                       </div>
-                    </div>
-                  </div>
 
-                  {isLoggedIn && (
-                    <div className="bg-zinc-900/20 border border-zinc-900 rounded-2xl p-4 space-y-4">
-                      <h4 className="text-xs font-semibold tracking-wider text-zinc-400 uppercase font-mono">Akun Anda</h4>
-                      <div className="grid grid-cols-1 gap-3">
-                        <div>
-                          <label className="text-[10px] text-zinc-500 uppercase tracking-wide font-mono">Username ExeChat</label>
-                          <div className="mt-2 flex gap-2">
-                            <input
-                              value={userName}
-                              onChange={(e) => setUserName(e.target.value)}
-                              placeholder="Username Anda"
-                              className="flex-1 bg-zinc-950 border border-zinc-900 rounded-xl px-3 py-2 text-xs text-zinc-100 focus:outline-none focus:border-amber-500"
-                            />
-                            <button
-                              onClick={handleSaveUsername}
-                              className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-zinc-950 text-xs font-semibold"
-                            >
-                              Simpan
-                            </button>
+                      {isLoggedIn && (
+                        <div className={`rounded-2xl p-6 border ${isDark ? "bg-zinc-900/20 border-zinc-850" : "bg-white border-zinc-200 shadow-sm"}`}>
+                          <h3 className={`text-xs font-semibold tracking-wider font-mono uppercase mb-2 ${isDark ? "text-zinc-500" : "text-zinc-400"}`}>
+                            Personalisasi Nama Pengguna
+                          </h3>
+                          <p className={`text-xs leading-relaxed mb-4 ${isDark ? "text-zinc-500" : "text-zinc-500"}`}>
+                            Atur nama panggilan Anda yang akan digunakan asisten Hexky untuk menyapa Anda dalam obrolan privat ini.
+                          </p>
+
+                          <div className="space-y-3">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs mb-2">
+                              <div className={`p-3 rounded-xl border flex justify-between ${isDark ? "bg-zinc-950/50 border-zinc-850/60" : "bg-zinc-50 border-zinc-200"}`}>
+                                <span className="text-zinc-500">Nama Google</span>
+                                <span className={`font-semibold ${isDark ? "text-zinc-200" : "text-zinc-800"}`}>{googleDefaultName || userEmail?.split("@")[0]}</span>
+                              </div>
+                              <div className={`p-3 rounded-xl border flex justify-between ${isDark ? "bg-zinc-950/50 border-zinc-850/60" : "bg-zinc-50 border-zinc-200"}`}>
+                                <span className="text-zinc-500">Panggilan Aktif</span>
+                                <span className={`font-semibold ${isDark ? "text-zinc-200" : "text-zinc-800"}`}>{userDisplayName || "Tamu"}</span>
+                              </div>
+                            </div>
+
+                            <div className="flex gap-2">
+                              <input
+                                value={userName}
+                                onChange={(e) => setUserName(e.target.value)}
+                                placeholder="Masukkan nama panggilan baru..."
+                                className={`flex-1 rounded-xl px-4 py-2.5 text-xs focus:outline-none border transition-colors ${
+                                  isDark 
+                                    ? "bg-zinc-950 border-zinc-850 text-zinc-100 focus:border-zinc-750 placeholder-zinc-700" 
+                                    : "bg-white border-zinc-200 text-zinc-900 focus:border-zinc-350 placeholder-zinc-400"
+                                }`}
+                              />
+                              <button
+                                onClick={handleSaveUsername}
+                                className={`px-5 py-2.5 rounded-xl text-xs font-semibold transition-all shadow-sm ${
+                                  isDark 
+                                    ? "bg-amber-500 hover:bg-amber-600 text-zinc-950 hover:scale-[1.02]" 
+                                    : "bg-zinc-900 hover:bg-zinc-800 text-white hover:scale-[1.02]"
+                                }`}
+                              >
+                                Simpan Nama
+                              </button>
+                            </div>
+                            
+                            {redeemFeedback && (
+                              <p className="text-[11px] text-emerald-500 font-sans tracking-wide">
+                                ✓ {redeemFeedback}
+                              </p>
+                            )}
                           </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* TAB 2: ENGINE & KARAKTER AI */}
+                  {settingsTab === "model" && (
+                    <div className="space-y-6 animate-fadeIn">
+                      {/* Model Engine AI Selection */}
+                      <div className="space-y-3">
+                        <h3 className={`text-xs font-semibold tracking-wider font-mono uppercase ${isDark ? "text-zinc-500" : "text-zinc-400"}`}>
+                          Pilihan Engine AI Utama
+                        </h3>
+                        <p className={`text-xs ${isDark ? "text-zinc-500" : "text-zinc-500"}`}>
+                          Engine menentukan kecerdasan di balik tanggapan asisten Anda.
+                        </p>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {MODEL_OPTIONS.map((m) => {
+                            const isSelected = currentSession
+                              ? currentSession.model === m.id
+                              : selectedModelId === m.id;
+
+                            return (
+                              <div
+                                key={m.id}
+                                onClick={() => {
+                                  if (currentSession) {
+                                    setSessions((prev) =>
+                                      prev.map((s) => (s.id === currentSessionId ? { ...s, model: m.id } : s))
+                                    );
+                                  } else {
+                                    setSelectedModelId(m.id);
+                                  }
+                                  playNotifySound();
+                                }}
+                                className={`p-4.5 rounded-2xl border cursor-pointer transition-all duration-300 flex flex-col justify-between ${
+                                  isSelected
+                                    ? isDark
+                                      ? "bg-zinc-900 border-zinc-750 shadow-lg ring-1 ring-amber-500/20 text-zinc-100"
+                                      : "bg-blue-50/75 border-[#1a73e8] shadow-sm ring-1 ring-blue-500/20 text-zinc-900"
+                                    : isDark
+                                      ? "border-zinc-850 bg-zinc-900/10 text-zinc-400 hover:border-zinc-700 hover:bg-zinc-900/20"
+                                      : "border-zinc-200 bg-white text-zinc-600 hover:border-zinc-300 hover:bg-zinc-50"
+                                }`}
+                              >
+                                <div>
+                                  <div className="flex items-center justify-between mb-2">
+                                    <span className={`text-xs font-bold ${isSelected ? (isDark ? "text-zinc-100" : "text-zinc-900") : "text-zinc-500"}`}>
+                                      {m.name}
+                                    </span>
+                                    {isSelected ? (
+                                      <span className={`text-[9px] px-2 py-0.5 rounded-full font-mono border font-bold ${
+                                        isDark ? "bg-amber-500/10 border-amber-500/30 text-amber-400" : "bg-blue-500/10 border-blue-500/20 text-blue-600"
+                                      }`}>
+                                        Aktif
+                                      </span>
+                                    ) : (
+                                      <span className={`text-[9px] px-2 py-0.5 rounded-full font-mono border ${
+                                        isDark ? "bg-zinc-950 border-zinc-850 text-zinc-500" : "bg-zinc-100 border-zinc-200 text-zinc-500"
+                                      }`}>
+                                        {m.id === "gemma-4-31b" ? "Cepat" : "Kuat"}
+                                      </span>
+                                    )}
+                                  </div>
+                                  <p className={`text-xs leading-relaxed ${isDark ? "text-zinc-500" : "text-zinc-550"}`}>
+                                    {m.description}
+                                  </p>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {/* Character Preset Instruction Selection */}
+                      <div className="space-y-3 pt-2">
+                        <h3 className={`text-xs font-semibold tracking-wider font-mono uppercase ${isDark ? "text-zinc-500" : "text-zinc-400"}`}>
+                          Karakter / Preset Kepribadian
+                        </h3>
+                        <p className={`text-xs ${isDark ? "text-zinc-500" : "text-zinc-500"}`}>
+                          Ubah kepribadian, gaya bicara, dan keahlian kognitif Hexky dalam merespon pesan.
+                        </p>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {SYSTEM_PRESETS.map((preset) => {
+                            const isSelected = currentSession
+                              ? currentSession.systemInstructionId === preset.id
+                              : selectedPresetId === preset.id;
+
+                            return (
+                              <div
+                                key={preset.id}
+                                onClick={() => {
+                                  if (currentSession) {
+                                    setSessions((prev) =>
+                                      prev.map((s) => (s.id === currentSessionId ? { ...s, systemInstructionId: preset.id } : s))
+                                    );
+                                  } else {
+                                    setSelectedPresetId(preset.id);
+                                  }
+                                  playNotifySound();
+                                }}
+                                className={`p-4.5 rounded-2xl border cursor-pointer transition-all duration-300 ${
+                                  isSelected
+                                    ? isDark
+                                      ? "bg-zinc-900 border-zinc-750 shadow-lg ring-1 ring-amber-500/20"
+                                      : "bg-blue-50/75 border-[#1a73e8] shadow-sm ring-1 ring-blue-500/20"
+                                    : isDark
+                                      ? "border-zinc-850 bg-zinc-900/10 hover:border-zinc-700 hover:bg-zinc-900/20"
+                                      : "border-zinc-200 bg-white hover:border-zinc-300 hover:bg-zinc-50"
+                                }`}
+                              >
+                                <div className="flex items-center gap-3 mb-2.5">
+                                  <div className={`p-2 rounded-xl border ${
+                                    isSelected 
+                                      ? isDark ? "bg-zinc-950 border-zinc-800 text-amber-400" : "bg-white border-blue-250 text-blue-600" 
+                                      : isDark ? "bg-zinc-900 border-zinc-800/80 text-zinc-400" : "bg-zinc-100 border-zinc-200 text-zinc-500"
+                                  }`}>
+                                    {getPresetIcon(preset.icon, "h-4 w-4")}
+                                  </div>
+                                  <span className={`text-xs font-bold ${isSelected ? (isDark ? "text-zinc-100" : "text-zinc-900") : "text-zinc-500"}`}>
+                                    {preset.name}
+                                  </span>
+                                </div>
+                                <p className={`text-xs leading-relaxed ${isDark ? "text-zinc-500" : "text-zinc-550"}`}>
+                                  {preset.description}
+                                </p>
+                              </div>
+                            );
+                          })}
                         </div>
                       </div>
                     </div>
                   )}
 
-                  {/* Section 2: Model selection */}
-                  <div className="space-y-4">
-                    <h3 className="text-xs font-semibold tracking-wider text-zinc-400 font-mono uppercase">
-                      Pilihan Model Engine AI
-                    </h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {MODEL_OPTIONS.map((m) => {
-                        const isSelected = currentSession
-                          ? currentSession.model === m.id
-                          : selectedModelId === m.id;
+                  {/* TAB 3: TEMA & TAMPILAN */}
+                  {settingsTab === "tampilan" && (
+                    <div className="space-y-6 animate-fadeIn">
+                      <div className={`rounded-2xl p-6 border ${isDark ? "bg-zinc-900/20 border-zinc-850" : "bg-white border-zinc-200 shadow-sm"}`}>
+                        <h3 className={`text-xs font-semibold tracking-wider font-mono uppercase mb-1.5 ${isDark ? "text-zinc-500" : "text-zinc-400"}`}>
+                          Pilihan Tema Tampilan
+                        </h3>
+                        <p className={`text-xs mb-5 ${isDark ? "text-zinc-500" : "text-zinc-500"}`}>
+                          Ubah estetika visual ExeChat agar nyaman di mata saat membaca obrolan.
+                        </p>
 
-                        return (
-                          <div
-                            key={m.id}
-                            onClick={() => {
-                              if (currentSession) {
-                                setSessions((prev) =>
-                                  prev.map((s) => (s.id === currentSessionId ? { ...s, model: m.id } : s))
-                                );
-                              } else {
-                                setSelectedModelId(m.id);
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                          {[
+                            { id: "system", name: "Tema Sistem", desc: "Ikuti pengaturan OS perangkat", icon: Laptop },
+                            { id: "dark", name: "Hitam (Gelap)", desc: "Nuansa gelap hemat daya", icon: Moon },
+                            { id: "light", name: "Putih (Terang)", desc: "Nuansa terang kontras tinggi", icon: Sun },
+                          ].map((t) => {
+                            const isSelected = themeMode === t.id;
+                            const IconComp = t.icon;
+
+                            return (
+                              <div
+                                key={t.id}
+                                onClick={() => {
+                                  setThemeMode(t.id as any);
+                                  playNotifySound();
+                                }}
+                                className={`p-4.5 rounded-2xl border cursor-pointer transition-all duration-300 flex flex-col justify-between items-start text-left ${
+                                  isSelected
+                                    ? isDark
+                                      ? "bg-zinc-900 border-amber-500/80 shadow-md text-zinc-100 ring-1 ring-amber-500/10"
+                                      : "bg-blue-50/75 border-[#1a73e8] shadow-sm text-zinc-900 ring-1 ring-blue-500/10"
+                                    : isDark
+                                      ? "border-zinc-850 bg-zinc-900/10 text-zinc-450 hover:border-zinc-700 hover:bg-zinc-900/20"
+                                      : "border-zinc-200 bg-white text-zinc-650 hover:border-zinc-300 hover:bg-zinc-50"
+                                }`}
+                              >
+                                <div className="flex items-center gap-2.5 mb-2.5">
+                                  <div className={`p-2 rounded-xl border ${
+                                    isSelected 
+                                      ? isDark ? "bg-amber-500/10 border-transparent text-amber-400" : "bg-[#1a73e8] border-transparent text-white" 
+                                      : isDark ? "bg-zinc-900 border-zinc-800/80 text-zinc-400" : "bg-zinc-100 border-zinc-200 text-zinc-500"
+                                  }`}>
+                                    <IconComp className="h-4 w-4" />
+                                  </div>
+                                  <span className={`text-xs font-bold ${isSelected ? (isDark ? "text-zinc-100" : "text-zinc-900") : "text-zinc-500"}`}>
+                                    {t.name}
+                                  </span>
+                                </div>
+                                <p className={`text-[11px] leading-normal ${isDark ? "text-zinc-500" : "text-zinc-550"}`}>
+                                  {t.desc}
+                                </p>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      <div className={`rounded-2xl p-6 border ${isDark ? "bg-zinc-900/20 border-zinc-850" : "bg-white border-zinc-200 shadow-sm"}`}>
+                        <h3 className={`text-xs font-semibold tracking-wider font-mono uppercase mb-2 ${isDark ? "text-zinc-500" : "text-zinc-400"}`}>
+                          Penyesuaian Audio & Suara
+                        </h3>
+                        <p className={`text-xs leading-relaxed ${isDark ? "text-zinc-500" : "text-zinc-500"}`}>
+                          ExeChat secara otomatis membunyikan notifikasi lembut saat asisten Hexky selesai merespon pesan Anda sebagai umpan balik interaktif.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* TAB 4: INGATAN AI */}
+                  {settingsTab === "ingatan" && (
+                    <div className="space-y-6 animate-fadeIn">
+                      <div className={`rounded-2xl p-6 border ${isDark ? "bg-zinc-900/20 border-zinc-850" : "bg-white border-zinc-200 shadow-sm"}`}>
+                        <div className="flex items-center gap-2.5 mb-2">
+                          <Brain className="h-5 w-5 text-amber-500 animate-pulse" />
+                          <h3 className={`text-xs font-semibold tracking-wider font-mono uppercase ${isDark ? "text-zinc-500" : "text-zinc-400"}`}>
+                            Konfigurasi Ingatan AI (Maksimal 5)
+                          </h3>
+                        </div>
+                        <p className={`text-xs leading-relaxed mb-5 ${isDark ? "text-zinc-500" : "text-zinc-500"}`}>
+                          Asisten Hexky akan mengingat nama, preferensi pekerjaan, bahasa, atau instruksi khusus yang Anda tetapkan di sini di seluruh sesi obrolan Anda yang berbeda secara permanen.
+                        </p>
+
+                        {/* Add Memory Form */}
+                        <div className="flex gap-2 mb-4">
+                          <input
+                            type="text"
+                            value={memoryInput}
+                            onChange={(e) => setMemoryInput(e.target.value)}
+                            placeholder={memories.length >= 5 ? "Batas maksimal ingatan tercapai" : "Contoh: Saya adalah programmer React..."}
+                            disabled={memories.length >= 5}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" && memoryInput.trim()) {
+                                e.preventDefault();
+                                if (memories.length < 5) {
+                                  setMemories((prev) => [...prev, memoryInput.trim()]);
+                                  setMemoryInput("");
+                                  playNotifySound();
+                                }
                               }
                             }}
-                            className={`p-4 rounded-2xl border cursor-pointer transition-all duration-300 flex flex-col justify-between ${
-                              isSelected
-                                ? "bg-zinc-900/60 border-zinc-700/80 shadow-lg shadow-black/20"
-                                : "border-zinc-900 bg-zinc-900/10 hover:border-zinc-800"
+                            className={`flex-1 rounded-xl px-4 py-2.5 text-xs focus:outline-none border transition-colors ${
+                              isDark 
+                                ? "bg-zinc-950 border-zinc-850 text-zinc-100 placeholder-zinc-700 focus:border-zinc-750" 
+                                : "bg-white border-zinc-200 text-zinc-900 placeholder-zinc-400 focus:border-zinc-350"
                             }`}
-                          >
-                            <div>
-                              <div className="flex items-center justify-between mb-2">
-                                <span className={`text-sm font-semibold ${isSelected ? "text-zinc-100" : "text-zinc-300"}`}>
-                                  {m.name}
-                                </span>
-                                <span className={`text-[10px] px-2 py-0.5 rounded-full font-mono ${
-                                  m.id === "gemma-4-31b"
-                                    ? "bg-zinc-800 border border-zinc-750 text-zinc-300"
-                                    : "bg-amber-950/20 border border-amber-900/30 text-amber-400"
-                                }`}>
-                                  {m.id === "gemma-4-31b" ? "Lightweight" : "Powerful"}
-                                </span>
-                              </div>
-                              <p className="text-xs text-zinc-500 leading-relaxed font-sans">
-                                {m.description}
-                              </p>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  {/* Section 3: System Presets */}
-                  <div className="space-y-4">
-                    <h3 className="text-xs font-semibold tracking-wider text-zinc-400 font-mono uppercase">
-                      Karakter / Preset AI
-                    </h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {SYSTEM_PRESETS.map((preset) => {
-                        const isSelected = currentSession
-                          ? currentSession.systemInstructionId === preset.id
-                          : selectedPresetId === preset.id;
-
-                        return (
-                          <div
-                            key={preset.id}
+                          />
+                          <button
                             onClick={() => {
-                              if (currentSession) {
-                                setSessions((prev) =>
-                                  prev.map((s) => (s.id === currentSessionId ? { ...s, systemInstructionId: preset.id } : s))
-                                );
-                              } else {
-                                setSelectedPresetId(preset.id);
-                              }
-                            }}
-                            className={`p-4 rounded-2xl border cursor-pointer transition-all duration-300 ${
-                              isSelected
-                                ? "bg-zinc-900/60 border-zinc-700/80 shadow-lg shadow-black/20"
-                                : "border-zinc-900 bg-zinc-900/10 hover:border-zinc-800"
-                            }`}
-                          >
-                            <div className="flex items-center gap-2.5 mb-2">
-                              <div className={`p-1.5 rounded-xl ${isSelected ? "bg-zinc-100 text-zinc-950" : "bg-zinc-900 text-zinc-400"}`}>
-                                {getPresetIcon(preset.icon, "h-4 w-4")}
-                              </div>
-                              <span className={`text-sm font-semibold ${isSelected ? "text-zinc-100" : "text-zinc-300"}`}>
-                                {preset.name}
-                              </span>
-                            </div>
-                            <p className="text-xs text-zinc-500 leading-relaxed font-sans">
-                              {preset.description}
-                            </p>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  {/* Section 4: Tema Tampilan (Redesigned Theme Switcher) */}
-                  <div className="space-y-4">
-                    <h3 className="text-xs font-semibold tracking-wider text-zinc-400 font-mono uppercase">
-                      Pengaturan Tema Tampilan
-                    </h3>
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                      {[
-                        { id: "system", name: "Sistem", desc: "Ikuti tema perangkat", icon: Laptop },
-                        { id: "dark", name: "Hitam (Gelap)", desc: "Tema gelap hemat daya", icon: Moon },
-                        { id: "light", name: "Putih (Terang)", desc: "Tema terang kontras tinggi", icon: Sun },
-                      ].map((t) => {
-                        const isSelected = themeMode === t.id;
-                        const IconComp = t.icon;
-
-                        return (
-                          <div
-                            key={t.id}
-                            onClick={() => setThemeMode(t.id as any)}
-                            className={`p-4 rounded-2xl border cursor-pointer transition-all duration-300 flex flex-col justify-between items-start text-left ${
-                              isSelected
-                                ? "bg-[#1a73e8]/10 border-[#1a73e8] shadow-lg shadow-[#1a73e8]/5"
-                                : "border-zinc-900 bg-zinc-900/10 hover:border-zinc-800"
-                            }`}
-                          >
-                            <div className="flex items-center gap-2.5 mb-2">
-                              <div className={`p-1.5 rounded-xl ${isSelected ? "bg-[#1a73e8] text-white" : "bg-zinc-900 text-zinc-400"}`}>
-                                <IconComp className="h-4 w-4" />
-                              </div>
-                              <span className={`text-sm font-semibold ${isSelected ? "text-zinc-100" : "text-zinc-300"}`}>
-                                {t.name}
-                              </span>
-                            </div>
-                            <p className="text-[11px] text-zinc-500 leading-normal font-sans">
-                              {t.desc}
-                            </p>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  {/* Section 5: Ingatan AI (Memory) */}
-                  <div className="space-y-4">
-                    <div className="flex items-center gap-2">
-                      <Brain className="h-4 w-4 text-amber-500" />
-                      <h3 className="text-xs font-semibold tracking-wider text-zinc-400 font-mono uppercase">
-                        Ingatan AI (Memory - Maksimal 5)
-                      </h3>
-                    </div>
-                    
-                    <div className="bg-zinc-900/20 border border-zinc-900 rounded-2xl p-6 space-y-4">
-                      <p className="text-xs text-zinc-450 leading-relaxed font-sans">
-                        ExeChat akan mengingat preferensi, nama, atau konteks khusus yang Anda simpan di sini untuk semua sesi obrolan mendatang.
-                      </p>
-
-                      {/* Add Memory Form */}
-                      <div className="flex gap-2">
-                        <input
-                          type="text"
-                          value={memoryInput}
-                          onChange={(e) => setMemoryInput(e.target.value)}
-                          placeholder={memories.length >= 5 ? "Batas maksimal ingatan tercapai" : "Contoh: Panggil saya Nairi..."}
-                          disabled={memories.length >= 5}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter" && memoryInput.trim()) {
-                              e.preventDefault();
-                              if (memories.length < 5) {
+                              if (memoryInput.trim() && memories.length < 5) {
                                 setMemories((prev) => [...prev, memoryInput.trim()]);
                                 setMemoryInput("");
+                                playNotifySound();
                               }
-                            }
-                          }}
-                          className="flex-1 bg-zinc-950 border border-zinc-900 focus:border-zinc-850 focus:outline-none rounded-xl px-4 py-2 text-xs text-zinc-200 placeholder-zinc-650 font-sans"
-                        />
-                        <button
-                          onClick={() => {
-                            if (memoryInput.trim() && memories.length < 5) {
-                              setMemories((prev) => [...prev, memoryInput.trim()]);
-                              setMemoryInput("");
-                            }
-                          }}
-                          disabled={!memoryInput.trim() || memories.length >= 5}
-                          className="px-4 py-2 rounded-xl bg-zinc-100 hover:bg-zinc-200 disabled:bg-zinc-900 disabled:text-zinc-650 text-zinc-950 text-xs font-semibold font-sans transition-all shrink-0"
-                        >
-                          Simpan
-                        </button>
-                      </div>
+                            }}
+                            disabled={!memoryInput.trim() || memories.length >= 5}
+                            className={`px-5 py-2.5 rounded-xl text-xs font-semibold transition-all shrink-0 border ${
+                              isDark 
+                                ? "bg-zinc-100 hover:bg-zinc-200 disabled:bg-zinc-900 disabled:text-zinc-700 text-zinc-950 border-transparent cursor-pointer" 
+                                : "bg-zinc-900 hover:bg-zinc-800 disabled:bg-zinc-100 disabled:text-zinc-350 text-white border-transparent shadow-sm cursor-pointer"
+                            }`}
+                          >
+                            Simpan
+                          </button>
+                        </div>
 
-                      {memories.length >= 5 && (
-                        <p className="text-[10px] text-amber-500 font-sans">
-                          * Batas maksimal 5 ingatan telah tercapai. Hapus beberapa ingatan jika ingin menambahkan yang baru.
-                        </p>
-                      )}
-
-                      {/* Memories List */}
-                      <div className="space-y-2 pt-2">
-                        {memories.length === 0 ? (
-                          <div className="text-center py-4 border border-dashed border-zinc-900 rounded-xl text-zinc-600 text-xs font-sans">
-                            Belum ada ingatan yang tersimpan. Tambahkan preferensi Anda di atas!
-                          </div>
-                        ) : (
-                          memories.map((mem, idx) => (
-                            <div
-                              key={idx}
-                              className="flex items-center justify-between gap-3 p-3 rounded-xl border border-zinc-900 bg-zinc-950/40 hover:bg-zinc-950 transition-all text-left"
-                            >
-                              <div className="flex items-center gap-2.5 min-w-0">
-                                <span className="h-1.5 w-1.5 rounded-full bg-amber-500 shrink-0" />
-                                <span className="text-xs text-zinc-300 truncate font-sans">{mem}</span>
-                              </div>
-                              <button
-                                onClick={() => setMemories((prev) => prev.filter((_, i) => i !== idx))}
-                                className="p-1 rounded bg-zinc-900/30 hover:bg-red-950/20 text-zinc-500 hover:text-red-400 transition-colors shrink-0"
-                                title="Hapus Ingatan"
-                              >
-                                <Trash2 className="h-3.5 w-3.5" />
-                              </button>
-                            </div>
-                          ))
+                        {memories.length >= 5 && (
+                          <p className="text-[10px] text-amber-500 mb-3">
+                            * Anda telah menyimpan 5 ingatan (maksimal). Silakan hapus ingatan lama untuk menambahkan preferensi baru.
+                          </p>
                         )}
+
+                        {/* Memories List */}
+                        <div className="space-y-2 pt-2 border-t border-zinc-500/10">
+                          {memories.length === 0 ? (
+                            <div className={`text-center py-6 border border-dashed rounded-xl text-xs ${isDark ? "border-zinc-800/80 text-zinc-600" : "border-zinc-200 text-zinc-400"}`}>
+                              Belum ada ingatan khusus. Tulis preferensi Anda di atas agar Hexky lebih mengenal Anda!
+                            </div>
+                          ) : (
+                            memories.map((mem, idx) => (
+                              <div
+                                key={idx}
+                                className={`flex items-center justify-between gap-3 p-3.5 rounded-xl border transition-all text-left ${
+                                  isDark 
+                                    ? "border-zinc-850 bg-zinc-950/45 hover:bg-zinc-950" 
+                                    : "border-zinc-150 bg-white hover:bg-zinc-50 shadow-sm"
+                                }`}
+                              >
+                                <div className="flex items-center gap-2.5 min-w-0">
+                                  <span className="h-1.5 w-1.5 rounded-full bg-amber-500 shrink-0" />
+                                  <span className={`text-xs truncate font-sans font-medium ${isDark ? "text-zinc-300" : "text-zinc-700"}`}>{mem}</span>
+                                </div>
+                                <button
+                                  onClick={() => {
+                                    setMemories((prev) => prev.filter((_, i) => i !== idx));
+                                    playNotifySound();
+                                  }}
+                                  className={`p-1.5 rounded-lg transition-colors shrink-0 border ${
+                                    isDark 
+                                      ? "bg-zinc-900/40 border-zinc-800 hover:bg-red-950/25 text-zinc-500 hover:text-red-400" 
+                                      : "bg-zinc-50 border-zinc-200 hover:bg-red-50 text-zinc-500 hover:text-red-650"
+                                  }`}
+                                  title="Hapus Ingatan"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </button>
+                              </div>
+                            ))
+                          )}
+                        </div>
                       </div>
                     </div>
-                  </div>
+                  )}
 
                 </div>
               </motion.div>
@@ -3039,33 +3229,41 @@ export default function App() {
                   animate={{ opacity: 1, scale: 1, y: 0 }}
                   exit={{ opacity: 0, scale: 0.98, y: 8 }}
                   transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
-                  className="relative w-full max-w-[380px] rounded-2xl border border-zinc-800 bg-zinc-900 p-6 shadow-xl z-10"
+                  className={`relative w-full max-w-[380px] rounded-2xl border p-6 shadow-xl z-10 transition-all ${
+                    isDark ? "bg-zinc-900 border-zinc-800 text-zinc-100" : "bg-white border-zinc-200 text-zinc-900"
+                  }`}
                 >
                   {/* Header */}
                   <div className="flex items-center gap-3 mb-3">
-                    <div className="h-10 w-10 rounded-xl bg-zinc-800 border border-zinc-700 flex items-center justify-center text-zinc-300">
+                    <div className={`h-10 w-10 rounded-xl flex items-center justify-center border ${
+                      isDark ? "bg-zinc-800 border-zinc-700 text-zinc-300" : "bg-zinc-100 border-zinc-200 text-zinc-600"
+                    }`}>
                       <User className="h-5 w-5" />
                     </div>
                     <div>
-                      <p className="text-[10px] text-zinc-500 font-medium">Langkah Terakhir</p>
-                      <h3 className="font-sans font-semibold text-base text-zinc-100">Siapa Nama Anda?</h3>
+                      <p className={`text-[10px] font-medium ${isDark ? "text-zinc-500" : "text-zinc-400"}`}>Langkah Terakhir</p>
+                      <h3 className={`font-sans font-semibold text-base ${isDark ? "text-zinc-100" : "text-zinc-900"}`}>Siapa Nama Anda?</h3>
                     </div>
                   </div>
 
-                  <p className="text-xs text-zinc-400 leading-relaxed mb-5 font-sans">
+                  <p className={`text-xs leading-relaxed mb-5 font-sans ${isDark ? "text-zinc-400" : "text-zinc-500"}`}>
                     Pilih nama panggilan yang akan ditampilkan dalam sesi obrolan Anda. Lewati untuk menggunakan nama dari akun Google Anda.
                   </p>
 
                   {/* Input field */}
                   <div className="space-y-1.5 mb-5">
-                    <label className="block text-[10px] text-zinc-500 font-medium uppercase tracking-wider">Nama Panggilan</label>
+                    <label className={`block text-[10px] font-medium uppercase tracking-wider ${isDark ? "text-zinc-500" : "text-zinc-400"}`}>Nama Panggilan</label>
                     <input
                       type="text"
                       value={registerModalName}
                       onChange={(e) => setRegisterModalName(e.target.value)}
                       placeholder="Contoh: Budi Prasetyo"
                       maxLength={30}
-                      className="w-full rounded-xl border border-zinc-850 bg-zinc-950 px-4 py-2.5 text-sm text-zinc-100 outline-none focus:border-zinc-700 transition-colors placeholder-zinc-700 font-sans"
+                      className={`w-full rounded-xl border px-4 py-2.5 text-sm outline-none transition-colors font-sans ${
+                        isDark 
+                          ? "bg-zinc-950 border-zinc-850 text-zinc-100 focus:border-zinc-700 placeholder-zinc-700" 
+                          : "bg-white border-zinc-200 text-zinc-900 focus:border-zinc-350 placeholder-zinc-450"
+                      }`}
                     />
                   </div>
 
@@ -3073,20 +3271,123 @@ export default function App() {
                   <div className="flex flex-col gap-2.5">
                     <button
                       onClick={() => handleCompleteRegistrationWithChosenName(registerModalName)}
-                      className="w-full py-2.5 px-4 rounded-xl bg-white hover:bg-zinc-100 text-zinc-950 font-semibold text-xs transition-colors duration-150 cursor-pointer text-center"
+                      className={`w-full py-2.5 px-4 rounded-xl font-semibold text-xs transition-colors duration-150 cursor-pointer text-center ${
+                        isDark ? "bg-white hover:bg-zinc-100 text-zinc-950" : "bg-zinc-900 hover:bg-zinc-800 text-white shadow-sm"
+                      }`}
                     >
                       Simpan & Lanjutkan
                     </button>
                     
                     <button
                       onClick={() => handleCompleteRegistrationWithChosenName(googleDefaultName)}
-                      className="w-full py-2.5 px-4 rounded-xl border border-zinc-800 hover:border-zinc-750 bg-transparent hover:bg-zinc-850 text-zinc-400 hover:text-zinc-200 font-medium text-xs transition-colors duration-150 cursor-pointer text-center"
+                      className={`w-full py-2.5 px-4 rounded-xl border font-medium text-xs transition-colors duration-150 cursor-pointer text-center ${
+                        isDark 
+                          ? "border-zinc-800 hover:border-zinc-750 bg-transparent hover:bg-zinc-850 text-zinc-400 hover:text-zinc-200" 
+                          : "border-zinc-200 hover:border-zinc-300 bg-transparent hover:bg-zinc-50 text-zinc-600 hover:text-zinc-800"
+                      }`}
                     >
                       Lewati (Gunakan Nama Google)
                     </button>
                   </div>
                 </motion.div>
               </div>
+            )}
+          </AnimatePresence>
+
+          {/* COOKIE CONSENT SYSTEM */}
+          <AnimatePresence>
+            {!cookieConsent && (
+              <motion.div
+                initial={{ opacity: 0, y: 50, scale: 0.95 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 40, scale: 0.95 }}
+                transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                className="fixed bottom-4 left-4 right-4 md:left-auto md:right-4 md:max-w-md z-50 p-5 rounded-2xl border shadow-2xl flex flex-col gap-4 font-sans select-none backdrop-blur-xl transition-all"
+                style={{
+                  backgroundColor: isDark ? "rgba(24, 24, 27, 0.95)" : "rgba(255, 255, 255, 0.95)",
+                  borderColor: isDark ? "rgba(63, 63, 70, 0.8)" : "rgba(228, 228, 231, 0.9)"
+                }}
+              >
+                <div className="flex items-start gap-3">
+                  <div className={`p-2 rounded-xl shrink-0 ${isDark ? "bg-amber-500/10 text-amber-400" : "bg-amber-500/15 text-amber-600"}`}>
+                    <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M12 2a10 10 0 1 0 10 10 4 4 0 0 1-5-5 4 4 0 0 1-5-5z" />
+                      <path d="M8.5 14.5a1 1 0 1 0 0-2 1 1 0 0 0 0 2z" fill="currentColor" />
+                      <path d="M11.5 17.5a1 1 0 1 0 0-2 1 1 0 0 0 0 2z" fill="currentColor" />
+                      <path d="M14.5 13.5a1 1 0 1 0 0-2 1 1 0 0 0 0 2z" fill="currentColor" />
+                    </svg>
+                  </div>
+                  <div className="space-y-1.5 min-w-0">
+                    <h4 className={`text-sm font-bold tracking-tight ${isDark ? "text-zinc-100" : "text-zinc-900"}`}>
+                      Pemberitahuan Cookie & Penyimpanan
+                    </h4>
+                    <p className={`text-xs leading-relaxed ${isDark ? "text-zinc-400" : "text-zinc-500"}`}>
+                      ExeChat menggunakan kuki dan penyimpanan lokal (localStorage) untuk mengingat sesi obrolan, pengaturan tema tampilan, serta verifikasi login Google Anda agar dapat berfungsi secara optimal dan aman.
+                    </p>
+                  </div>
+                </div>
+
+                {showCookieDetails && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: "auto" }}
+                    className={`text-[11px] p-3 rounded-xl border space-y-2 leading-relaxed ${
+                      isDark ? "bg-zinc-900/60 border-zinc-800 text-zinc-400" : "bg-zinc-50 border-zinc-200 text-zinc-650"
+                    }`}
+                  >
+                    <div className="font-semibold text-xs mb-1">Rincian Penyimpanan Kami:</div>
+                    <div className="flex items-start gap-1.5">
+                      <span className="text-amber-500">•</span>
+                      <span><strong>Esensial (Wajib)</strong>: Menyimpan ID sesi percakapan Anda, status login Google, dan kunci API yang diperlukan untuk berinteraksi dengan AI.</span>
+                    </div>
+                    <div className="flex items-start gap-1.5">
+                      <span className="text-amber-500">•</span>
+                      <span><strong>Preferensi (Opsional)</strong>: Menyimpan pilihan tema (Gelap/Terang), karakter/preset asisten pilihan, serta memori preferensi panggilan Anda.</span>
+                    </div>
+                    <div>Kami menghargai privasi Anda sepenuhnya. Seluruh data chat Anda disimpan secara lokal di perangkat Anda sendiri.</div>
+                  </motion.div>
+                )}
+
+                <div className="flex flex-wrap items-center justify-between gap-3 pt-2.5 border-t border-zinc-500/10">
+                  <button
+                    onClick={() => setShowCookieDetails(!showCookieDetails)}
+                    className={`text-xs font-semibold hover:underline ${isDark ? "text-zinc-400 hover:text-zinc-250" : "text-zinc-600 hover:text-zinc-900"}`}
+                  >
+                    {showCookieDetails ? "Sembunyikan Detail" : "Pelajari Detail"}
+                  </button>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => {
+                        localStorage.setItem("exechat_cookie_consent", "rejected");
+                        setCookieConsent("rejected");
+                        playNotifySound();
+                      }}
+                      className={`text-xs font-semibold py-1.5 px-3 rounded-lg border transition-all cursor-pointer ${
+                        isDark 
+                          ? "border-zinc-800 hover:bg-zinc-900 text-zinc-400 hover:text-zinc-200" 
+                          : "border-zinc-200 hover:bg-zinc-100 text-zinc-600 hover:text-zinc-800"
+                      }`}
+                    >
+                      Tolak
+                    </button>
+                    <button
+                      onClick={() => {
+                        localStorage.setItem("exechat_cookie_consent", "accepted");
+                        setCookieConsent("accepted");
+                        playNotifySound();
+                      }}
+                      className={`text-xs font-semibold py-1.5 px-4.5 rounded-lg transition-all border cursor-pointer ${
+                        isDark 
+                          ? "bg-amber-500 hover:bg-amber-600 text-zinc-950 border-transparent shadow-md hover:scale-[1.02]" 
+                          : "bg-zinc-900 hover:bg-zinc-800 text-white border-transparent shadow-sm hover:scale-[1.02]"
+                      }`}
+                    >
+                      Setujui
+                    </button>
+                  </div>
+                </div>
+              </motion.div>
             )}
           </AnimatePresence>
         </main>
