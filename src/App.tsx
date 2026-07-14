@@ -41,14 +41,14 @@ import {
   ThumbsDown,
   MoreHorizontal,
   RotateCw,
-  User
+  User,
+  LogOut
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { Message, ChatSession, SystemPreset, ModelOption } from "./types";
 import { MarkdownRenderer } from "./components/MarkdownRenderer";
-import { auth, provider, db } from "./firebase";
-import { signInWithPopup, onAuthStateChanged } from "firebase/auth";
-import { ref, get, set, update } from "firebase/database";
+import { GoogleOAuthProvider, GoogleLogin } from "@react-oauth/google";
+import { jwtDecode } from "jwt-decode";
 import { MODEL_OPTIONS, SYSTEM_PRESETS, SUGGESTED_PROMPTS } from "./presets";
 
 const notifySoundUrl = new URL("../Sound/notify.mp3", import.meta.url).href;
@@ -189,6 +189,9 @@ export default function App() {
   });
   const [userDisplayName, setUserDisplayName] = useState<string>(() => {
     return localStorage.getItem("exechat_display_name") || "";
+  });
+  const [userPhoto, setUserPhoto] = useState<string | null>(() => {
+    return localStorage.getItem("exechat_user_photo") || null;
   });
   const [lastClaimAt, setLastClaimAt] = useState<number | null>(() => {
     const raw = localStorage.getItem("exechat_last_claim_at");
@@ -352,7 +355,12 @@ export default function App() {
     } else {
       localStorage.removeItem("exechat_display_name");
     }
-  }, [isLoggedIn, userEmail, userId, userName, userDisplayName]);
+    if (userPhoto) {
+      localStorage.setItem("exechat_user_photo", userPhoto);
+    } else {
+      localStorage.removeItem("exechat_user_photo");
+    }
+  }, [isLoggedIn, userEmail, userId, userName, userDisplayName, userPhoto]);
 
   // Sync last claim timestamp
   useEffect(() => {
@@ -422,97 +430,31 @@ export default function App() {
       ttsSynthRef.current = window.speechSynthesis;
     }
 
-    // If logged in as guest previously, restore session instantly
-    const cachedUserId = localStorage.getItem("exechat_user_id");
-    if (cachedUserId === "guest") {
-      setUserId("guest");
-      setUserEmail("guest@exechat.local");
-      setUserName("Tamu");
-      setUserDisplayName("Tamu");
-      setCredits(99999);
+    // Restore sessions from localStorage
+    const savedLoggedIn = localStorage.getItem("exechat_logged_in") === "true";
+    const savedUserId = localStorage.getItem("exechat_user_id");
+
+    if (savedLoggedIn && savedUserId && savedUserId !== "guest") {
+      setUserId(savedUserId);
+      setUserEmail(localStorage.getItem("exechat_email"));
+      setUserName(localStorage.getItem("exechat_username") || "");
+      setUserDisplayName(localStorage.getItem("exechat_display_name") || "");
+      setUserPhoto(localStorage.getItem("exechat_user_photo") || null);
+      setCredits(99999); // Unlimited credits
       setIsLoggedIn(true);
-      setAuthLoading(false);
+    } else {
+      // Clean up any guest or invalid sessions
+      setIsLoggedIn(false);
+      setUserId(null);
+      setUserEmail(null);
+      setUserName("");
+      setUserDisplayName("");
+      setUserPhoto(null);
+      setCredits(0);
     }
-
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      console.debug("onAuthStateChanged fired. user:", user);
-      try {
-        // If the cached session is guest, do not override with null on sign out from firebase
-        const currentCachedUserId = localStorage.getItem("exechat_user_id");
-        if (!user && currentCachedUserId === "guest") {
-          return;
-        }
-
-        if (user && user.uid && user.email) {
-          try {
-            // debug: print current id token length to validate auth token is available
-            try {
-              const token = await user.getIdToken();
-              console.debug("current user id token length:", token ? token.length : 0);
-            } catch (tErr) {
-              console.warn("Failed to fetch id token for debug:", tErr);
-            }
-            const snapshot = await get(ref(db, `users/${user.uid}`));
-            if (snapshot.exists()) {
-              const data = snapshot.val();
-              const displayNameValue = data.username || data.displayName || user.displayName || user.email.split("@")[0] || "";
-              
-              // Load credits and claim time from localStorage, fallback to DB, or default to 500
-              const storedCredits = localStorage.getItem(`exechat_credits_${user.uid}`);
-              const resolvedCredits = storedCredits !== null ? Number(storedCredits) : (typeof data.credits === "number" ? data.credits : 500);
-              localStorage.setItem(`exechat_credits_${user.uid}`, String(resolvedCredits));
-
-              const storedLastClaim = localStorage.getItem(`exechat_last_claim_at_${user.uid}`);
-              const resolvedLastClaim = storedLastClaim !== null ? Number(storedLastClaim) : (typeof data.lastClaimAt === "number" ? data.lastClaimAt : null);
-              if (resolvedLastClaim !== null) {
-                localStorage.setItem(`exechat_last_claim_at_${user.uid}`, String(resolvedLastClaim));
-              }
-
-              setUserId(user.uid);
-              setUserEmail(user.email);
-              setUserDisplayName(displayNameValue);
-              setUserName(displayNameValue);
-              setCredits(resolvedCredits);
-              setLastClaimAt(resolvedLastClaim);
-              setIsLoggedIn(true);
-              setShowAuthOverlay(false);
-              setAuthStep("choose");
-              setPendingAuthUser(null);
-              setAuthMessage(null);
-            } else {
-              setPendingAuthUser({
-                uid: user.uid,
-                email: user.email,
-                displayName: user.displayName,
-              });
-              setNewUsernameInput(user.displayName || user.email.split("@")[0] || "");
-              setAuthStep("register");
-              setAuthMessage("Akun belum terdaftar. Silakan buat nama akun untuk melanjutkan.");
-              setShowAuthOverlay(true);
-              setIsLoggedIn(false);
-            }
-          } catch (err: any) {
-            console.error("Gagal memuat data pengguna dari Firebase:", err);
-            if (err && err.code && err.code.includes("permission-denied") || (err && String(err).toLowerCase().includes("permission denied"))) {
-              setErrorText("Akses database ditolak (PERMISSION_DENIED). Pastikan user sudah login dan aturan RTDB mengizinkan akses untuk user yang terautentikasi.");
-            }
-          }
-        } else {
-          setIsLoggedIn(false);
-          setUserEmail(null);
-          setUserId(null);
-          setUserName("");
-          setUserDisplayName("");
-          setCredits(0);
-          setLastClaimAt(null);
-        }
-      } finally {
-        setAuthLoading(false);
-      }
-    });
+    setAuthLoading(false);
 
     return () => {
-      unsubscribe();
       if (ttsSynthRef.current) {
         ttsSynthRef.current.cancel();
       }
@@ -713,284 +655,68 @@ export default function App() {
     return "Diskusi Baru";
   };
 
-  // Google Login click handler
-  const handleGoogleLoginClick = () => {
-    handleGoogleLogin();
+  // Google Login Success callback
+  const handleGoogleLoginSuccess = (credentialResponse: any) => {
+    if (!credentialResponse || !credentialResponse.credential) {
+      setErrorText("Gagal masuk dengan Google: Tidak ada credential.");
+      return;
+    }
+    try {
+      const decoded: any = jwtDecode(credentialResponse.credential);
+      if (!decoded || !decoded.sub || !decoded.email) {
+        throw new Error("Informasi pengguna Google tidak valid.");
+      }
+      
+      const uid = decoded.sub;
+      const email = decoded.email;
+      const name = decoded.name || decoded.given_name || email.split("@")[0] || "User";
+      const picture = decoded.picture || null;
+
+      setUserId(uid);
+      setUserEmail(email);
+      setUserName(name);
+      setUserDisplayName(name);
+      setUserPhoto(picture);
+      setCredits(99999);
+      setIsLoggedIn(true);
+      setErrorText(null);
+      playNotifySound();
+    } catch (error: any) {
+      console.error("Google login decode error:", error);
+      setErrorText(error?.message || "Gagal masuk dengan Google.");
+    }
   };
 
-  // Guest Login handler
-  const handleGuestLogin = () => {
-    setIsLoggedIn(true);
-    setUserId("guest");
-    setUserEmail("guest@exechat.local");
-    setUserName("Tamu");
-    setUserDisplayName("Tamu");
-    setCredits(99999);
-    localStorage.setItem("exechat_logged_in", "true");
-    localStorage.setItem("exechat_email", "guest@exechat.local");
-    localStorage.setItem("exechat_user_id", "guest");
-    localStorage.setItem("exechat_username", "Tamu");
-    localStorage.setItem("exechat_display_name", "Tamu");
-    localStorage.setItem("exechat_credits_guest", "99999");
-    setShowAuthOverlay(false);
-    setErrorText(null);
+  // Google Login click handler (fallback trigger)
+  const handleGoogleLoginClick = () => {
+    // Left for compatibility in settings layouts
   };
 
   // Logout handler
-  const handleLogout = async () => {
-    try {
-      await auth.signOut();
-    } catch (e) {
-      console.warn("Firebase sign out error:", e);
-    }
+  const handleLogout = () => {
     localStorage.removeItem("exechat_logged_in");
     localStorage.removeItem("exechat_email");
     localStorage.removeItem("exechat_user_id");
     localStorage.removeItem("exechat_username");
     localStorage.removeItem("exechat_display_name");
+    localStorage.removeItem("exechat_user_photo");
     setIsLoggedIn(false);
     setUserId(null);
     setUserEmail(null);
     setUserName("");
     setUserDisplayName("");
+    setUserPhoto(null);
     setCredits(0);
     setLastClaimAt(null);
-    setShowAuthOverlay(true);
+    playNotifySound();
   };
 
-  // Claim Daily Credits
+  // Claim Daily Credits (stub)
   const handleClaimDailyCredits = async () => {
-    if (!isLoggedIn || !userId) return;
-    const now = Date.now();
-    if (lastClaimAt && (now - lastClaimAt) < 24 * 60 * 60 * 1000) {
-      setErrorText("Anda sudah mengklaim kredit harian dalam 24 jam terakhir. Silakan coba nanti.");
-      return;
-    }
-
-    try {
-      const newCredits = credits + 50;
-      setCredits(newCredits);
-      setLastClaimAt(now);
-      localStorage.setItem(`exechat_credits_${userId}`, String(newCredits));
-      localStorage.setItem(`exechat_last_claim_at_${userId}`, String(now));
-      setErrorText(null);
-    } catch (err: any) {
-      console.error("Gagal mengklaim kredit harian:", err);
-      setErrorText(err.message || "Terjadi kesalahan saat mengklaim kredit.");
-    }
+    setErrorText("Kredit harian tidak diperlukan di versi ExeChat Premium (Kredit Tidak Terbatas).");
   };
 
-  const saveUserProfile = async (uid: string, email: string, displayName: string | null, requestedUsername?: string, creditsValue?: number) => {
-    const userRef = ref(db, `users/${uid}`);
-    let snapshot;
-    try {
-      snapshot = await get(userRef);
-    } catch (e) {
-      console.warn("Failed to get profile, assuming new user", e);
-    }
-    const fallbackName = displayName || email.split("@")[0] || "User";
-
-    if (snapshot && snapshot.exists()) {
-      const existing = snapshot.val();
-      const usernameValue = requestedUsername || existing.username || fallbackName;
-      const profileUpdate: Record<string, any> = {
-        email,
-        displayName: usernameValue,
-        username: usernameValue,
-        updatedAt: Date.now(),
-      };
-      await update(userRef, profileUpdate);
-
-      // Load credits from localStorage
-      const storedCredits = localStorage.getItem(`exechat_credits_${uid}`);
-      const currentCredits = storedCredits !== null ? Number(storedCredits) : 500;
-      return {
-        username: usernameValue,
-        displayName: usernameValue,
-        credits: currentCredits,
-        lastClaimAt: localStorage.getItem(`exechat_last_claim_at_${uid}`) ? Number(localStorage.getItem(`exechat_last_claim_at_${uid}`)) : null,
-      };
-    }
-
-    const usernameValue = requestedUsername || fallbackName;
-    const profileUpdate: Record<string, any> = {
-      email,
-      displayName: usernameValue,
-      username: usernameValue,
-      updatedAt: Date.now(),
-    };
-    await update(userRef, profileUpdate);
-
-    // Initialize credits to 500 in localStorage
-    localStorage.setItem(`exechat_credits_${uid}`, "500");
-    return {
-      username: usernameValue,
-      displayName: fallbackName,
-      credits: 500,
-      lastClaimAt: null,
-    };
-  };
-
-  const finalizeUserSession = (uid: string, email: string, username: string, displayName: string, creditsValue: number, lastClaimAtValue: number | null) => {
-    setUserId(uid);
-    setUserEmail(email);
-    setUserDisplayName(displayName);
-    setUserName(username);
-    setCredits(creditsValue);
-    setLastClaimAt(lastClaimAtValue);
-    setIsLoggedIn(true);
-    setShowAuthOverlay(false);
-    setAuthStep("choose");
-    setPendingAuthUser(null);
-    setAuthMessage(null);
-    setNewUsernameInput("");
-    setPendingRedeemCodeInput("");
-    setErrorText(null);
-
-    localStorage.setItem("exechat_logged_in", "true");
-    localStorage.setItem("exechat_email", email);
-    localStorage.setItem("exechat_user_id", uid);
-    localStorage.setItem("exechat_username", username);
-    localStorage.setItem("exechat_display_name", displayName);
-    localStorage.setItem(`exechat_credits_${uid}`, String(creditsValue));
-    if (lastClaimAtValue !== null) {
-      localStorage.setItem(`exechat_last_claim_at_${uid}`, String(lastClaimAtValue));
-    }
-  };
-
-  const handleGoogleLogin = async () => {
-    if (isLoggedIn) {
-      setErrorText("Anda sudah masuk, tidak bisa mengganti akun Google dari sini.");
-      return;
-    }
-
-    setShowAuthOverlay(true);
-    setAuthStep("choose");
-    setAuthMessage(null);
-    setIsLoggingInProcess(true);
-    try {
-      const result = await signInWithPopup(auth, provider);
-      const user = result.user;
-      if (!user || !user.uid || !user.email) {
-        throw new Error("Gagal mendapatkan informasi pengguna dari Google.");
-      }
-
-      const snapshot = await get(ref(db, `users/${user.uid}`));
-      if (snapshot.exists()) {
-        const data = snapshot.val();
-        const resolvedUsername = data.username || data.displayName || user.displayName || user.email.split("@")[0] || "User";
-        const storedCredits = localStorage.getItem(`exechat_credits_${user.uid}`);
-        const resolvedCredits = storedCredits !== null ? Number(storedCredits) : 500;
-        finalizeUserSession(
-          user.uid,
-          user.email,
-          resolvedUsername,
-          resolvedUsername,
-          resolvedCredits,
-          localStorage.getItem(`exechat_last_claim_at_${user.uid}`) ? Number(localStorage.getItem(`exechat_last_claim_at_${user.uid}`)) : null,
-        );
-      } else {
-        setPendingAuthUser({
-          uid: user.uid,
-          email: user.email,
-          displayName: user.displayName,
-        });
-        setNewUsernameInput(user.displayName || user.email.split("@")[0] || "");
-        setAuthStep("register");
-        setAuthMessage("Akun belum terdaftar. Silakan buat nama akun untuk melanjutkan.");
-        setIsLoggedIn(false);
-      }
-      setErrorText(null);
-    } catch (error: any) {
-      console.error("Google Sign-In gagal:", error);
-      setErrorText(error?.message || "Gagal masuk dengan Google.");
-      setShowAuthOverlay(false);
-    } finally {
-      setIsLoggingInProcess(false);
-    }
-  };
-
-  const handleCompleteRegistration = async (event?: React.FormEvent) => {
-    event?.preventDefault();
-    if (!pendingAuthUser) return;
-
-    const trimmedUsername = newUsernameInput.trim();
-    if (!trimmedUsername || !/^[a-zA-Z0-9 _-]{3,20}$/.test(trimmedUsername)) {
-      setAuthMessage("Nama akun harus 3-20 karakter dan hanya boleh berisi huruf, angka, spasi, underscore, atau strip.");
-      return;
-    }
-
-    setIsLoggingInProcess(true);
-    try {
-      await update(ref(db, `users/${pendingAuthUser.uid}`), {
-        email: pendingAuthUser.email.trim().toLowerCase(),
-        displayName: trimmedUsername,
-        username: trimmedUsername,
-        updatedAt: Date.now(),
-      });
-
-      localStorage.setItem(`exechat_credits_${pendingAuthUser.uid}`, "500");
-      finalizeUserSession(pendingAuthUser.uid, pendingAuthUser.email, trimmedUsername, trimmedUsername, 500, null);
-
-      if (pendingRedeemCodeInput.trim()) {
-        await handleRedeemCode(pendingAuthUser.uid, pendingRedeemCodeInput.trim());
-      }
-      setAuthMessage("Akun berhasil dibuat. Selamat datang di ExeChat.");
-    } catch (error: any) {
-      console.error("Gagal menyelesaikan pendaftaran:", error);
-      setAuthMessage(error?.message || "Gagal membuat akun. Coba lagi nanti.");
-    } finally {
-      setIsLoggingInProcess(false);
-    }
-  };
-
-  const REDEEM_CODES: Record<string, number> = {
-    "EXEAI50": 50,
-    "HEHEXKY": 100,
-    "FREEKREDIT": 500,
-  };
-
-  const handleRedeemCode = async (targetUserId?: string, customCode?: string) => {
-    const uid = targetUserId || userId;
-    if (!uid) {
-      setRedeemFeedback("Silakan login dengan Google terlebih dahulu untuk menukarkan kode.");
-      return;
-    }
-
-    const redemptionCode = (customCode || redeemCodeInput).trim().toUpperCase();
-    if (!redemptionCode) {
-      setRedeemFeedback("Masukkan kode redeem terlebih dahulu.");
-      return;
-    }
-
-    // Check if already redeemed
-    const redeemedCodesKey = `exechat_redeemed_${uid}`;
-    const redeemedListStr = localStorage.getItem(redeemedCodesKey) || "[]";
-    const redeemedList = JSON.parse(redeemedListStr) as string[];
-    
-    if (redeemedList.includes(redemptionCode)) {
-      setRedeemFeedback("Kode ini sudah pernah Anda tukarkan sebelumnya.");
-      return;
-    }
-
-    const reward = REDEEM_CODES[redemptionCode];
-    if (reward) {
-      const newCredits = credits + reward;
-      setCredits(newCredits);
-      localStorage.setItem(`exechat_credits_${uid}`, String(newCredits));
-      
-      redeemedList.push(redemptionCode);
-      localStorage.setItem(redeemedCodesKey, JSON.stringify(redeemedList));
-
-      setRedeemFeedback(`Berhasil! Anda menerima ${reward} kredit.`);
-      setRedeemCodeInput("");
-      setPendingRedeemCodeInput("");
-    } else {
-      setRedeemFeedback("Kode redeem tidak valid atau kedaluwarsa.");
-    }
-  };
-
-  const handleSaveUsername = async () => {
+  const handleSaveUsername = () => {
     if (!userId) {
       setErrorText("Silakan login terlebih dahulu untuk mengubah username.");
       return;
@@ -1007,20 +733,10 @@ export default function App() {
       return;
     }
 
-    try {
-      await update(ref(db, `users/${userId}`), {
-        username: trimmed,
-        displayName: trimmed,
-        updatedAt: Date.now(),
-      });
-      setUserName(trimmed);
-      setUserDisplayName(trimmed);
-      setErrorText(null);
-      setRedeemFeedback("Username berhasil disimpan.");
-    } catch (err) {
-      console.error("Gagal menyimpan username:", err);
-      setErrorText("Gagal menyimpan username. Coba lagi nanti.");
-    }
+    setUserName(trimmed);
+    setUserDisplayName(trimmed);
+    setErrorText(null);
+    setRedeemFeedback("Username berhasil disimpan.");
   };
 
   const createNewSession = (initialMsg?: string) => {
@@ -1257,7 +973,7 @@ export default function App() {
           temperature: apiTemp,
           model: apiModel,
           uid: isLoggedIn ? userId : null,
-          idToken: isLoggedIn ? await auth.currentUser?.getIdToken() : null,
+          idToken: null,
         }),
         signal: controller.signal,
       });
@@ -1495,7 +1211,7 @@ export default function App() {
           temperature: apiTemp,
           model: apiModel,
           uid: isLoggedIn ? userId : null,
-          idToken: isLoggedIn ? await auth.currentUser?.getIdToken() : null,
+          idToken: null,
         }),
         signal: controller.signal,
       });
@@ -1859,84 +1575,49 @@ export default function App() {
         {/* Background Cybernetic Glow Accent */}
         <div className={`absolute top-0 left-0 w-full h-[450px] bg-gradient-to-b ${curTheme.gradient} pointer-events-none select-none z-0`} />
         
-        <div className="w-full max-w-md rounded-3xl border border-zinc-800/70 bg-zinc-950/90 p-8 shadow-2xl z-10 mx-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-[10px] uppercase tracking-[0.3em] text-zinc-500 font-mono">ExeChat Secure Gate</p>
-              <h2 className="mt-1 text-2xl font-bold text-zinc-100">
-                {authStep === "register" ? "Lengkapi Akun Anda" : "Masuk ke ExeChat"}
-              </h2>
+        <div className="w-full max-w-md rounded-3xl border border-zinc-800/70 bg-zinc-950/90 p-8 shadow-2xl z-10 mx-4 flex flex-col items-center text-center">
+          <div className="mb-5 select-none">
+            <div className="inline-flex h-16 w-16 rounded-2xl bg-zinc-900 border border-zinc-800 flex items-center justify-center shadow-lg">
+              <svg className="h-9 w-9 animate-[spin_12s_linear_infinite]" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M12 3Q12 12 21 12Q12 12 12 21Q12 12 3 12Q12 12 12 3Z" fill="url(#loginGlow)" />
+                <defs>
+                  <linearGradient id="loginGlow" x1="3" y1="3" x2="21" y2="21" gradientUnits="userSpaceOnUse">
+                    <stop offset="0%" stopColor="#59a6ff" />
+                    <stop offset="50%" stopColor="#c084fc" />
+                    <stop offset="100%" stopColor="#ff8da1" />
+                  </linearGradient>
+                </defs>
+              </svg>
             </div>
           </div>
 
-          <p className="mt-3 text-sm text-zinc-450 leading-relaxed">
-            {authStep === "register"
-              ? "Akun Google Anda belum terdaftar. Buat nama akun terlebih dahulu untuk melanjutkan pendaftaran aman."
-              : "Silakan masuk dengan akun Google untuk memulai sesi chat aman."}
-          </p>
+          <div className="mb-6">
+            <p className="text-[10px] uppercase tracking-[0.3em] text-zinc-500 font-mono">ExeChat Gateway</p>
+            <h2 className="mt-1.5 text-2xl font-bold text-zinc-100">Masuk ke ExeChat</h2>
+            <p className="mt-2.5 text-xs text-zinc-400 max-w-sm leading-relaxed">
+              Selamat datang di ExeChat. Masuk dengan akun Google Anda untuk memulai sesi chat AI berkecepatan tinggi dengan Cerebras secara instan.
+            </p>
+          </div>
 
-          {authMessage && (
-            <div className="mt-4 rounded-xl border border-amber-900/40 bg-amber-950/25 px-3 py-2.5 text-xs text-amber-300">
-              {authMessage}
+          {errorText && (
+            <div className="w-full mb-5 rounded-xl border border-red-900/40 bg-red-950/20 px-3 py-2.5 text-xs text-red-400">
+              {errorText}
             </div>
           )}
 
-          {authStep === "choose" ? (
-            <div className="mt-6 space-y-3">
-              <button
-                onClick={handleGoogleLoginClick}
-                disabled={isLoggingInProcess}
-                className="flex w-full items-center justify-center gap-3 rounded-2xl bg-zinc-100 px-4 py-3.5 text-sm font-bold text-zinc-950 hover:bg-zinc-200 active:scale-[0.98] transition-all disabled:opacity-70 cursor-pointer"
-              >
-                <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden="true">
-                  <path fill="#4285F4" d="M21.6 12.23c0-.79-.07-1.54-.2-2.27H12v4.3h5.38a4.6 4.6 0 0 1-2 3.02v2.5h3.24c1.9-1.75 2.98-4.33 2.98-7.55Z" />
-                  <path fill="#34A853" d="M12 22c2.7 0 4.96-.9 6.62-2.43l-3.24-2.5c-.9.6-2.04.96-3.38.96-2.6 0-4.8-1.76-5.59-4.12H3.07v2.58A10 10 0 0 0 12 22Z" />
-                  <path fill="#FBBC05" d="M6.41 13.91A6.02 6.02 0 0 1 6.41 10.1V7.52H3.07a10 10 0 0 0 0 12.78l3.34-2.59Z" />
-                  <path fill="#EA4335" d="M12 6.04c1.47 0 2.79.5 3.83 1.48l2.87-2.87A9.98 9.98 0 0 0 3.07 7.52l3.34 2.59C7.2 7.8 9.4 6.04 12 6.04Z" />
-                </svg>
-                {isLoggingInProcess ? "Memproses..." : "Lanjutkan dengan Google"}
-              </button>
+          <div className="w-full flex justify-center py-4 bg-zinc-900/40 rounded-2xl border border-zinc-850/60 p-4">
+            <GoogleLogin
+              onSuccess={handleGoogleLoginSuccess}
+              onError={() => setErrorText("Gagal masuk dengan Google. Silakan coba lagi.")}
+              useOneTap
+              theme="filled_black"
+              shape="pill"
+            />
+          </div>
 
-              <button
-                onClick={handleGuestLogin}
-                disabled={isLoggingInProcess}
-                className="flex w-full items-center justify-center gap-3 rounded-2xl border border-zinc-850 bg-zinc-900/60 px-4 py-3.5 text-sm font-bold text-zinc-100 hover:bg-zinc-900 active:scale-[0.98] transition-all cursor-pointer"
-              >
-                <User className="h-5 w-5 text-zinc-400" />
-                Gunakan sebagai Tamu (Guest Mode)
-              </button>
-            </div>
-          ) : (
-            <form onSubmit={(e) => handleCompleteRegistration(e)} className="mt-6 space-y-4">
-              <div>
-                <label className="mb-1 block text-xs uppercase tracking-[0.2em] text-zinc-500 font-mono">Nama akun</label>
-                <input
-                  value={newUsernameInput}
-                  onChange={(e) => setNewUsernameInput(e.target.value)}
-                  placeholder="Contoh: Budi123"
-                  className="w-full rounded-2xl border border-zinc-800 bg-zinc-900/80 px-4 py-3 text-sm text-zinc-100 outline-none focus:border-amber-500"
-                />
-              </div>
-
-              <div>
-                <label className="mb-1 block text-xs uppercase tracking-[0.2em] text-zinc-500 font-mono">Kode redeem (opsional)</label>
-                <input
-                  value={pendingRedeemCodeInput}
-                  onChange={(e) => setPendingRedeemCodeInput(e.target.value)}
-                  placeholder="Masukkan kode redeem"
-                  className="w-full rounded-2xl border border-zinc-800 bg-zinc-900/80 px-4 py-3 text-sm text-zinc-100 outline-none focus:border-emerald-500"
-                />
-              </div>
-
-              <button
-                type="submit"
-                disabled={isLoggingInProcess}
-                className="w-full rounded-2xl bg-amber-500 px-4 py-3.5 text-sm font-bold text-zinc-950 hover:bg-amber-600 active:scale-[0.98] transition-all disabled:opacity-70 cursor-pointer"
-              >
-                {isLoggingInProcess ? "Menyimpan..." : "Selesai dan masuk"}
-              </button>
-            </form>
-          )}
+          <div className="mt-6 text-[10px] text-zinc-600 font-mono">
+            Sesi aman terenkripsi • Kredit Tidak Terbatas
+          </div>
         </div>
       </div>
     );
@@ -1953,110 +1634,6 @@ export default function App() {
         onChange={handleFileSelected}
       />
       <AnimatePresence>
-        {showAuthOverlay && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="absolute inset-0 z-50 flex items-center justify-center bg-[#05070a]/95 backdrop-blur-xl px-4"
-          >
-            <motion.div
-              initial={{ y: 16, opacity: 0, scale: 0.98 }}
-              animate={{ y: 0, opacity: 1, scale: 1 }}
-              exit={{ y: 10, opacity: 0, scale: 0.98 }}
-              className="w-full max-w-md rounded-3xl border border-zinc-800/70 bg-zinc-950/90 p-6 shadow-2xl"
-            >
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-[10px] uppercase tracking-[0.3em] text-zinc-500">ExeChat</p>
-                  <h2 className="mt-1 text-xl font-semibold text-zinc-100">
-                    {authStep === "register" ? "Lengkapi akun Anda" : "Masuk ke ExeChat"}
-                  </h2>
-                </div>
-                <button
-                  onClick={() => {
-                    setShowAuthOverlay(false);
-                    setAuthStep("choose");
-                    setPendingAuthUser(null);
-                    setAuthMessage(null);
-                  }}
-                  className="rounded-full border border-zinc-800 p-2 text-zinc-400 transition hover:bg-zinc-900 hover:text-zinc-200"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              </div>
-
-              <p className="mt-3 text-sm text-zinc-400">
-                {authStep === "register"
-                  ? "Akun Google Anda belum terdaftar. Buat nama akun, lalu lanjutkan atau lewati kode redeem."
-                  : "Pilih akun Google untuk masuk atau mendaftar."}
-              </p>
-
-              {authMessage && (
-                <div className="mt-4 rounded-xl border border-amber-900/40 bg-amber-950/25 px-3 py-2 text-sm text-amber-300">
-                  {authMessage}
-                </div>
-              )}
-
-              {authStep === "choose" ? (
-                <div className="space-y-3">
-                  <button
-                    onClick={handleGoogleLoginClick}
-                    disabled={isLoggingInProcess}
-                    className="mt-6 flex w-full items-center justify-center gap-3 rounded-2xl bg-zinc-100 px-4 py-3 text-sm font-semibold text-zinc-950 transition hover:bg-zinc-200 disabled:opacity-70 cursor-pointer"
-                  >
-                    <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden="true">
-                      <path fill="#4285F4" d="M21.6 12.23c0-.79-.07-1.54-.2-2.27H12v4.3h5.38a4.6 4.6 0 0 1-2 3.02v2.5h3.24c1.9-1.75 2.98-4.33 2.98-7.55Z" />
-                      <path fill="#34A853" d="M12 22c2.7 0 4.96-.9 6.62-2.43l-3.24-2.5c-.9.6-2.04.96-3.38.96-2.6 0-4.8-1.76-5.59-4.12H3.07v2.58A10 10 0 0 0 12 22Z" />
-                      <path fill="#FBBC05" d="M6.41 13.91A6.02 6.02 0 0 1 6.41 10.1V7.52H3.07a10 10 0 0 0 0 12.78l3.34-2.59Z" />
-                      <path fill="#EA4335" d="M12 6.04c1.47 0 2.79.5 3.83 1.48l2.87-2.87A9.98 9.98 0 0 0 3.07 7.52l3.34 2.59C7.2 7.8 9.4 6.04 12 6.04Z" />
-                    </svg>
-                    {isLoggingInProcess ? "Memproses..." : "Lanjutkan dengan Google"}
-                  </button>
-
-                  <button
-                    onClick={handleGuestLogin}
-                    disabled={isLoggingInProcess}
-                    className="flex w-full items-center justify-center gap-3 rounded-2xl border border-zinc-800 bg-zinc-900/40 px-4 py-3 text-sm font-semibold text-zinc-100 transition hover:bg-zinc-900 cursor-pointer"
-                  >
-                    <User className="h-5 w-5 text-zinc-400" />
-                    Gunakan sebagai Tamu (Guest Mode)
-                  </button>
-                </div>
-              ) : (
-                <form onSubmit={(e) => handleCompleteRegistration(e)} className="mt-6 space-y-4">
-                  <div>
-                    <label className="mb-1 block text-xs uppercase tracking-[0.2em] text-zinc-500">Nama akun</label>
-                    <input
-                      value={newUsernameInput}
-                      onChange={(e) => setNewUsernameInput(e.target.value)}
-                      placeholder="Contoh: Budi123"
-                      className="w-full rounded-2xl border border-zinc-800 bg-zinc-900/80 px-3 py-2.5 text-sm text-zinc-100 outline-none focus:border-amber-500"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="mb-1 block text-xs uppercase tracking-[0.2em] text-zinc-500">Kode redeem (opsional)</label>
-                    <input
-                      value={pendingRedeemCodeInput}
-                      onChange={(e) => setPendingRedeemCodeInput(e.target.value)}
-                      placeholder="Masukkan kode redeem"
-                      className="w-full rounded-2xl border border-zinc-800 bg-zinc-900/80 px-3 py-2.5 text-sm text-zinc-100 outline-none focus:border-emerald-500"
-                    />
-                  </div>
-
-                  <button
-                    type="submit"
-                    disabled={isLoggingInProcess}
-                    className="w-full rounded-2xl bg-amber-500 px-4 py-3 text-sm font-semibold text-zinc-950 transition hover:bg-amber-400 disabled:opacity-70"
-                  >
-                    {isLoggingInProcess ? "Menyimpan..." : "Selesai dan masuk"}
-                  </button>
-                </form>
-              )}
-            </motion.div>
-          </motion.div>
-        )}
       </AnimatePresence>
 
       {/* Background Cybernetic Glow Accent */}
@@ -2214,10 +1791,54 @@ export default function App() {
                 >
                   <Menu className="h-4.5 w-4.5" />
                 </button>
+                
+                {/* ExeChat Title on Header */}
+                <span className="text-sm font-semibold tracking-wide bg-gradient-to-r from-[#59a6ff] via-[#c084fc] to-[#ff8da1] bg-clip-text text-transparent select-none">
+                  ExeChat Room
+                </span>
               </div>
 
-              {/* Header Right Actions */}
-              <div className="flex items-center gap-2 select-none">
+              {/* Header Right Actions - Profile Picture, Full Name, Email, Logout */}
+              <div className="flex items-center gap-3 select-none">
+                {isLoggedIn && (
+                  <div className="flex items-center gap-3 border-l border-zinc-800/60 pl-3 md:pl-4">
+                    {/* User Profile Detail (Desktop only) */}
+                    <div className="hidden md:flex flex-col text-right">
+                      <span className="text-xs font-semibold text-zinc-100 leading-tight">
+                        {userDisplayName || userName}
+                      </span>
+                      <span className="text-[10px] text-zinc-500 font-mono leading-none mt-0.5">
+                        {userEmail}
+                      </span>
+                    </div>
+
+                    {/* Foto Profil */}
+                    <div className="relative group">
+                      {userPhoto ? (
+                        <img
+                          src={userPhoto}
+                          alt="Profil"
+                          referrerPolicy="no-referrer"
+                          className="h-8 w-8 rounded-full object-cover border border-zinc-800 shadow-md transition-transform group-hover:scale-105"
+                        />
+                      ) : (
+                        <div className="h-8 w-8 rounded-full bg-gradient-to-tr from-[#59a6ff] to-[#c084fc] flex items-center justify-center font-bold text-xs text-white border border-zinc-800 shadow-md">
+                          {(userDisplayName || userName || "U").charAt(0).toUpperCase()}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Tombol Logout */}
+                    <button
+                      onClick={handleLogout}
+                      className={`p-2 rounded-xl transition-colors ${resolvedTheme === "dark" ? "hover:bg-red-950/25 text-zinc-400 hover:text-red-400" : "hover:bg-red-50 text-zinc-600 hover:text-red-600"}`}
+                      title="Keluar (Logout)"
+                    >
+                      <LogOut className="h-4 w-4" />
+                    </button>
+                  </div>
+                )}
+
                 {currentSession && currentSession.messages.length > 0 && (
                   <button
                     onClick={handleClearCurrentSession}
