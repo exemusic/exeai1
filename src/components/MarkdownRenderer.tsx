@@ -1,11 +1,12 @@
 import React, { useState } from "react";
-import { Copy, Check, Terminal } from "lucide-react";
+import { Copy, Check, Terminal, X } from "lucide-react";
 
 interface MarkdownRendererProps {
   content: string;
 }
 
 export function MarkdownRenderer({ content }: MarkdownRendererProps) {
+  const [viewImage, setViewImage] = useState<string | null>(null);
   const [copiedText, setCopiedText] = useState<string | null>(null);
 
   const handleCopy = (text: string) => {
@@ -225,6 +226,15 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps) {
 
         return <div key={index}>{renderedElements}</div>;
       })}
+      {viewImage && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4" onClick={() => setViewImage(null)}>
+          <img src={viewImage} className="max-w-full max-h-full rounded-lg object-contain shadow-2xl" />
+          <button className="absolute top-4 right-4 bg-zinc-900 text-white p-2 rounded-full hover:bg-zinc-800" onClick={() => setViewImage(null)}>
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+      )}
     </div>
   );
 }
+
