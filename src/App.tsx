@@ -1186,9 +1186,9 @@ export default function App() {
         console.log("Stream generation aborted by user.");
       } else {
         const msg = (err && err.message) ? err.message.toLowerCase() : "";
-        if (msg.includes("cerebras") || msg.includes("too_many_requests") || msg.includes("queue_exceeded") || msg.includes("429")) {
+        if (msg.includes("cerebras") || msg.includes("too_many_requests") || msg.includes("queue_exceeded") || msg.includes("429") || msg.includes("sibuk") || msg.includes("banyak request")) {
           // Friendly user message for busy/rate-limited backend
-          setErrorText("Server sedang sibuk. Silakan coba lagi nanti.");
+          setErrorText(err.message || "Server sedang sibuk. Silakan coba lagi nanti.");
           setSessions((prev) =>
             prev.map((s) => {
               if (s.id === targetSessionId) {
@@ -1196,7 +1196,7 @@ export default function App() {
                   ...s,
                   messages: s.messages.map((m) =>
                     m.id === assistantMsgId && m.content === ""
-                      ? { ...m, content: "Server sedang sibuk saat ini. Silakan coba lagi nanti." }
+                      ? { ...m, content: err.message || "Server sedang sibuk saat ini. Silakan coba lagi nanti." }
                       : m
                   ),
                 };
@@ -1216,7 +1216,7 @@ export default function App() {
                   ...s,
                   messages: s.messages.map((m) =>
                     m.id === assistantMsgId && m.content === ""
-                      ? { ...m, content: "Terjadi kesalahan koneksi atau konfigurasi API Key. Silakan muat ulang (refresh) halaman jika masalah berlanjut." }
+                      ? { ...m, content: err.message || "Terjadi kesalahan koneksi atau konfigurasi API Key. Silakan muat ulang (refresh) halaman jika masalah berlanjut." }
                       : m
                   ),
                 };
