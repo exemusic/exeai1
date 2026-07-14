@@ -22,6 +22,8 @@ import {
   HelpCircle,
   Clock,
   ChevronRight,
+  ChevronDown,
+  ChevronLeft,
   RefreshCw,
   Sliders,
   AppWindow,
@@ -99,13 +101,13 @@ export default function App() {
 
   useEffect(() => {
     const greetings = [
-      "Ada ide baru untuk dieksplorasi?",
-      "Apa yang ingin kita pecahkan hari ini?",
-      "Butuh bantuan menulis kode atau menganalisis data?",
-      "Mari buat sesuatu yang luar biasa hari ini!",
-      "Bagaimana ExeChat bisa membantu produktivitasmu?",
-      "Tanyakan apa saja, asisten AI-mu siap membantu.",
-      "Ada konsep rumit yang ingin kamu sederhanakan?"
+      "ada ide baru?",
+      "mau bahas apa hari ini?",
+      "apa yang ingin kamu ketahui?",
+      "ada yang bisa kubantu?",
+      "mari buat sesuatu yang hebat!",
+      "tanyakan apa saja padaku.",
+      "ada topik seru hari ini?"
     ];
     const randomIdx = Math.floor(Math.random() * greetings.length);
     setWelcomeGreeting(greetings[randomIdx]);
@@ -123,9 +125,11 @@ export default function App() {
   const [selectedModelId, setSelectedModelId] = useState("gemma-4-31b");
   const [temperature, setTemperature] = useState(0.7);
   const [showSettings, setShowSettings] = useState(false);
+  const [showPresetModal, setShowPresetModal] = useState(false);
+  const [showModelModal, setShowModelModal] = useState(false);
   const [hasApiKey, setHasApiKey] = useState<boolean | null>(null);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
-  const [isDesktopSidebarOpen, setIsDesktopSidebarOpen] = useState(true); // Open by default for better user guidance
+  const [isDesktopSidebarOpen, setIsDesktopSidebarOpen] = useState(false); // Closed by default as per user request
 
   // Theme settings (System, Dark/Hitam, Light/Putih)
   const [themeMode, setThemeMode] = useState<"system" | "dark" | "light">(() => {
@@ -604,6 +608,111 @@ export default function App() {
     return 4;
   };
 
+  // Smart Chat Title Generator based on the first query/question
+  const generateSmartTitle = (prompt: string): string => {
+    let clean = prompt.trim();
+    // Remove emojis
+    clean = clean.replace(/[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF]/g, "");
+    // Normalize spaces
+    clean = clean.replace(/\s+/g, " ");
+
+    const lower = clean.toLowerCase();
+
+    // Check for coding/programming keywords
+    if (
+      lower.includes("coding") || 
+      lower.includes("bantu coding") || 
+      lower.includes("error") || 
+      lower.includes("bug") || 
+      lower.includes("code") || 
+      lower.includes("javascript") || 
+      lower.includes("typescript") || 
+      lower.includes("python") || 
+      lower.includes("html") || 
+      lower.includes("css") || 
+      lower.includes("bisa bantu coding") || 
+      lower.includes("mengerti soal codingan") ||
+      lower.includes("bantu saya bikin")
+    ) {
+      return "Bantu Coding";
+    }
+
+    // Check for recipe/cooking
+    if (
+      lower.includes("resep") || 
+      lower.includes("masak") || 
+      lower.includes("makanan") || 
+      lower.includes("bikin makanan") || 
+      lower.includes("kuliner")
+    ) {
+      const match = clean.match(/(?:resep|cara masak)\s+([a-zA-Z\s]{3,15})/i);
+      if (match && match[1]) {
+        return `Resep ${match[1].trim().split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}`;
+      }
+      return "Resep Masakan";
+    }
+
+    // Check for essay/writing
+    if (
+      lower.includes("essay") || 
+      lower.includes("artikel") || 
+      lower.includes("tulis") || 
+      lower.includes("buatkan teks") || 
+      lower.includes("surat")
+    ) {
+      return "Pembuatan Teks";
+    }
+
+    // Check for questions like "apa itu...", "jelaskan..."
+    if (
+      lower.includes("apa itu") || 
+      lower.includes("jelaskan") || 
+      lower.includes("bagaimana cara") || 
+      lower.includes("how to")
+    ) {
+      const match = clean.match(/(?:apa itu|jelaskan tentang|bagaimana cara)\s+([a-zA-Z\s]{3,20})/i);
+      if (match && match[1]) {
+        return match[1].trim().split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
+      }
+      return "Penjelasan Topik";
+    }
+
+    // Check for translation
+    if (
+      lower.includes("terjemah") || 
+      lower.includes("translate") || 
+      lower.includes("artikan") || 
+      lower.includes("bahasa inggris") || 
+      lower.includes("arti dari")
+    ) {
+      return "Penerjemahan Bahasa";
+    }
+
+    // Check for greetings
+    if (
+      lower === "halo" || 
+      lower === "hallo" || 
+      lower === "hai" || 
+      lower === "hi" || 
+      lower.startsWith("halo ai") || 
+      lower.startsWith("hallo ai") || 
+      lower.startsWith("selamat pagi") || 
+      lower.startsWith("selamat siang")
+    ) {
+      return "Percakapan Santai";
+    }
+
+    // Default: extract first 3 words, capitalize nicely
+    const words = clean.split(" ").filter(w => w.length > 2);
+    if (words.length > 0) {
+      const selectedWords = words.slice(0, 3).map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase());
+      const rawTitle = selectedWords.join(" ");
+      return rawTitle.length > 25 ? rawTitle.substring(0, 25) + "..." : rawTitle;
+    }
+
+    return "Diskusi Baru";
+  };
+
   // Google Login click handler
   const handleGoogleLoginClick = () => {
     handleGoogleLogin();
@@ -924,7 +1033,7 @@ export default function App() {
     const id = randomId;
     const newSession: ChatSession = {
       id,
-      title: initialMsg ? (initialMsg.length > 25 ? initialMsg.substring(0, 25) + "..." : initialMsg) : `Obrolan Baru`,
+      title: initialMsg ? generateSmartTitle(initialMsg) : `Obrolan Baru`,
       messages: [],
       systemInstructionId: selectedPresetId,
       temperature,
@@ -1028,20 +1137,6 @@ export default function App() {
       return;
     }
 
-    // 3. Credit deduction check
-    const cost = getCreditCost(text);
-    if (credits < cost) {
-      setErrorText(`Kredit tidak mencukupi! Pertanyaan ini memerlukan ${cost} kredit (sisa Anda: ${credits}). Anda dapat mengklaim 50 kredit harian di panel Pengaturan.`);
-      return;
-    }
-
-    // Deduct credits locally (optimistic update)
-    const newCredits = Math.max(0, credits - cost);
-    setCredits(newCredits);
-    if (userId) {
-      localStorage.setItem(`exechat_credits_${userId}`, String(newCredits));
-    }
-
     // Capture any selected file attachment before resetting the state
     const attachmentObj = selectedFile ? {
       type: (selectedFile.mime?.startsWith("audio/") ? "audio" : selectedFile.mime?.startsWith("image/") ? "image" : "file") as "audio" | "image" | "file",
@@ -1077,7 +1172,7 @@ export default function App() {
           const shouldRename = s.title === "Obrolan Baru" && s.messages.length === 0;
           return {
             ...s,
-            title: shouldRename ? (text.length > 25 ? text.substring(0, 25) + "..." : text) : s.title,
+            title: shouldRename ? generateSmartTitle(text) : s.title,
             messages: [...s.messages, userMessage],
           };
         }
@@ -1562,21 +1657,34 @@ export default function App() {
           </div>
         </div>
 
-        {/* Config Button (Quick Settings Panel Toggle) */}
-        <button
-          onClick={() => {
-            setShowSettings(!showSettings);
-            if (isMobile) setIsMobileSidebarOpen(false);
-          }}
-          className={`p-1.5 rounded-lg border transition-all duration-200 ${
-            showSettings
-              ? "bg-zinc-900 border-zinc-800 text-zinc-100"
-              : "border-zinc-900/60 hover:border-zinc-800 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/40"
-          }`}
-          title="Pengaturan Mode"
-        >
-          <Settings className="h-4 w-4" />
-        </button>
+        <div className="flex items-center gap-1.5">
+          {/* Config Button (Quick Settings Panel Toggle) */}
+          <button
+            onClick={() => {
+              setShowSettings(!showSettings);
+              if (isMobile) setIsMobileSidebarOpen(false);
+            }}
+            className={`p-1.5 rounded-lg border transition-all duration-200 ${
+              showSettings
+                ? "bg-zinc-900 border-zinc-800 text-zinc-100"
+                : "border-zinc-900/60 hover:border-zinc-800 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/40"
+            }`}
+            title="Pengaturan Mode"
+          >
+            <Settings className="h-4 w-4" />
+          </button>
+
+          {/* Close Sidebar button on Desktop */}
+          {!isMobile && (
+            <button
+              onClick={() => setIsDesktopSidebarOpen(false)}
+              className="p-1.5 rounded-lg border border-zinc-900/60 hover:border-zinc-800 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/40 transition-all duration-200 cursor-pointer"
+              title="Tutup Riwayat Chat"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+          )}
+        </div>
       </div>
 
       {/* New Chat Button */}
@@ -1706,25 +1814,14 @@ export default function App() {
 
       {/* Sidebar Status Footer */}
       <div className={`p-4 border-t ${curTheme.border} ${curTheme.sectionBg} text-[11px] space-y-2.5 shrink-0`}>
-        {/* User Credits Status Indicator */}
-        <div className="flex flex-col gap-2">
-          <div className="flex items-center justify-between text-zinc-300 bg-zinc-900/40 border border-zinc-850/60 rounded-xl py-2 px-3">
-            <div className="flex items-center gap-1.5 font-mono text-[10px]">
-              <Sparkles className="h-3.5 w-3.5 text-amber-500 animate-pulse" />
-              <span>Kredit Sisa:</span>
-            </div>
-            <span className="font-bold font-mono text-amber-400">{credits} Credits</span>
-          </div>
-
-          {!isLoggedIn && (
-            <button
-              onClick={handleGoogleLoginClick}
-              className="w-full text-center text-[10px] text-zinc-400 hover:text-zinc-200 bg-zinc-900/10 border border-dashed border-zinc-800 hover:border-zinc-700 rounded-xl py-1.5 transition-all font-sans"
-            >
-              Masuk
-            </button>
-          )}
-        </div>
+        {!isLoggedIn && (
+          <button
+            onClick={handleGoogleLoginClick}
+            className="w-full text-center text-[10px] text-zinc-400 hover:text-zinc-200 bg-zinc-900/10 border border-dashed border-zinc-800 hover:border-zinc-700 rounded-xl py-1.5 transition-all font-sans"
+          >
+            Masuk dengan Google
+          </button>
+        )}
         
         <div className="text-center text-zinc-600 text-[10px] select-none pt-0.5">
           © 2026 ExeChat version 1
@@ -2171,7 +2268,13 @@ export default function App() {
                       transition={{ delay: 0.1, duration: 0.4 }}
                       className="font-display font-semibold text-3xl sm:text-4xl md:text-[42px] tracking-tight leading-tight mb-8 bg-gradient-to-r from-[#59a6ff] via-[#c084fc] to-[#ff8da1] bg-clip-text text-transparent select-none"
                     >
-                      {userDisplayName || userName ? `Halo ${userDisplayName || userName}, yuk kita bahas lebih lanjut` : "Halo, yuk kita bahas lebih lanjut"}
+                      {userDisplayName === "Tamu" || userName === "Tamu"
+                        ? `Halo Tamu, ${welcomeGreeting}`
+                        : (userDisplayName || userName 
+                            ? `Halo ${userDisplayName || userName}, ${welcomeGreeting}` 
+                            : `Halo, ${welcomeGreeting.charAt(0).toUpperCase() + welcomeGreeting.slice(1)}`
+                          )
+                      }
                     </motion.h2>
 
                     {/* Centered Input Textbox with Shiny Rotating Gradient Border */}
@@ -2252,55 +2355,35 @@ export default function App() {
                       }`}>
                         {/* Selector Controls (Model & Preset) */}
                         <div className="flex flex-wrap items-center gap-1.5 md:gap-2">
-                          <select
-                            value={currentSession ? currentSession.model : selectedModelId}
-                            onChange={(e) => {
-                              const val = e.target.value;
-                              if (currentSession) {
-                                setSessions((prev) =>
-                                  prev.map((s) => (s.id === currentSessionId ? { ...s, model: val } : s))
-                                );
-                              } else {
-                                setSelectedModelId(val);
-                              }
-                            }}
-                            className={`text-[10px] md:text-[11px] rounded-lg py-1 px-1.5 md:px-2.5 max-w-[100px] sm:max-w-none truncate font-sans cursor-pointer focus:outline-none transition-all ${
+                          <button
+                            type="button"
+                            onClick={() => setShowModelModal(true)}
+                            className={`flex items-center gap-1.5 text-[10px] md:text-[11px] rounded-lg py-1.5 px-1.5 md:px-2.5 max-w-[120px] sm:max-w-none truncate font-sans cursor-pointer focus:outline-none transition-all border ${
                               isDark 
-                                ? "bg-zinc-950 hover:bg-zinc-900 text-zinc-400 border-zinc-900" 
-                                : "bg-white hover:bg-zinc-100 text-zinc-600 border-zinc-200"
+                                ? "bg-zinc-950 hover:bg-zinc-900 text-zinc-400 border-zinc-900 hover:border-zinc-800" 
+                                : "bg-white hover:bg-zinc-100 text-zinc-600 border-zinc-200 hover:border-zinc-350"
                             }`}
+                            title="Pilih Model AI"
                           >
-                            {MODEL_OPTIONS.map((m) => (
-                              <option key={m.id} value={m.id} className={isDark ? "bg-zinc-950 text-zinc-300" : "bg-white text-zinc-700"}>
-                                {m.name}
-                              </option>
-                            ))}
-                          </select>
+                            <Cpu className="h-3 w-3 text-purple-500 shrink-0" />
+                            <span className="truncate">{activeModel.name}</span>
+                            <ChevronDown className="h-3 w-3 text-zinc-500 shrink-0" />
+                          </button>
 
-                          <select
-                            value={currentSession ? currentSession.systemInstructionId : selectedPresetId}
-                            onChange={(e) => {
-                              const val = e.target.value;
-                              if (currentSession) {
-                                setSessions((prev) =>
-                                  prev.map((s) => (s.id === currentSessionId ? { ...s, systemInstructionId: val } : s))
-                                );
-                              } else {
-                                setSelectedPresetId(val);
-                              }
-                            }}
-                            className={`text-[10px] md:text-[11px] rounded-lg py-1 px-1.5 md:px-2.5 max-w-[100px] sm:max-w-none truncate font-sans cursor-pointer focus:outline-none transition-all ${
+                          <button
+                            type="button"
+                            onClick={() => setShowPresetModal(true)}
+                            className={`flex items-center gap-1.5 text-[10px] md:text-[11px] rounded-lg py-1.5 px-1.5 md:px-2.5 max-w-[120px] sm:max-w-none truncate font-sans cursor-pointer focus:outline-none transition-all border ${
                               isDark 
-                                ? "bg-zinc-950 hover:bg-zinc-900 text-zinc-400 border-zinc-900" 
-                                : "bg-white hover:bg-zinc-100 text-zinc-600 border-zinc-200"
+                                ? "bg-zinc-950 hover:bg-zinc-900 text-zinc-400 border-zinc-900 hover:border-zinc-800" 
+                                : "bg-white hover:bg-zinc-100 text-zinc-600 border-zinc-200 hover:border-zinc-350"
                             }`}
+                            title="Pilih Karakter AI"
                           >
-                            {SYSTEM_PRESETS.map((p) => (
-                              <option key={p.id} value={p.id} className={isDark ? "bg-zinc-950 text-zinc-300" : "bg-white text-zinc-700"}>
-                                Preset: {p.name}
-                              </option>
-                            ))}
-                          </select>
+                            <Sparkles className="h-3 w-3 text-amber-500 shrink-0" />
+                            <span className="truncate">Preset: {activePreset.name}</span>
+                            <ChevronDown className="h-3 w-3 text-zinc-500 shrink-0" />
+                          </button>
                         </div>
 
                         {/* Send button */}
@@ -2610,53 +2693,30 @@ export default function App() {
                   <div className="flex flex-wrap items-center justify-between gap-1.5 mb-2 md:mb-3 text-[10px] md:text-xs text-zinc-500 px-0.5">
                     <div className="flex flex-wrap items-center gap-1.5 md:gap-2">
                       {/* Model Selector */}
-                      <select
-                        value={currentSession ? currentSession.model : selectedModelId}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          if (currentSession) {
-                            setSessions((prev) =>
-                              prev.map((s) => (s.id === currentSessionId ? { ...s, model: val } : s))
-                            );
-                          } else {
-                            setSelectedModelId(val);
-                          }
-                        }}
-                        className="bg-zinc-900 hover:bg-zinc-900/80 text-zinc-300 border border-zinc-850 hover:border-zinc-850 text-[10px] md:text-[11px] rounded-lg py-1 px-2 font-mono max-w-[105px] sm:max-w-none truncate cursor-pointer focus:outline-none transition-all shadow-sm"
+                      <button
+                        type="button"
+                        onClick={() => setShowModelModal(true)}
+                        className="bg-zinc-900 hover:bg-zinc-900/80 text-zinc-300 border border-zinc-850 hover:border-zinc-850 text-[10px] md:text-[11px] rounded-lg py-1 px-2.5 font-sans max-w-[125px] sm:max-w-none truncate cursor-pointer focus:outline-none transition-all shadow-sm flex items-center gap-1"
                       >
-                        {MODEL_OPTIONS.map((m) => (
-                          <option key={m.id} value={m.id} className="bg-zinc-950 text-zinc-300">
-                            {m.name}
-                          </option>
-                        ))}
-                      </select>
+                        <Cpu className="h-2.5 w-2.5 text-purple-500 shrink-0" />
+                        <span className="truncate">{activeModel.name}</span>
+                        <ChevronDown className="h-2.5 w-2.5 text-zinc-500 shrink-0" />
+                      </button>
 
                       {/* Preset/Instruction Selector */}
-                      <select
-                        value={currentSession ? currentSession.systemInstructionId : selectedPresetId}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          if (currentSession) {
-                            setSessions((prev) =>
-                              prev.map((s) => (s.id === currentSessionId ? { ...s, systemInstructionId: val } : s))
-                            );
-                          } else {
-                            setSelectedPresetId(val);
-                          }
-                        }}
-                        className="bg-zinc-900 hover:bg-zinc-900/80 text-zinc-300 border border-zinc-850 hover:border-zinc-850 text-[10px] md:text-[11px] rounded-lg py-1 px-2 font-mono max-w-[105px] sm:max-w-none truncate cursor-pointer focus:outline-none transition-all shadow-sm"
+                      <button
+                        type="button"
+                        onClick={() => setShowPresetModal(true)}
+                        className="bg-zinc-900 hover:bg-zinc-900/80 text-zinc-300 border border-zinc-850 hover:border-zinc-850 text-[10px] md:text-[11px] rounded-lg py-1 px-2.5 font-sans max-w-[125px] sm:max-w-none truncate cursor-pointer focus:outline-none transition-all shadow-sm flex items-center gap-1"
                       >
-                        {SYSTEM_PRESETS.map((p) => (
-                          <option key={p.id} value={p.id} className="bg-zinc-950 text-zinc-300">
-                            Preset: {p.name}
-                          </option>
-                        ))}
-                      </select>
+                        <Sparkles className="h-2.5 w-2.5 text-amber-500 shrink-0" />
+                        <span className="truncate">Preset: {activePreset.name}</span>
+                        <ChevronDown className="h-2.5 w-2.5 text-zinc-500 shrink-0" />
+                      </button>
                     </div>
 
-                    {/* Character Counter & Cost Display */}
+                    {/* Character Counter Display */}
                     <div className="flex items-center gap-2 md:gap-3 font-mono text-[9px] md:text-[10px] text-zinc-650 select-none">
-                      <span>Estimasi: {getCreditCost(inputMessage)} kredit</span>
                       <span>{inputMessage.length} karakter</span>
                     </div>
                   </div>
@@ -2787,28 +2847,29 @@ export default function App() {
 
                 {/* Content */}
                 <div className="flex-1 overflow-y-auto p-6 md:p-10 space-y-8 max-w-4xl mx-auto w-full">
-                  
-                  {/* Section 1: Akun & Kredit (NEW INTEGRATION) */}
+                  {/* Section 1: Akun (NEW INTEGRATION) */}
                   <div className={`rounded-2xl p-6 space-y-4 border ${isDark ? "bg-zinc-900/20 border-zinc-900" : "bg-zinc-100/50 border-zinc-200"}`}>
                     <h3 className="text-xs font-semibold tracking-wider text-zinc-400 font-mono uppercase">
-                      Informasi Akun & Kredit Harian
+                      Informasi Akun Pengguna
                     </h3>
                     
                     <div className={`flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-xl border ${isDark ? "bg-zinc-900/40 border-zinc-850/60" : "bg-white border-zinc-200"}`}>
                       <div>
-                        <div className="flex items-center gap-2 text-zinc-100 font-semibold text-sm">
-                          <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-                          <span>Sign In sebagai {userEmail}</span>
-                        </div>
-                        <p className="text-xs text-zinc-500 mt-1">Anda berhak mengklaim 50 kredit harian setiap 24 jam.</p>
+                        {isLoggedIn ? (
+                          <div className="flex items-center gap-2 text-zinc-100 font-semibold text-sm">
+                            <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                            <span>Sign In sebagai {userEmail}</span>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2 text-zinc-100 font-semibold text-sm">
+                            <span className="h-2 w-2 rounded-full bg-amber-500 animate-pulse" />
+                            <span>Menggunakan Mode Tamu (Free & Unlimited AI)</span>
+                          </div>
+                        )}
+                        <p className="text-xs text-zinc-500 mt-1">ExeChat bebas digunakan sepenuhnya tanpa batasan kredit.</p>
                       </div>
 
                       <div className="flex flex-col sm:items-end gap-2 shrink-0">
-                        <div className="font-mono text-xs text-zinc-400 bg-zinc-950 px-3 py-1.5 rounded-lg border border-zinc-900 flex items-center gap-1.5">
-                          <Sparkles className="h-3.5 w-3.5 text-amber-500" />
-                          <span>Total Kredit: <strong className="text-amber-400 text-sm">{credits}</strong></span>
-                        </div>
-
                         {isLoggedIn ? (
                           <div className="space-y-3 w-full sm:w-auto text-left">
                             <div className="grid grid-cols-2 gap-2">
@@ -2818,12 +2879,6 @@ export default function App() {
                               <div className="text-[11px] text-zinc-200 text-right">{userName || "Belum diatur"}</div>
                             </div>
                             <div className="flex flex-col gap-2">
-                              <button
-                                onClick={handleClaimDailyCredits}
-                                className="w-full text-xs bg-amber-500 hover:bg-amber-600 text-zinc-950 font-semibold py-1.5 px-4 rounded-lg transition-all cursor-pointer"
-                              >
-                                Klaim 50 Kredit Harian
-                              </button>
                               <button
                                 onClick={handleLogout}
                                 className="w-full text-xs bg-red-650/25 hover:bg-red-650/40 text-red-200 border border-red-900/30 font-semibold py-1.5 px-4 rounded-lg transition-all cursor-pointer"
@@ -2842,54 +2897,32 @@ export default function App() {
                         )}
                       </div>
                     </div>
+                  </div>
 
-                    {isLoggedIn && (
-                      <div className="bg-zinc-900/20 border border-zinc-900 rounded-2xl p-4 space-y-4">
-                        <h4 className="text-xs font-semibold tracking-wider text-zinc-400 uppercase font-mono">Akun Anda</h4>
-                        <div className="grid grid-cols-1 gap-3">
-                          <div>
-                            <label className="text-[10px] text-zinc-500 uppercase tracking-wide font-mono">Username ExeChat</label>
-                            <div className="mt-2 flex gap-2">
-                              <input
-                                value={userName}
-                                onChange={(e) => setUserName(e.target.value)}
-                                placeholder="Username Anda"
-                                className="flex-1 bg-zinc-950 border border-zinc-900 rounded-xl px-3 py-2 text-xs text-zinc-100 focus:outline-none focus:border-amber-500"
-                              />
-                              <button
-                                onClick={handleSaveUsername}
-                                className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-zinc-950 text-xs font-semibold"
-                              >
-                                Simpan
-                              </button>
-                            </div>
+                  {isLoggedIn && (
+                    <div className="bg-zinc-900/20 border border-zinc-900 rounded-2xl p-4 space-y-4">
+                      <h4 className="text-xs font-semibold tracking-wider text-zinc-400 uppercase font-mono">Akun Anda</h4>
+                      <div className="grid grid-cols-1 gap-3">
+                        <div>
+                          <label className="text-[10px] text-zinc-500 uppercase tracking-wide font-mono">Username ExeChat</label>
+                          <div className="mt-2 flex gap-2">
+                            <input
+                              value={userName}
+                              onChange={(e) => setUserName(e.target.value)}
+                              placeholder="Username Anda"
+                              className="flex-1 bg-zinc-950 border border-zinc-900 rounded-xl px-3 py-2 text-xs text-zinc-100 focus:outline-none focus:border-amber-500"
+                            />
+                            <button
+                              onClick={handleSaveUsername}
+                              className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-zinc-950 text-xs font-semibold"
+                            >
+                              Simpan
+                            </button>
                           </div>
-
-                          <div>
-                            <label className="text-[10px] text-zinc-500 uppercase tracking-wide font-mono">Kode Redeem</label>
-                            <div className="mt-2 flex gap-2">
-                              <input
-                                value={redeemCodeInput}
-                                onChange={(e) => setRedeemCodeInput(e.target.value)}
-                                placeholder="MASUKAN KODE"
-                                className="flex-1 bg-zinc-950 border border-zinc-900 rounded-xl px-3 py-2 text-xs text-zinc-100 focus:outline-none focus:border-amber-500"
-                              />
-                              <button
-                                onClick={() => handleRedeemCode()}
-                                className="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-zinc-950 text-xs font-semibold"
-                              >
-                                Tukarkan
-                              </button>
-                            </div>
-                            {redeemFeedback && (
-                              <p className="mt-2 text-[10px] text-emerald-300">{redeemFeedback}</p>
-                            )}
-                          </div>
-
                         </div>
                       </div>
-                    )}
-                  </div>
+                    </div>
+                  )}
 
                   {/* Section 2: Model selection */}
                   <div className="space-y-4">
@@ -2936,9 +2969,6 @@ export default function App() {
                               <p className="text-xs text-zinc-500 leading-relaxed font-sans">
                                 {m.description}
                               </p>
-                            </div>
-                            <div className="mt-3 text-[10px] font-mono text-zinc-600">
-                              Cost: 1-4 credits/query
                             </div>
                           </div>
                         );
@@ -3118,6 +3148,243 @@ export default function App() {
 
                 </div>
               </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* CUSTOM PRESET SELECTION MODAL */}
+          <AnimatePresence>
+            {showPresetModal && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                {/* Backdrop */}
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  onClick={() => setShowPresetModal(false)}
+                  className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+                />
+
+                {/* Modal Card */}
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.95, y: 15 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.95, y: 15 }}
+                  className={`relative w-full max-w-lg rounded-3xl border shadow-2xl p-6 overflow-hidden z-10 transition-all ${
+                    isDark ? "bg-[#1e1f20] border-zinc-800 text-zinc-100" : "bg-white border-zinc-200 text-zinc-900"
+                  }`}
+                >
+                  {/* Header */}
+                  <div className="flex items-center justify-between mb-4 pb-1">
+                    <div className="flex items-center gap-2">
+                      <Sparkles className="h-5 w-5 text-amber-500 animate-pulse" />
+                      <h3 className="font-sans font-semibold text-lg">Pilih Karakter AI</h3>
+                    </div>
+                    <button
+                      onClick={() => setShowPresetModal(false)}
+                      className={`p-1.5 rounded-xl transition-colors ${
+                        isDark ? "hover:bg-zinc-900 text-zinc-400 hover:text-zinc-200" : "hover:bg-zinc-100 text-zinc-500 hover:text-zinc-850"
+                      }`}
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+
+                  <p className={`text-xs mb-5 leading-normal ${isDark ? "text-zinc-400" : "text-zinc-500"}`}>
+                    Sesuaikan gaya bicara, kepribadian, dan keahlian asisten AI untuk obrolan Anda saat ini.
+                  </p>
+
+                  {/* Scrollable list of Presets */}
+                  <div className="space-y-3.5 max-h-[360px] overflow-y-auto pr-1">
+                    {SYSTEM_PRESETS.map((preset) => {
+                      const isSelected = currentSession
+                        ? currentSession.systemInstructionId === preset.id
+                        : selectedPresetId === preset.id;
+
+                      return (
+                        <div
+                          key={preset.id}
+                          onClick={() => {
+                            if (currentSession) {
+                              setSessions((prev) =>
+                                prev.map((s) => (s.id === currentSessionId ? { ...s, systemInstructionId: preset.id } : s))
+                              );
+                            } else {
+                              setSelectedPresetId(preset.id);
+                            }
+                            setShowPresetModal(false);
+                            playNotifySound();
+                          }}
+                          className={`p-3.5 rounded-2xl border cursor-pointer transition-all duration-200 flex items-start gap-4 ${
+                            isSelected
+                              ? (isDark ? "bg-zinc-900/90 border-zinc-700/80 shadow-md shadow-black/20" : "bg-zinc-100 border-zinc-300 shadow-sm")
+                              : (isDark ? "border-zinc-900/60 hover:border-zinc-800 bg-zinc-900/10" : "border-zinc-100 hover:border-zinc-200 bg-zinc-50/50")
+                          }`}
+                        >
+                          <div className={`p-2.5 rounded-xl shrink-0 ${
+                            isSelected 
+                              ? (isDark ? "bg-zinc-100 text-zinc-950" : "bg-[#1a73e8] text-white") 
+                              : (isDark ? "bg-zinc-900 text-zinc-400" : "bg-zinc-200 text-zinc-600")
+                          }`}>
+                            {getPresetIcon(preset.icon, "h-5 w-5")}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between mb-1">
+                              <span className={`text-sm font-semibold ${isSelected ? (isDark ? "text-zinc-100" : "text-zinc-900") : (isDark ? "text-zinc-300" : "text-zinc-700")}`}>
+                                {preset.name}
+                              </span>
+                              {isSelected && (
+                                <span className="text-[10px] font-mono font-medium text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
+                                  Aktif
+                                </span>
+                              )}
+                            </div>
+                            <p className={`text-xs leading-relaxed font-sans ${isDark ? "text-zinc-500" : "text-zinc-500"}`}>
+                              {preset.description}
+                            </p>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  <div className="mt-6 flex justify-end">
+                    <button
+                      onClick={() => setShowPresetModal(false)}
+                      className={`text-xs font-semibold py-2 px-5 rounded-xl border transition-all ${
+                        isDark 
+                          ? "border-zinc-850 hover:bg-zinc-900 text-zinc-300" 
+                          : "border-zinc-200 hover:bg-zinc-100 text-zinc-600"
+                      }`}
+                    >
+                      Batal
+                    </button>
+                  </div>
+                </motion.div>
+              </div>
+            )}
+          </AnimatePresence>
+
+          {/* CUSTOM MODEL SELECTION MODAL */}
+          <AnimatePresence>
+            {showModelModal && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                {/* Backdrop */}
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  onClick={() => setShowModelModal(false)}
+                  className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+                />
+
+                {/* Modal Card */}
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.95, y: 15 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.95, y: 15 }}
+                  className={`relative w-full max-w-lg rounded-3xl border shadow-2xl p-6 overflow-hidden z-10 transition-all ${
+                    isDark ? "bg-[#1e1f20] border-zinc-800 text-zinc-100" : "bg-white border-zinc-200 text-zinc-900"
+                  }`}
+                >
+                  {/* Header */}
+                  <div className="flex items-center justify-between mb-4 pb-1">
+                    <div className="flex items-center gap-2">
+                      <Cpu className="h-5 w-5 text-purple-500 animate-pulse" />
+                      <h3 className="font-sans font-semibold text-lg">Pilih Model AI</h3>
+                    </div>
+                    <button
+                      onClick={() => setShowModelModal(false)}
+                      className={`p-1.5 rounded-xl transition-colors ${
+                        isDark ? "hover:bg-zinc-900 text-zinc-400 hover:text-zinc-200" : "hover:bg-zinc-100 text-zinc-500 hover:text-zinc-850"
+                      }`}
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+
+                  <p className={`text-xs mb-5 leading-normal ${isDark ? "text-zinc-400" : "text-zinc-500"}`}>
+                    Pilih model kecerdasan buatan (Hexky) yang paling sesuai dengan kebutuhan analisis dan respon chat Anda.
+                  </p>
+
+                  {/* Scrollable list of Models */}
+                  <div className="space-y-3.5 max-h-[360px] overflow-y-auto pr-1">
+                    {MODEL_OPTIONS.map((m) => {
+                      const isSelected = currentSession
+                        ? currentSession.model === m.id
+                        : selectedModelId === m.id;
+
+                      return (
+                        <div
+                          key={m.id}
+                          onClick={() => {
+                            if (currentSession) {
+                              setSessions((prev) =>
+                                prev.map((s) => (s.id === currentSessionId ? { ...s, model: m.id } : s))
+                              );
+                            } else {
+                              setSelectedModelId(m.id);
+                            }
+                            setShowModelModal(false);
+                            playNotifySound();
+                          }}
+                          className={`p-3.5 rounded-2xl border cursor-pointer transition-all duration-200 flex items-start gap-4 ${
+                            isSelected
+                              ? (isDark ? "bg-zinc-900/90 border-zinc-700/80 shadow-md shadow-black/20" : "bg-zinc-100 border-zinc-300 shadow-sm")
+                              : (isDark ? "border-zinc-900/60 hover:border-zinc-800 bg-zinc-900/10" : "border-zinc-100 hover:border-zinc-200 bg-zinc-50/50")
+                          }`}
+                        >
+                          <div className={`p-2.5 rounded-xl shrink-0 ${
+                            isSelected 
+                              ? (isDark ? "bg-zinc-100 text-zinc-950" : "bg-[#1a73e8] text-white") 
+                              : (isDark ? "bg-zinc-900 text-zinc-400" : "bg-zinc-200 text-zinc-600")
+                          }`}>
+                            <Cpu className="h-5 w-5" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between mb-1">
+                              <div className="flex items-center gap-2">
+                                <span className={`text-sm font-semibold ${isSelected ? (isDark ? "text-zinc-100" : "text-zinc-900") : (isDark ? "text-zinc-300" : "text-zinc-700")}`}>
+                                  {m.name}
+                                </span>
+                                {m.badge && (
+                                  <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-mono uppercase font-semibold ${
+                                    m.badge === "Production" 
+                                      ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/20" 
+                                      : "bg-blue-500/15 text-blue-400 border border-blue-500/20"
+                                  }`}>
+                                    {m.badge}
+                                  </span>
+                                )}
+                              </div>
+                              {isSelected && (
+                                <span className="text-[10px] font-mono font-medium text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20 shrink-0">
+                                  Aktif
+                                </span>
+                              )}
+                            </div>
+                            <p className={`text-xs leading-relaxed font-sans ${isDark ? "text-zinc-500" : "text-zinc-500"}`}>
+                              {m.description}
+                            </p>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  <div className="mt-6 flex justify-end">
+                    <button
+                      onClick={() => setShowModelModal(false)}
+                      className={`text-xs font-semibold py-2 px-5 rounded-xl border transition-all ${
+                        isDark 
+                          ? "border-zinc-850 hover:bg-zinc-900 text-zinc-300" 
+                          : "border-zinc-200 hover:bg-zinc-100 text-zinc-600"
+                      }`}
+                    >
+                      Batal
+                    </button>
+                  </div>
+                </motion.div>
+              </div>
             )}
           </AnimatePresence>
         </main>
