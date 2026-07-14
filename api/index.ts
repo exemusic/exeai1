@@ -261,7 +261,7 @@ app.get("/api/models", async (req, res) => {
 // Runware AI generation endpoint supporting only Seedream 5.0 Pro image generation
 app.post("/api/image/generate", async (req, res) => {
   try {
-    const { prompt, initImage, model = "bytedance:seedream@5.0-pro" } = req.body;
+    const { prompt, initImage } = req.body;
     const runwareApiKey = process.env.RUNWARE_API_KEY;
 
     if (!runwareApiKey) {
@@ -270,21 +270,17 @@ app.post("/api/image/generate", async (req, res) => {
       });
     }
 
-    const taskUUID = crypto.randomUUID();
     const taskType = "imageInference";
-    
-    // Map the user-facing model ID "bytedance:seedream@5.0-pro" to a valid Runware model ID.
-    // Runware does not host bytedance:seedream@5.0-pro, so we map it to runware:100 (Stable Diffusion v1.5).
-    const runwareModel = "runware:100";
+    const taskUUID = crypto.randomUUID();
 
-    // Build the request task according to taskType specifications
+    // Use model: 100 as an integer to prevent PHP type mismatch errors in the Runware backend
     const task: any = {
       taskType,
       taskUUID,
-      model: runwareModel,
+      model: 100, 
       positivePrompt: prompt,
-      width: 1024,
-      height: 1024
+      width: 512,
+      height: 512
     };
 
     if (initImage) {
@@ -304,8 +300,8 @@ app.post("/api/image/generate", async (req, res) => {
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.warn("Runware API Error Status:", response.status, errorText);
-      return res.status(response.status).json({ error: `Gagal memproses request dengan Runware API (${response.status}): ${errorText}` });
+      console.error("Runware response not OK:", errorText);
+      return res.status(response.status).json({ error: errorText });
     }
 
     const responseData = await response.json();
@@ -318,7 +314,7 @@ app.post("/api/image/generate", async (req, res) => {
     }
 
     if (tasksList.length === 0) {
-      return res.status(500).json({ error: "Runware tidak mengembalikan data task yang valid." });
+      return res.status(500).json({ error: "Runware did not return any task data." });
     }
 
     const completedTask = tasksList[0];
@@ -328,7 +324,7 @@ app.post("/api/image/generate", async (req, res) => {
 
     const result = extractRunwareResult(completedTask);
     if (!result) {
-      return res.status(500).json({ error: "Gagal mendapatkan hasil gambar dari response Runware." });
+      return res.status(500).json({ error: "No valid image URL found in Runware response." });
     }
 
     res.json({
