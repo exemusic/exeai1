@@ -226,6 +226,38 @@ function extractRunwareResult(task: any) {
   return null;
 }
 
+// Temporary route to search Runware models
+app.get("/api/models", async (req, res) => {
+  try {
+    const q = (req.query.q as string) || "stable";
+    const runwareApiKey = process.env.RUNWARE_API_KEY;
+    if (!runwareApiKey) {
+      return res.status(400).json({ error: "RUNWARE_API_KEY not found" });
+    }
+    const task = {
+      taskType: "modelSearch",
+      taskUUID: "search-models-" + Date.now(),
+      search: q,
+      limit: 10
+    };
+    const response = await fetch("https://api.runware.ai/v1", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${runwareApiKey}`
+      },
+      body: JSON.stringify([task])
+    });
+    if (!response.ok) {
+      return res.status(response.status).json({ error: await response.text() });
+    }
+    const data = await response.json();
+    return res.json(data);
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
 // Runware AI generation endpoint supporting only Seedream 5.0 Pro image generation
 app.post("/api/image/generate", async (req, res) => {
   try {
