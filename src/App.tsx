@@ -2150,56 +2150,17 @@ export default function App() {
                              ) : (
                               // Custom Markdown rendering
                               msg.content === "" && isGenerating && index === currentSession.messages.length - 1 ? (
-                                <div className="flex flex-col gap-3.5 py-2.5 select-none w-full max-w-sm bg-zinc-900/40 rounded-2xl border border-zinc-850 p-4">
-                                  {/* Shimmering waveform gradient dots */}
-                                  <div className="flex items-center gap-2">
-                                    <Sparkles className="h-4 w-4 text-amber-500 animate-[spin_4s_linear_infinite]" />
-                                    <span className="text-xs text-zinc-300 font-semibold font-sans">ExeChat sedang berpikir...</span>
+                                <div className="flex items-center gap-2.5 py-3 px-1 select-none">
+                                  <div className="flex gap-1 items-center">
+                                    <span className="h-1.5 w-1.5 rounded-full bg-zinc-500 animate-[bounce_1s_infinite_100ms]" />
+                                    <span className="h-1.5 w-1.5 rounded-full bg-zinc-500 animate-[bounce_1s_infinite_200ms]" />
+                                    <span className="h-1.5 w-1.5 rounded-full bg-zinc-500 animate-[bounce_1s_infinite_300ms]" />
                                   </div>
-                                  <div className="space-y-2 mt-1">
-                                    {/* Step 1 */}
-                                    <div className="flex items-center gap-2 text-[11px] text-emerald-400 font-mono">
-                                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                                      <span>[OK] Menganalisis konteks obrolan...</span>
-                                    </div>
-                                    {/* Step 2 */}
-                                    <div className="flex items-center gap-2 text-[11px] text-indigo-400 font-mono animate-pulse">
-                                      <span className="h-1.5 w-1.5 rounded-full bg-indigo-400 animate-ping" />
-                                      <span>[*] Merancang struktur penyelesaian...</span>
-                                    </div>
-                                    {/* Step 3 */}
-                                    <div className="flex items-center gap-2 text-[11px] text-zinc-650 font-mono">
-                                      <span className="h-1.5 w-1.5 rounded-full bg-zinc-700" />
-                                      <span>[ ] Memformulasikan respons...</span>
-                                    </div>
-                                  </div>
-                                  <div className="w-full bg-zinc-950 rounded-full h-1 mt-1 overflow-hidden border border-zinc-900">
-                                    <div className="bg-gradient-to-r from-emerald-500 via-indigo-500 to-amber-500 h-full animate-[shimmer_1.5s_infinite]" style={{ width: "40%" }} />
-                                  </div>
+                                  <span className="text-xs text-zinc-500 font-medium font-sans">AI sedang berpikir...</span>
                                 </div>
                               ) : (
                                 <div className="text-zinc-800 dark:text-zinc-100 font-sans text-sm sm:text-base md:text-[16px] leading-relaxed select-text">
                                   <MarkdownRenderer content={msg.content} />
-                                  
-                                  {isGenerating && index === currentSession.messages.length - 1 && (
-                                    <div className="mt-4 flex flex-col gap-2 p-3.5 rounded-2xl bg-zinc-900/30 border border-zinc-850/60 max-w-sm animate-pulse select-none">
-                                      <div className="flex items-center gap-2 text-xs text-zinc-400 font-semibold">
-                                        <Code2 className="h-3.5 w-3.5 text-indigo-400 animate-spin" style={{ animationDuration: '3s' }} />
-                                        <span>Thinking Progress:</span>
-                                      </div>
-                                      <div className="space-y-1 font-mono text-[11px]">
-                                        <div className="flex items-center gap-1.5 text-emerald-400">
-                                          <span>✓</span> <span>Analisis Struktur Sukses</span>
-                                        </div>
-                                        <div className="flex items-center gap-1.5 text-indigo-400">
-                                          <span>✓</span> <span>Optimalisasi Token & Arsitektur</span>
-                                        </div>
-                                        <div className="flex items-center gap-1.5 text-amber-500">
-                                          <span className="animate-ping">•</span> <span>Menyusun Baris Kode & Markdown...</span>
-                                        </div>
-                                      </div>
-                                    </div>
-                                  )}
 
                                   {isSpeaking && (
                                     <div className="inline-flex items-center gap-1.5 mt-2 px-2.5 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-500 text-[10px] font-mono animate-pulse">
@@ -2330,9 +2291,9 @@ export default function App() {
 
                     {/* Loader typing indicator */}
                     {isGenerating && currentSession.messages[currentSession.messages.length - 1]?.content !== "" && (
-                      <div className="flex items-center gap-1.5 text-zinc-500 pl-9 md:pl-12 py-1 text-[11px] md:text-xs select-none">
-                        <RefreshCw className="h-2.5 w-2.5 md:h-3 md:w-3 animate-spin text-zinc-600" />
-                        <span>AI sedang memikirkan & mengetik jawaban...</span>
+                      <div className="flex items-center gap-2 text-zinc-500 pl-9 md:pl-12 py-1 text-[11px] md:text-xs select-none">
+                        <span className="h-1.5 w-1.5 rounded-full bg-zinc-600 animate-pulse" />
+                        <span>AI sedang menulis...</span>
                       </div>
                     )}
                   </div>
