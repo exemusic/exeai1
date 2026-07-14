@@ -46,8 +46,8 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { Message, ChatSession, SystemPreset, ModelOption } from "./types";
-import { MarkdownRenderer } from "./components/MarkdownRenderer";
-import { CodeEditorMode } from "./components/CodeEditorMode";
+import { MarkdownRenderer } from "./components/MarkdownRenderer.tsx";
+import { CodeEditorMode } from "./components/CodeEditorMode.tsx";
 import { GoogleOAuthProvider, GoogleLogin } from "@react-oauth/google";
 import { jwtDecode } from "jwt-decode";
 import { MODEL_OPTIONS, SYSTEM_PRESETS, SUGGESTED_PROMPTS } from "./presets";
