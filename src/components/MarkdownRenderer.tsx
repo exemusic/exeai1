@@ -1,8 +1,113 @@
 import React, { useState } from "react";
-import { Copy, Check, Terminal } from "lucide-react";
+import { Copy, Check, Terminal, Pencil, Save, X } from "lucide-react";
 
 interface MarkdownRendererProps {
   content: string;
+}
+
+interface EditableCodeBlockProps {
+  initialCode: string;
+  language: string;
+  onCopy: (text: string) => void;
+  isCopied: boolean;
+}
+
+function EditableCodeBlock({ initialCode, language, onCopy, isCopied }: EditableCodeBlockProps) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [code, setCode] = useState(initialCode);
+  const [tempCode, setTempCode] = useState(initialCode);
+
+  const handleSave = () => {
+    setCode(tempCode);
+    setIsEditing(false);
+  };
+
+  const handleCancel = () => {
+    setTempCode(code);
+    setIsEditing(false);
+  };
+
+  return (
+    <div className="my-4 overflow-hidden rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950 font-mono text-sm shadow-lg shadow-black/40">
+      {/* Header */}
+      <div className="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800/80 bg-zinc-100/80 dark:bg-zinc-900/60 px-4 py-2 text-xs text-zinc-500 dark:text-zinc-400 select-none">
+        <div className="flex items-center gap-2">
+          <Terminal className="h-3.5 w-3.5 text-zinc-500" />
+          <span className="font-semibold text-zinc-600 dark:text-zinc-350">{language || "plaintext"}</span>
+          {code !== initialCode && (
+            <span className="text-[9px] bg-amber-500/15 text-amber-500 border border-amber-500/20 rounded px-1.5 py-0.5 font-sans font-semibold animate-pulse">
+              Diedit oleh User
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-1.5">
+          {isEditing ? (
+            <>
+              <button
+                onClick={handleSave}
+                className="flex items-center gap-1 rounded-md px-2 py-1 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 font-sans font-semibold transition-all duration-200 cursor-pointer"
+                title="Simpan perubahan"
+              >
+                <Save className="h-3 w-3" />
+                <span>Simpan</span>
+              </button>
+              <button
+                onClick={handleCancel}
+                className="flex items-center gap-1 rounded-md px-2 py-1 bg-zinc-500/10 hover:bg-zinc-500/20 text-zinc-600 dark:text-zinc-400 font-sans font-semibold transition-all duration-200 cursor-pointer"
+                title="Batal"
+              >
+                <X className="h-3 w-3" />
+                <span>Batal</span>
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                onClick={() => setIsEditing(true)}
+                className="flex items-center gap-1 rounded-md px-2.5 py-1 hover:bg-zinc-200 dark:hover:bg-zinc-800 hover:text-zinc-700 dark:hover:text-zinc-200 font-sans font-medium transition-all duration-200 cursor-pointer"
+                title="Edit kode ini"
+              >
+                <Pencil className="h-3 w-3 text-zinc-500 dark:text-zinc-400" />
+                <span>Edit</span>
+              </button>
+              <button
+                onClick={() => onCopy(code)}
+                className="flex items-center gap-1.5 rounded-md px-2 py-1 hover:bg-zinc-200 dark:hover:bg-zinc-800 hover:text-zinc-700 dark:hover:text-zinc-200 font-sans font-medium transition-all duration-200 cursor-pointer"
+              >
+                {isCopied ? (
+                  <>
+                    <Check className="h-3 w-3 text-emerald-400" />
+                    <span className="text-emerald-400 font-semibold">Copied!</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy className="h-3 w-3" />
+                    <span>Copy</span>
+                  </>
+                )}
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* Code Display or Editor */}
+      <div className="max-h-96 overflow-y-auto overflow-x-auto p-4 scrollbar-thin scrollbar-thumb-zinc-300 dark:scrollbar-thumb-zinc-850">
+        {isEditing ? (
+          <textarea
+            value={tempCode}
+            onChange={(e) => setTempCode(e.target.value)}
+            className="w-full bg-zinc-100 dark:bg-zinc-900/40 border border-zinc-200 dark:border-zinc-800/80 rounded-lg p-3 text-zinc-800 dark:text-zinc-200 font-mono text-xs md:text-sm leading-relaxed focus:outline-none focus:border-amber-500/50 resize-y min-h-[120px]"
+            rows={Math.min(code.split("\n").length + 1, 15)}
+          />
+        ) : (
+          <pre className="text-zinc-700 dark:text-zinc-300 leading-normal select-text">
+            <code>{code}</code>
+          </pre>
+        )}
+      </div>
+    </div>
+  );
 }
 
 export function MarkdownRenderer({ content }: MarkdownRendererProps) {
@@ -29,40 +134,13 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps) {
           const isCopied = copiedText === code;
 
           return (
-            <div
+            <EditableCodeBlock
               key={index}
-              className="my-4 overflow-hidden rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950 font-mono text-sm shadow-lg shadow-black/40"
-            >
-
-              <div className="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800/80 bg-zinc-100/80 dark:bg-zinc-900/60 px-4 py-2 text-xs text-zinc-500 dark:text-zinc-400 select-none">
-                <div className="flex items-center gap-2">
-                  <Terminal className="h-3.5 w-3.5 text-zinc-500" />
-                  <span>{language || "plaintext"}</span>
-                </div>
-                <button
-                  onClick={() => handleCopy(code)}
-                  className="flex items-center gap-1.5 rounded-md px-2 py-1 hover:bg-zinc-200 dark:hover:bg-zinc-800 hover:text-zinc-700 dark:hover:text-zinc-200 transition-all duration-200"
-                >
-                  {isCopied ? (
-                    <>
-                      <Check className="h-3 w-3 text-emerald-400" />
-                      <span className="text-emerald-400">Copied!</span>
-                    </>
-                  ) : (
-                    <>
-                      <Copy className="h-3 w-3" />
-                      <span>Copy</span>
-                    </>
-                  )}
-                </button>
-              </div>
-
-              <div className="max-h-64 overflow-y-auto overflow-x-auto p-4 scrollbar-thin scrollbar-thumb-zinc-300 dark:scrollbar-thumb-zinc-850">
-                <pre className="text-zinc-700 dark:text-zinc-300 leading-normal select-text">
-                  <code>{code.trim()}</code>
-                </pre>
-              </div>
-            </div>
+              initialCode={code}
+              language={language}
+              onCopy={handleCopy}
+              isCopied={isCopied}
+            />
           );
         }
 

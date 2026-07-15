@@ -43,7 +43,9 @@ import {
   RotateCw,
   User,
   LogOut,
-  Globe
+  Globe,
+  Trophy,
+  Pencil
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { Message, ChatSession, SystemPreset, ModelOption } from "./types";
@@ -232,6 +234,40 @@ export default function App() {
   const ttsSynthRef = useRef<SpeechSynthesis | null>(null);
   const notifyAudioRef = useRef<HTMLAudioElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const homeTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const chatTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+
+  const getFormattedCurrentDate = () => {
+    const days = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
+    const months = [
+      "Januari", "Februari", "Maret", "April", "Mei", "Juni",
+      "Juli", "Agustus", "September", "Oktober", "November", "Desember"
+    ];
+    const now = new Date();
+    const dayName = days[now.getDay()];
+    const date = now.getDate();
+    const monthName = months[now.getMonth()];
+    const year = now.getFullYear();
+    const hours = String(now.getHours()).padStart(2, "0");
+    const minutes = String(now.getMinutes()).padStart(2, "0");
+    return `Hari ini adalah ${dayName}, tanggal ${date} ${monthName} ${year}, jam ${hours}:${minutes} WIB.`;
+  };
+
+  useEffect(() => {
+    if (inputMessage === "") {
+      if (homeTextareaRef.current) homeTextareaRef.current.style.height = "auto";
+      if (chatTextareaRef.current) chatTextareaRef.current.style.height = "auto";
+    } else {
+      if (homeTextareaRef.current) {
+        homeTextareaRef.current.style.height = "auto";
+        homeTextareaRef.current.style.height = `${Math.min(homeTextareaRef.current.scrollHeight, 240)}px`;
+      }
+      if (chatTextareaRef.current) {
+        chatTextareaRef.current.style.height = "auto";
+        chatTextareaRef.current.style.height = `${Math.min(chatTextareaRef.current.scrollHeight, 240)}px`;
+      }
+    }
+  }, [inputMessage]);
 
   useEffect(() => {
     notifyAudioRef.current = new Audio(notifySoundUrl);
@@ -814,6 +850,8 @@ export default function App() {
         return <PenTool className={className} />;
       case "Languages":
         return <Languages className={className} />;
+      case "Trophy":
+        return <Trophy className={className} />;
       default:
         return <MessageSquare className={className} />;
     }
@@ -928,7 +966,7 @@ export default function App() {
       (p) => p.id === (activeSessionState ? activeSessionState.systemInstructionId : selectedPresetId)
     ) || SYSTEM_PRESETS[0];
     const apiTemp = activeSessionState ? activeSessionState.temperature : temperature;
-    const apiWebSearch = activeSessionState ? (activeSessionState.webSearchEnabled ?? globalWebSearchEnabled) : globalWebSearchEnabled;
+    const apiWebSearch = apiModel === "gemini-3.5-flash";
 
     const updatedSession = sessions.find((s) => s.id === targetSessionId);
     const conversationHistory = updatedSession ? [...updatedSession.messages, userMessage] : [userMessage];
@@ -952,6 +990,7 @@ export default function App() {
     if (memories.length > 0) {
       finalInstruction += "\n\n[MEMORI AI (Ingatan pengguna yang tersimpan)]:\n" + memories.map((m, idx) => `${idx + 1}. ${m}`).join("\n");
     }
+    finalInstruction += `\n\n[INFO WAKTU REAL-TIME SEKARANG]\n${getFormattedCurrentDate()}`;
 
     const controller = new AbortController();
     abortControllerRef.current = controller;
@@ -1110,6 +1149,25 @@ export default function App() {
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
       setIsGenerating(false);
+      setSessions((prev) =>
+        prev.map((s) => {
+          if (s.id === currentSessionId) {
+            const messages = s.messages;
+            if (messages.length > 0) {
+              const lastMsg = messages[messages.length - 1];
+              if (lastMsg.role === "model") {
+                const updatedMessages = [...messages];
+                updatedMessages[messages.length - 1] = {
+                  ...lastMsg,
+                  content: lastMsg.content ? lastMsg.content + "\n\n*(Jawaban dihentikan oleh pengguna)*" : "*(Jawaban dihentikan)*"
+                };
+                return { ...s, messages: updatedMessages };
+              }
+            }
+          }
+          return s;
+        })
+      );
     }
   };
 
@@ -1159,7 +1217,7 @@ export default function App() {
       (p) => p.id === (activeSessionObj.systemInstructionId || selectedPresetId)
     ) || SYSTEM_PRESETS[0];
     const apiTemp = activeSessionObj.temperature || temperature;
-    const apiWebSearch = activeSessionObj.webSearchEnabled ?? globalWebSearchEnabled;
+    const apiWebSearch = apiModel === "gemini-3.5-flash";
 
     const formattedHistory = priorMessages.map((m) => {
       let content = m.content;
@@ -1180,6 +1238,7 @@ export default function App() {
     if (memories.length > 0) {
       finalInstruction += "\n\n[MEMORI AI (Ingatan pengguna yang tersimpan)]:\n" + memories.map((m, idx) => `${idx + 1}. ${m}`).join("\n");
     }
+    finalInstruction += `\n\n[INFO WAKTU REAL-TIME SEKARANG]\n${getFormattedCurrentDate()}`;
 
     const controller = new AbortController();
     abortControllerRef.current = controller;
@@ -1964,6 +2023,7 @@ export default function App() {
                         </button>
 
                         <textarea
+                          ref={homeTextareaRef}
                           value={inputMessage}
                           onChange={(e) => setInputMessage(e.target.value)}
                           onKeyDown={(e) => {
@@ -2015,33 +2075,6 @@ export default function App() {
                             <Sparkles className="h-3 w-3 text-amber-500 shrink-0" />
                             <span className="truncate">Preset: {activePreset.name}</span>
                             <ChevronDown className="h-3 w-3 text-zinc-500 shrink-0" />
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const nextSearchState = !(currentSession ? (currentSession.webSearchEnabled ?? false) : globalWebSearchEnabled);
-                              if (currentSession) {
-                                setSessions((prev) =>
-                                  prev.map((s) => (s.id === currentSessionId ? { ...s, webSearchEnabled: nextSearchState } : s))
-                                );
-                              } else {
-                                setGlobalWebSearchEnabled(nextSearchState);
-                              }
-                            }}
-                            className={`flex items-center gap-1.5 text-[10px] md:text-[11px] rounded-lg py-1.5 px-2 px-2.5 truncate font-sans cursor-pointer focus:outline-none transition-all border ${
-                              (currentSession ? (currentSession.webSearchEnabled ?? false) : globalWebSearchEnabled)
-                                ? (isDark 
-                                    ? "bg-amber-950/20 text-amber-400 border-amber-900/50 hover:bg-amber-950/30" 
-                                    : "bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100")
-                                : (isDark 
-                                    ? "bg-zinc-950 hover:bg-zinc-900 text-zinc-400 border-zinc-900 hover:border-zinc-800" 
-                                    : "bg-white hover:bg-zinc-100 text-zinc-600 border-zinc-200 hover:border-zinc-350")
-                            }`}
-                            title="Aktifkan Pencarian Web Google"
-                          >
-                            <Globe className={`h-3 w-3 shrink-0 ${(currentSession ? (currentSession.webSearchEnabled ?? false) : globalWebSearchEnabled) ? "text-amber-500 animate-pulse" : "text-zinc-500"}`} />
-                            <span className="truncate">Cari di Web: {(currentSession ? (currentSession.webSearchEnabled ?? false) : globalWebSearchEnabled) ? "Aktif" : "Nonaktif"}</span>
                           </button>
                         </div>
 
@@ -2142,7 +2175,9 @@ export default function App() {
                                     <span className="h-1.5 w-1.5 rounded-full bg-zinc-500 animate-[bounce_1s_infinite_200ms]" />
                                     <span className="h-1.5 w-1.5 rounded-full bg-zinc-500 animate-[bounce_1s_infinite_300ms]" />
                                   </div>
-                                  <span className="text-xs text-zinc-500 font-medium font-sans">AI sedang berpikir...</span>
+                                  <span className="text-xs text-zinc-500 font-medium font-sans">
+                                    {currentSession?.model === "gemini-3.5-flash" ? "Ai sedang mencari info..." : "AI sedang berpikir..."}
+                                  </span>
                                 </div>
                               ) : (
                                 <div className="text-zinc-800 dark:text-zinc-100 font-sans text-sm sm:text-base md:text-[16px] leading-relaxed select-text">
@@ -2376,48 +2411,26 @@ export default function App() {
                         <Plus className="h-4 w-4 md:h-5 md:w-5 stroke-[2]" />
                       </button>
 
-                      {/* Web Search toggle button */}
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const nextSearchState = !(currentSession ? (currentSession.webSearchEnabled ?? false) : globalWebSearchEnabled);
-                          if (currentSession) {
-                            setSessions((prev) =>
-                              prev.map((s) => (s.id === currentSessionId ? { ...s, webSearchEnabled: nextSearchState } : s))
-                            );
-                          } else {
-                            setGlobalWebSearchEnabled(nextSearchState);
-                          }
-                        }}
-                        className={`p-2 md:p-2.5 rounded-lg md:rounded-xl transition-all shrink-0 ${
-                          (currentSession ? (currentSession.webSearchEnabled ?? false) : globalWebSearchEnabled)
-                            ? "bg-amber-950/30 text-amber-400 hover:bg-amber-950/50"
-                            : "hover:bg-zinc-800 text-zinc-500 hover:text-amber-400"
-                        }`}
-                        title={`Cari di Web: ${(currentSession ? (currentSession.webSearchEnabled ?? false) : globalWebSearchEnabled) ? "Aktif" : "Nonaktif"}`}
-                      >
-                        <Globe className={`h-4 w-4 md:h-5 md:w-5 ${(currentSession ? (currentSession.webSearchEnabled ?? false) : globalWebSearchEnabled) ? "text-amber-500 animate-pulse" : ""}`} />
-                      </button>
-
-                    <textarea
-                      rows={1}
-                      value={inputMessage}
-                      onChange={(e) => setInputMessage(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" && !e.shiftKey) {
-                          e.preventDefault();
-                          handleSendMessage();
-                        }
-                      }}
-                      placeholder={
-                        isGenerating
-                          ? "Harap tunggu jawaban model selesai..."
-                          : "Tanyakan apa saja ke ExeChat..."
-                      }
-                      disabled={isGenerating}
-                      className="flex-1 max-h-40 min-h-[38px] md:min-h-[44px] bg-transparent resize-none py-2 px-2.5 border-none outline-none focus:ring-0 text-zinc-200 text-xs md:text-sm placeholder-zinc-550"
-                      style={{ height: "auto" }}
-                    />
+                     <textarea
+                       ref={chatTextareaRef}
+                       rows={1}
+                       value={inputMessage}
+                       onChange={(e) => setInputMessage(e.target.value)}
+                       onKeyDown={(e) => {
+                         if (e.key === "Enter" && !e.shiftKey) {
+                           e.preventDefault();
+                           handleSendMessage();
+                         }
+                       }}
+                       placeholder={
+                         isGenerating
+                           ? "Harap tunggu jawaban model selesai..."
+                           : "Tanyakan apa saja ke ExeChat..."
+                       }
+                       disabled={isGenerating}
+                       className="flex-1 max-h-40 min-h-[38px] md:min-h-[44px] bg-transparent resize-none py-2 px-2.5 border-none outline-none focus:ring-0 text-zinc-200 text-xs md:text-sm placeholder-zinc-550"
+                       style={{ height: "auto" }}
+                     />
 
                     {/* Abort button / Submit button */}
                     <div className="flex items-center gap-1 pl-1.5 shrink-0">

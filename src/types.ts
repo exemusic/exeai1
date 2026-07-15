@@ -30,6 +30,7 @@ export interface SystemPreset {
   icon: string;
   description: string;
   instruction: string;
+  badge?: string;
 }
 
 export interface ModelOption {
