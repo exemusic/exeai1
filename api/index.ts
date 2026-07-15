@@ -1,7 +1,7 @@
 import express from "express";
 import dotenv from "dotenv";
+import { GoogleGenAI } from "@google/genai";
 
-// Load environment variables
 dotenv.config();
 
 const app = express();
@@ -57,9 +57,37 @@ app.post("/api/user/get-or-create-credits", (req, res) => {
   return res.json({ credits: 99999 });
 });
 
-// Streaming chat endpoint using Server-Sent Events (SSE) with no credit limits (Guest Mode friendly)
+async function streamGemini(messages: any[], systemInstruction: string, temperature: number, res: any) {
+  const geminiKey = process.env.GEMINI_API_KEY || "AQ.Ab8RN6JmEkETYlx3cH-qZwcJMOlGaVFpt491zP1T11A5hH3hMA";
+  const ai = new GoogleGenAI({
+    apiKey: geminiKey,
+    httpOptions: {
+      headers: {
+        'User-Agent': 'aistudio-build'
+      }
+    }
+  });
+  const contents = messages.map((m: any) => ({
+    role: m.role === "model" || m.role === "assistant" ? "model" : "user",
+    parts: [{ text: m.content }]
+  }));
+  const responseStream = await ai.models.generateContentStream({
+    model: "gemini-3.5-flash",
+    contents: contents,
+    config: {
+      systemInstruction: systemInstruction || "Anda adalah ExeAi, asisten AI modern yang sangat pintar, ramah, dan solutif.",
+      temperature: temperature !== undefined ? Number(temperature) : 0.7
+    }
+  });
+  for await (const chunk of responseStream) {
+    const text = chunk.text;
+    if (text) {
+      res.write(`data: ${JSON.stringify({ text })}\n\n`);
+    }
+  }
+}
+
 app.post("/api/chat/stream", async (req, res) => {
-  // Set headers for SSE
   res.setHeader("Content-Type", "text/event-stream");
   res.setHeader("Cache-Control", "no-cache");
   res.setHeader("Connection", "keep-alive");
@@ -70,6 +98,12 @@ app.post("/api/chat/stream", async (req, res) => {
 
     if (!messages || !Array.isArray(messages)) {
       res.write(`data: ${JSON.stringify({ error: "Invalid or missing messages array" })}\n\n`);
+      return res.end();
+    }
+
+    if (model === "gemini-3.5-flash") {
+      await streamGemini(messages, systemInstruction, temperature, res);
+      res.write("data: [DONE]\n\n");
       return res.end();
     }
 
