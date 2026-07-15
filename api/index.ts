@@ -58,7 +58,12 @@ app.post("/api/user/get-or-create-credits", (req, res) => {
 });
 
 async function streamGemini(messages: any[], systemInstruction: string, temperature: number, webSearchEnabled: boolean, res: any) {
-  const geminiKey = process.env.GEMINI_API_KEY || "AQ.Ab8RN6JmEkETYlx3cH-qZwcJMOlGaVFpt491zP1T11A5hH3hMA";
+  const geminiKey = process.env.GEMINI_API_KEY;
+  if (!geminiKey) {
+    res.write(`data: ${JSON.stringify({ error: "Kunci API Gemini tidak dikonfigurasi di server. Silakan atur variabel lingkungan GEMINI_API_KEY di dashboard platform Anda." })}\n\n`);
+    res.write("data: [DONE]\n\n");
+    return res.end();
+  }
   const ai = new GoogleGenAI({
     apiKey: geminiKey,
     httpOptions: {
