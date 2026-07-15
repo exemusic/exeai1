@@ -57,7 +57,7 @@ app.post("/api/user/get-or-create-credits", (req, res) => {
   return res.json({ credits: 99999 });
 });
 
-async function streamGemini(messages: any[], systemInstruction: string, temperature: number, res: any) {
+async function streamGemini(messages: any[], systemInstruction: string, temperature: number, webSearchEnabled: boolean, res: any) {
   const geminiKey = process.env.GEMINI_API_KEY || "AQ.Ab8RN6JmEkETYlx3cH-qZwcJMOlGaVFpt491zP1T11A5hH3hMA";
   const ai = new GoogleGenAI({
     apiKey: geminiKey,
@@ -71,13 +71,20 @@ async function streamGemini(messages: any[], systemInstruction: string, temperat
     role: m.role === "model" || m.role === "assistant" ? "model" : "user",
     parts: [{ text: m.content }]
   }));
+  
+  const config: any = {
+    systemInstruction: systemInstruction || "Anda adalah ExeAi, asisten AI modern yang sangat pintar, ramah, dan solutif.",
+    temperature: temperature !== undefined ? Number(temperature) : 0.7
+  };
+
+  if (webSearchEnabled) {
+    config.tools = [{ googleSearch: {} }];
+  }
+
   const responseStream = await ai.models.generateContentStream({
     model: "gemini-3.5-flash",
     contents: contents,
-    config: {
-      systemInstruction: systemInstruction || "Anda adalah ExeAi, asisten AI modern yang sangat pintar, ramah, dan solutif.",
-      temperature: temperature !== undefined ? Number(temperature) : 0.7
-    }
+    config: config
   });
   for await (const chunk of responseStream) {
     const text = chunk.text;
@@ -94,15 +101,15 @@ app.post("/api/chat/stream", async (req, res) => {
   res.setHeader("X-Accel-Buffering", "no");
 
   try {
-    const { messages, systemInstruction, temperature, model = "gemma-4-31b" } = req.body;
+    const { messages, systemInstruction, temperature, model = "gemma-4-31b", webSearchEnabled = false } = req.body;
 
     if (!messages || !Array.isArray(messages)) {
       res.write(`data: ${JSON.stringify({ error: "Invalid or missing messages array" })}\n\n`);
       return res.end();
     }
 
-    if (model === "gemini-3.5-flash") {
-      await streamGemini(messages, systemInstruction, temperature, res);
+    if (model === "gemini-3.5-flash" || webSearchEnabled) {
+      await streamGemini(messages, systemInstruction, temperature, webSearchEnabled, res);
       res.write("data: [DONE]\n\n");
       return res.end();
     }

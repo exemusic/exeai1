@@ -42,7 +42,8 @@ import {
   MoreHorizontal,
   RotateCw,
   User,
-  LogOut
+  LogOut,
+  Globe
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { Message, ChatSession, SystemPreset, ModelOption } from "./types";
@@ -121,6 +122,7 @@ export default function App() {
 
   const [selectedPresetId, setSelectedPresetId] = useState("default");
   const [selectedModelId, setSelectedModelId] = useState("gemma-4-31b");
+  const [globalWebSearchEnabled, setGlobalWebSearchEnabled] = useState(false);
   const [temperature, setTemperature] = useState(0.7);
   const [showSettings, setShowSettings] = useState(false);
   const [settingsTab, setSettingsTab] = useState<"akun" | "model" | "tampilan" | "ingatan">("akun");
@@ -765,6 +767,7 @@ export default function App() {
       temperature,
       model: selectedModelId,
       createdAt: Date.now(),
+      webSearchEnabled: globalWebSearchEnabled,
     };
 
     setSessions((prev) => [newSession, ...prev]);
@@ -925,6 +928,7 @@ export default function App() {
       (p) => p.id === (activeSessionState ? activeSessionState.systemInstructionId : selectedPresetId)
     ) || SYSTEM_PRESETS[0];
     const apiTemp = activeSessionState ? activeSessionState.temperature : temperature;
+    const apiWebSearch = activeSessionState ? (activeSessionState.webSearchEnabled ?? globalWebSearchEnabled) : globalWebSearchEnabled;
 
     const updatedSession = sessions.find((s) => s.id === targetSessionId);
     const conversationHistory = updatedSession ? [...updatedSession.messages, userMessage] : [userMessage];
@@ -965,6 +969,7 @@ export default function App() {
           model: apiModel,
           uid: isLoggedIn ? userId : null,
           idToken: null,
+          webSearchEnabled: apiWebSearch,
         }),
         signal: controller.signal,
       });
@@ -1154,6 +1159,7 @@ export default function App() {
       (p) => p.id === (activeSessionObj.systemInstructionId || selectedPresetId)
     ) || SYSTEM_PRESETS[0];
     const apiTemp = activeSessionObj.temperature || temperature;
+    const apiWebSearch = activeSessionObj.webSearchEnabled ?? globalWebSearchEnabled;
 
     const formattedHistory = priorMessages.map((m) => {
       let content = m.content;
@@ -1191,6 +1197,7 @@ export default function App() {
           model: apiModel,
           uid: isLoggedIn ? userId : null,
           idToken: null,
+          webSearchEnabled: apiWebSearch,
         }),
         signal: controller.signal,
       });
@@ -2009,6 +2016,33 @@ export default function App() {
                             <span className="truncate">Preset: {activePreset.name}</span>
                             <ChevronDown className="h-3 w-3 text-zinc-500 shrink-0" />
                           </button>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const nextSearchState = !(currentSession ? (currentSession.webSearchEnabled ?? false) : globalWebSearchEnabled);
+                              if (currentSession) {
+                                setSessions((prev) =>
+                                  prev.map((s) => (s.id === currentSessionId ? { ...s, webSearchEnabled: nextSearchState } : s))
+                                );
+                              } else {
+                                setGlobalWebSearchEnabled(nextSearchState);
+                              }
+                            }}
+                            className={`flex items-center gap-1.5 text-[10px] md:text-[11px] rounded-lg py-1.5 px-2 px-2.5 truncate font-sans cursor-pointer focus:outline-none transition-all border ${
+                              (currentSession ? (currentSession.webSearchEnabled ?? false) : globalWebSearchEnabled)
+                                ? (isDark 
+                                    ? "bg-amber-950/20 text-amber-400 border-amber-900/50 hover:bg-amber-950/30" 
+                                    : "bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100")
+                                : (isDark 
+                                    ? "bg-zinc-950 hover:bg-zinc-900 text-zinc-400 border-zinc-900 hover:border-zinc-800" 
+                                    : "bg-white hover:bg-zinc-100 text-zinc-600 border-zinc-200 hover:border-zinc-350")
+                            }`}
+                            title="Aktifkan Pencarian Web Google"
+                          >
+                            <Globe className={`h-3 w-3 shrink-0 ${(currentSession ? (currentSession.webSearchEnabled ?? false) : globalWebSearchEnabled) ? "text-amber-500 animate-pulse" : "text-zinc-500"}`} />
+                            <span className="truncate">Cari di Web: {(currentSession ? (currentSession.webSearchEnabled ?? false) : globalWebSearchEnabled) ? "Aktif" : "Nonaktif"}</span>
+                          </button>
                         </div>
 
                         {/* Send button */}
@@ -2340,6 +2374,29 @@ export default function App() {
                         title="Unggah file pendukung (Teks, Kode, Gambar, dsb)"
                       >
                         <Plus className="h-4 w-4 md:h-5 md:w-5 stroke-[2]" />
+                      </button>
+
+                      {/* Web Search toggle button */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const nextSearchState = !(currentSession ? (currentSession.webSearchEnabled ?? false) : globalWebSearchEnabled);
+                          if (currentSession) {
+                            setSessions((prev) =>
+                              prev.map((s) => (s.id === currentSessionId ? { ...s, webSearchEnabled: nextSearchState } : s))
+                            );
+                          } else {
+                            setGlobalWebSearchEnabled(nextSearchState);
+                          }
+                        }}
+                        className={`p-2 md:p-2.5 rounded-lg md:rounded-xl transition-all shrink-0 ${
+                          (currentSession ? (currentSession.webSearchEnabled ?? false) : globalWebSearchEnabled)
+                            ? "bg-amber-950/30 text-amber-400 hover:bg-amber-950/50"
+                            : "hover:bg-zinc-800 text-zinc-500 hover:text-amber-400"
+                        }`}
+                        title={`Cari di Web: ${(currentSession ? (currentSession.webSearchEnabled ?? false) : globalWebSearchEnabled) ? "Aktif" : "Nonaktif"}`}
+                      >
+                        <Globe className={`h-4 w-4 md:h-5 md:w-5 ${(currentSession ? (currentSession.webSearchEnabled ?? false) : globalWebSearchEnabled) ? "text-amber-500 animate-pulse" : ""}`} />
                       </button>
 
                     <textarea

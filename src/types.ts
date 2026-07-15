@@ -21,6 +21,7 @@ export interface ChatSession {
   temperature: number;
   model: string;
   createdAt: number;
+  webSearchEnabled?: boolean;
 }
 
 export interface SystemPreset {
