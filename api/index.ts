@@ -82,7 +82,8 @@ async function streamGemini(messages: any[], systemInstruction: string, temperat
     temperature: temperature !== undefined ? Number(temperature) : 0.7
   };
 
-  if (webSearchEnabled) {
+  let useSearch = webSearchEnabled;
+  if (useSearch) {
     config.tools = [{ googleSearch: {} }];
   }
 
@@ -99,20 +100,62 @@ async function streamGemini(messages: any[], systemInstruction: string, temperat
       }
     }
   } catch (err: any) {
-    console.error("Gemini stream error:", err);
-    let errMsg = "Terjadi kesalahan saat memanggil Gemini API.";
     const errString = String(err.message || JSON.stringify(err));
-    if (errString.includes("API key not valid") || errString.includes("API_KEY_INVALID") || errString.includes("INVALID_ARGUMENT")) {
-      errMsg = "Kunci API Gemini (GEMINI_API_KEY) Anda tidak valid atau telah kedaluwarsa. Silakan periksa atau perbarui Kunci API Anda di menu Settings > Secrets di pojok kanan atas.";
-    } else if (errString.includes("PERMISSION_DENIED")) {
-      errMsg = "Akses ditolak (Permission Denied) oleh Gemini API. Pastikan model gemini-3.5-flash diaktifkan untuk Kunci API Anda di menu Settings > Secrets.";
-    } else if (errString.includes("RESOURCE_EXHAUSTED") || errString.includes("quota")) {
-      errMsg = "Batas kuota Gemini API tercapai (Rate Limit). Silakan coba beberapa saat lagi atau gunakan Kunci API yang mendukung penagihan aktif di menu Settings > Secrets.";
+    
+    // If search was enabled and it failed due to quota, rate limit, permission, or search tool restrictions,
+    // gracefully fallback to answering WITHOUT search!
+    if (useSearch && (
+      errString.includes("RESOURCE_EXHAUSTED") || 
+      errString.includes("quota") || 
+      errString.includes("PERMISSION_DENIED") || 
+      errString.includes("not allowed") || 
+      errString.includes("Search") || 
+      errString.includes("tool")
+    )) {
+      console.warn("Google Search failed or quota exhausted on this key. Falling back to direct answering...", errString);
+      
+      // Send a helpful, clean notification message to the user that search is skipped due to free key quota
+      res.write(`data: ${JSON.stringify({ text: "*(Info: Pencarian Web Google dilewati karena Kunci API gratis Anda tidak mendukung kuota Pencarian, beralih ke respon langsung...)*\n\n" })}\n\n`);
+      
+      // Remove the search tool from configuration and retry
+      const retryConfig = { ...config };
+      delete retryConfig.tools;
+      
+      try {
+        const responseStream = await ai.models.generateContentStream({
+          model: "gemini-3.5-flash",
+          contents: contents,
+          config: retryConfig
+        });
+        for await (const chunk of responseStream) {
+          const text = chunk.text;
+          if (text) {
+            res.write(`data: ${JSON.stringify({ text })}\n\n`);
+          }
+        }
+      } catch (retryErr: any) {
+        handleGeminiError(retryErr, res);
+      }
     } else {
-      errMsg = `Gagal menghubungi Gemini API: ${errString}`;
+      handleGeminiError(err, res);
     }
-    res.write(`data: ${JSON.stringify({ error: errMsg })}\n\n`);
   }
+}
+
+function handleGeminiError(err: any, res: any) {
+  console.error("Gemini stream error:", err);
+  let errMsg = "Terjadi kesalahan saat memanggil Gemini API.";
+  const errString = String(err.message || JSON.stringify(err));
+  if (errString.includes("API key not valid") || errString.includes("API_KEY_INVALID") || errString.includes("INVALID_ARGUMENT")) {
+    errMsg = "Kunci API Gemini (GEMINI_API_KEY) Anda tidak valid atau telah kedaluwarsa. Silakan periksa atau perbarui Kunci API Anda di menu Settings > Secrets di pojok kanan atas.";
+  } else if (errString.includes("PERMISSION_DENIED")) {
+    errMsg = "Akses ditolak (Permission Denied) oleh Gemini API. Pastikan model gemini-3.5-flash diaktifkan untuk Kunci API Anda di menu Settings > Secrets.";
+  } else if (errString.includes("RESOURCE_EXHAUSTED") || errString.includes("quota")) {
+    errMsg = "Batas kuota Gemini API tercapai (Rate Limit). Silakan coba beberapa saat lagi atau gunakan Kunci API yang mendukung penagihan aktif di menu Settings > Secrets.";
+  } else {
+    errMsg = `Gagal menghubungi Gemini API: ${errString}`;
+  }
+  res.write(`data: ${JSON.stringify({ error: errMsg })}\n\n`);
 }
 
 app.post("/api/chat/stream", async (req, res) => {

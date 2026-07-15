@@ -2772,6 +2772,11 @@ export default function App() {
                                   <span className={`text-xs font-bold ${isSelected ? (isDark ? "text-zinc-100" : "text-zinc-900") : "text-zinc-500"}`}>
                                     {preset.name}
                                   </span>
+                                  {preset.badge && (
+                                    <span className="ml-auto text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-500 dark:bg-amber-500/25 dark:text-amber-400 uppercase tracking-wider font-sans">
+                                      {preset.badge}
+                                    </span>
+                                  )}
                                 </div>
                                 <p className={`text-xs leading-relaxed ${isDark ? "text-zinc-500" : "text-zinc-550"}`}>
                                   {preset.description}
@@ -3041,11 +3046,18 @@ export default function App() {
                           </div>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center justify-between mb-1">
-                              <span className={`text-sm font-semibold ${isSelected ? (isDark ? "text-zinc-100" : "text-zinc-900") : (isDark ? "text-zinc-300" : "text-zinc-700")}`}>
-                                {preset.name}
-                              </span>
+                              <div className="flex items-center gap-1.5 min-w-0">
+                                <span className={`text-sm font-semibold truncate ${isSelected ? (isDark ? "text-zinc-100" : "text-zinc-900") : (isDark ? "text-zinc-300" : "text-zinc-700")}`}>
+                                  {preset.name}
+                                </span>
+                                {preset.badge && (
+                                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-500 dark:bg-amber-500/25 dark:text-amber-400 uppercase tracking-wider font-sans shrink-0">
+                                    {preset.badge}
+                                  </span>
+                                )}
+                              </div>
                               {isSelected && (
-                                <span className="text-[10px] font-mono font-medium text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
+                                <span className="text-[10px] font-mono font-medium text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20 shrink-0">
                                   Aktif
                                 </span>
                               )}
