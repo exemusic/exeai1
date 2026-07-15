@@ -86,16 +86,32 @@ async function streamGemini(messages: any[], systemInstruction: string, temperat
     config.tools = [{ googleSearch: {} }];
   }
 
-  const responseStream = await ai.models.generateContentStream({
-    model: "gemini-3.5-flash",
-    contents: contents,
-    config: config
-  });
-  for await (const chunk of responseStream) {
-    const text = chunk.text;
-    if (text) {
-      res.write(`data: ${JSON.stringify({ text })}\n\n`);
+  try {
+    const responseStream = await ai.models.generateContentStream({
+      model: "gemini-3.5-flash",
+      contents: contents,
+      config: config
+    });
+    for await (const chunk of responseStream) {
+      const text = chunk.text;
+      if (text) {
+        res.write(`data: ${JSON.stringify({ text })}\n\n`);
+      }
     }
+  } catch (err: any) {
+    console.error("Gemini stream error:", err);
+    let errMsg = "Terjadi kesalahan saat memanggil Gemini API.";
+    const errString = String(err.message || JSON.stringify(err));
+    if (errString.includes("API key not valid") || errString.includes("API_KEY_INVALID") || errString.includes("INVALID_ARGUMENT")) {
+      errMsg = "Kunci API Gemini (GEMINI_API_KEY) Anda tidak valid atau telah kedaluwarsa. Silakan periksa atau perbarui Kunci API Anda di menu Settings > Secrets di pojok kanan atas.";
+    } else if (errString.includes("PERMISSION_DENIED")) {
+      errMsg = "Akses ditolak (Permission Denied) oleh Gemini API. Pastikan model gemini-3.5-flash diaktifkan untuk Kunci API Anda di menu Settings > Secrets.";
+    } else if (errString.includes("RESOURCE_EXHAUSTED") || errString.includes("quota")) {
+      errMsg = "Batas kuota Gemini API tercapai (Rate Limit). Silakan coba beberapa saat lagi atau gunakan Kunci API yang mendukung penagihan aktif di menu Settings > Secrets.";
+    } else {
+      errMsg = `Gagal menghubungi Gemini API: ${errString}`;
+    }
+    res.write(`data: ${JSON.stringify({ error: errMsg })}\n\n`);
   }
 }
 
