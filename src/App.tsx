@@ -47,7 +47,6 @@ import {
 import { motion, AnimatePresence } from "motion/react";
 import { Message, ChatSession, SystemPreset, ModelOption } from "./types";
 import { MarkdownRenderer } from "./components/MarkdownRenderer";
-import { CodeEditorMode } from "./components/CodeEditorMode";
 import { GoogleOAuthProvider, GoogleLogin } from "@react-oauth/google";
 import { jwtDecode } from "jwt-decode";
 import { MODEL_OPTIONS, SYSTEM_PRESETS, SUGGESTED_PROMPTS } from "./presets";
@@ -55,7 +54,7 @@ import { MODEL_OPTIONS, SYSTEM_PRESETS, SUGGESTED_PROMPTS } from "./presets";
 const notifySoundUrl = new URL("../Sound/notify.mp3", import.meta.url).href;
 
 export default function App() {
-  // Chat Sessions States
+
   const [sessions, setSessions] = useState<ChatSession[]>(() => {
     const saved = localStorage.getItem("exeai_sessions");
     if (saved) {
@@ -84,7 +83,7 @@ export default function App() {
     }
     return null;
   });
-  // Welcome Greetings & Memories
+
   const [welcomeGreeting, setWelcomeGreeting] = useState("Ada ide baru untuk dieksplorasi?");
   const [memories, setMemories] = useState<string[]>(() => {
     const saved = localStorage.getItem("exechat_memories");
@@ -114,14 +113,12 @@ export default function App() {
     setWelcomeGreeting(greetings[randomIdx]);
   }, []);
 
-  // Current Input & State
   const [inputMessage, setInputMessage] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
   const [errorText, setErrorText] = useState<string | null>(null);
   const [uploadProgress, setUploadProgress] = useState<Record<string, number>>({});
   const [searchQuery, setSearchQuery] = useState("");
 
-  // Settings & Options States
   const [selectedPresetId, setSelectedPresetId] = useState("default");
   const [selectedModelId, setSelectedModelId] = useState("gemma-4-31b");
   const [temperature, setTemperature] = useState(0.7);
@@ -135,9 +132,8 @@ export default function App() {
   const [showModelModal, setShowModelModal] = useState(false);
   const [hasApiKey, setHasApiKey] = useState<boolean | null>(null);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
-  const [isDesktopSidebarOpen, setIsDesktopSidebarOpen] = useState(false); // Closed by default as per user request
+  const [isDesktopSidebarOpen, setIsDesktopSidebarOpen] = useState(false); 
 
-  // Theme settings (System, Dark/Hitam, Light/Putih)
   const [themeMode, setThemeMode] = useState<"system" | "dark" | "light">(() => {
     return (localStorage.getItem("exechat_theme_mode") as any) || "dark";
   });
@@ -172,11 +168,9 @@ export default function App() {
     }
   }, [resolvedTheme]);
 
-  // Credits & Account States - loaded strictly from Firebase Realtime Database
   const [credits, setCredits] = useState<number>(0);
   const [authLoading, setAuthLoading] = useState<boolean>(true);
 
-  // User feedback and action states for assistant messages
   const [likedMessages, setLikedMessages] = useState<Record<string, boolean>>({});
   const [dislikedMessages, setDislikedMessages] = useState<Record<string, boolean>>({});
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
@@ -213,33 +207,24 @@ export default function App() {
   const [newUsernameInput, setNewUsernameInput] = useState("");
   const [pendingRedeemCodeInput, setPendingRedeemCodeInput] = useState("");
   const [authMessage, setAuthMessage] = useState<string | null>(null);
-  
-  // Registration Popup states for new user custom names
+
   const [showRegisterModal, setShowRegisterModal] = useState<boolean>(false);
-  const [showCodeEditor, setShowCodeEditor] = useState(false);
   const [registerModalName, setRegisterModalName] = useState<string>("");
   const [googleDefaultName, setGoogleDefaultName] = useState<string>("");
-  
-  // Selected file for upload (before sending message)
+
   const [selectedFile, setSelectedFile] = useState<{
     name: string;
     url: string;
     size: number;
     mime?: string;
     textContent?: string;
-    base64?: string;
   } | null>(null);
 
-  // Credits are persisted strictly in Firebase Realtime Database.
-
-  // Editing Session Title States
   const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
   const [editTitleInput, setEditTitleInput] = useState("");
 
-  // TTS State
   const [speakingMessageId, setSpeakingMessageId] = useState<string | null>(null);
 
-  // References
   const chatBottomRef = useRef<HTMLDivElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const ttsSynthRef = useRef<SpeechSynthesis | null>(null);
@@ -256,11 +241,9 @@ export default function App() {
     if (!notifyAudioRef.current) return;
     notifyAudioRef.current.currentTime = 0;
     notifyAudioRef.current.play().catch(() => {
-      // Ignore playback errors from browser autoplay restrictions.
+
     });
   };
-
-
 
   const handleFileSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
     console.log("[File] Handler triggered, files count:", e.target.files ? e.target.files.length : 0);
@@ -269,12 +252,11 @@ export default function App() {
       console.log("[File] No file selected");
       return;
     }
-    
+
     console.log("[File] Selected file:", file.name, "| Type:", file.type, "| Size:", file.size);
-    
-    const maxBytes = 20 * 1024 * 1024; // 20MB
-    
-    // Check size first
+
+    const maxBytes = 20 * 1024 * 1024; 
+
     if (file.size > maxBytes) {
       console.log("[File] File too large:", file.size);
       setErrorText("Ukuran file melebihi batas 20MB.");
@@ -283,12 +265,11 @@ export default function App() {
     }
 
     console.log("[File] Accepting file, creating object URL...");
-    
+
     setErrorText(null);
     const url = URL.createObjectURL(file);
     console.log("[File] Object URL created:", url);
 
-    // Check if it is a text-based file
     const isTextFile = (f: File): boolean => {
       const textExtensions = [
         "txt", "js", "jsx", "ts", "tsx", "css", "json", "md", "html", "py", 
@@ -301,66 +282,47 @@ export default function App() {
       return false;
     };
 
-    // Load base64 content
-    const base64Reader = new FileReader();
-    base64Reader.onload = () => {
-      const base64Str = (base64Reader.result as string).split(",")[1];
-      
-      if (isTextFile(file)) {
-        const textReader = new FileReader();
-        textReader.onload = () => {
-          setSelectedFile({
-            name: file.name,
-            url,
-            size: file.size,
-            mime: file.type || undefined,
-            textContent: textReader.result as string,
-            base64: base64Str,
-          });
-        };
-        textReader.onerror = () => {
-          setSelectedFile({
-            name: file.name,
-            url,
-            size: file.size,
-            mime: file.type || undefined,
-            base64: base64Str,
-          });
-        };
-        textReader.readAsText(file);
-      } else {
+    if (isTextFile(file)) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const textContent = event.target?.result as string;
+        console.log("[File] Plain-text content loaded, size in chars:", textContent.length);
         setSelectedFile({
           name: file.name,
           url,
           size: file.size,
           mime: file.type || undefined,
-          base64: base64Str,
+          textContent: textContent,
         });
-      }
-    };
-    base64Reader.onerror = () => {
+      };
+      reader.onerror = () => {
+        console.error("[File] Error reading file as text.");
+        setSelectedFile({
+          name: file.name,
+          url,
+          size: file.size,
+          mime: file.type || undefined,
+        });
+      };
+      reader.readAsText(file);
+    } else {
       setSelectedFile({
         name: file.name,
         url,
         size: file.size,
         mime: file.type || undefined,
       });
-    };
-    base64Reader.readAsDataURL(file);
+    }
 
     console.log("[File] setSelectedFile triggered, should appear in UI now");
     playNotifySound();
     e.currentTarget.value = "";
   };
 
-  // Sync sessions to localStorage
   useEffect(() => {
     localStorage.setItem("exeai_sessions", JSON.stringify(sessions));
   }, [sessions]);
 
-  // Theme persistence removed per new requirements.
-
-  // Sync login state to localStorage
   useEffect(() => {
     localStorage.setItem("exechat_logged_in", String(isLoggedIn));
     if (userEmail) {
@@ -390,7 +352,6 @@ export default function App() {
     }
   }, [isLoggedIn, userEmail, userId, userName, userDisplayName, userPhoto]);
 
-  // Sync last claim timestamp
   useEffect(() => {
     if (lastClaimAt !== null) {
       localStorage.setItem("exechat_last_claim_at", String(lastClaimAt));
@@ -399,7 +360,6 @@ export default function App() {
     }
   }, [lastClaimAt]);
 
-  // Sync currentSessionId to URL path and localStorage
   useEffect(() => {
     if (currentSessionId) {
       localStorage.setItem("exeai_current_session_id", currentSessionId);
@@ -417,7 +377,6 @@ export default function App() {
     }
   }, [currentSessionId]);
 
-  // Handle URL navigation (popstate)
   useEffect(() => {
     const handlePopState = () => {
       const match = window.location.pathname.match(/\/chat\/([a-zA-Z0-9_-]+)/);
@@ -436,7 +395,6 @@ export default function App() {
     return () => window.removeEventListener("popstate", handlePopState);
   }, [sessions]);
 
-  // Check API Key and backend health on mount
   useEffect(() => {
     fetch("/api/health")
       .then((res) => {
@@ -453,12 +411,10 @@ export default function App() {
         setHasApiKey(false);
       });
 
-    // Initialize Speech Synthesis
     if (typeof window !== "undefined" && "speechSynthesis" in window) {
       ttsSynthRef.current = window.speechSynthesis;
     }
 
-    // Restore sessions from localStorage
     const savedLoggedIn = localStorage.getItem("exechat_logged_in") === "true";
     const savedUserId = localStorage.getItem("exechat_user_id");
 
@@ -468,10 +424,10 @@ export default function App() {
       setUserName(localStorage.getItem("exechat_username") || "");
       setUserDisplayName(localStorage.getItem("exechat_display_name") || "");
       setUserPhoto(localStorage.getItem("exechat_user_photo") || null);
-      setCredits(99999); // Unlimited credits
+      setCredits(99999); 
       setIsLoggedIn(true);
     } else {
-      // Clean up any guest or invalid sessions
+
       setIsLoggedIn(false);
       setUserId(null);
       setUserEmail(null);
@@ -489,14 +445,12 @@ export default function App() {
     };
   }, []);
 
-  // Scroll to bottom helper
   const scrollToBottom = (behavior: ScrollBehavior = "smooth") => {
     setTimeout(() => {
       chatBottomRef.current?.scrollIntoView({ behavior });
     }, 80);
   };
 
-  // Scroll on new message or generation change
   const currentSession = sessions.find((s) => s.id === currentSessionId);
   useEffect(() => {
     if (currentSession) {
@@ -504,7 +458,6 @@ export default function App() {
     }
   }, [currentSession?.messages?.length, isGenerating]);
 
-  // Get current active settings from active session (or fallback to defaults)
   const activePreset = SYSTEM_PRESETS.find(
     (p) => p.id === (currentSession?.systemInstructionId || selectedPresetId)
   ) || SYSTEM_PRESETS[0];
@@ -515,7 +468,6 @@ export default function App() {
 
   const activeTemp = currentSession ? currentSession.temperature : temperature;
 
-  // Dynamic theme config dictionary
   const themeConfig: Record<string, {
     name: string;
     outerBg: string;
@@ -569,7 +521,6 @@ export default function App() {
   const curTheme = themeConfig[theme] || themeConfig.dark;
   const isDark = theme === "dark";
 
-  // Credit calculation helper
   const getCreditCost = (text: string): number => {
     const len = text.trim().length;
     if (len < 20) return 1;
@@ -578,17 +529,15 @@ export default function App() {
     return 4;
   };
 
-  // Smart Chat Title Generator based on the first query/question
   const generateSmartTitle = (prompt: string): string => {
     let clean = prompt.trim();
-    // Remove emojis
+
     clean = clean.replace(/[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF]/g, "");
-    // Normalize spaces
+
     clean = clean.replace(/\s+/g, " ");
 
     const lower = clean.toLowerCase();
 
-    // Check for coding/programming keywords
     if (
       lower.includes("coding") || 
       lower.includes("bantu coding") || 
@@ -607,7 +556,6 @@ export default function App() {
       return "Bantu Coding";
     }
 
-    // Check for recipe/cooking
     if (
       lower.includes("resep") || 
       lower.includes("masak") || 
@@ -622,7 +570,6 @@ export default function App() {
       return "Resep Masakan";
     }
 
-    // Check for essay/writing
     if (
       lower.includes("essay") || 
       lower.includes("artikel") || 
@@ -633,7 +580,6 @@ export default function App() {
       return "Pembuatan Teks";
     }
 
-    // Check for questions like "apa itu...", "jelaskan..."
     if (
       lower.includes("apa itu") || 
       lower.includes("jelaskan") || 
@@ -647,7 +593,6 @@ export default function App() {
       return "Penjelasan Topik";
     }
 
-    // Check for translation
     if (
       lower.includes("terjemah") || 
       lower.includes("translate") || 
@@ -658,7 +603,6 @@ export default function App() {
       return "Penerjemahan Bahasa";
     }
 
-    // Check for greetings
     if (
       lower === "halo" || 
       lower === "hallo" || 
@@ -672,7 +616,6 @@ export default function App() {
       return "Percakapan Santai";
     }
 
-    // Default: extract first 3 words, capitalize nicely
     const words = clean.split(" ").filter(w => w.length > 2);
     if (words.length > 0) {
       const selectedWords = words.slice(0, 3).map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase());
@@ -683,7 +626,6 @@ export default function App() {
     return "Diskusi Baru";
   };
 
-  // Google Login Success callback
   const handleGoogleLoginSuccess = (credentialResponse: any) => {
     if (!credentialResponse || !credentialResponse.credential) {
       setErrorText("Gagal masuk dengan Google: Tidak ada credential.");
@@ -694,31 +636,29 @@ export default function App() {
       if (!decoded || !decoded.sub || !decoded.email) {
         throw new Error("Informasi pengguna Google tidak valid.");
       }
-      
+
       const uid = decoded.sub;
       const email = decoded.email;
       const name = decoded.name || decoded.given_name || email.split("@")[0] || "User";
       const picture = decoded.picture || null;
 
-      // Base info
       setUserId(uid);
       setUserEmail(email);
       setUserPhoto(picture);
       setCredits(99999);
       setErrorText(null);
 
-      // Check if newly registered (has_registered not set in localStorage)
       const hasRegistered = localStorage.getItem(`exechat_has_registered_${uid}`) === "true";
       if (!hasRegistered) {
         setGoogleDefaultName(name);
         setRegisterModalName(name);
         setShowRegisterModal(true);
-        // We set username/display_name temporarily to Google name
+
         setUserName(name);
         setUserDisplayName(name);
         setIsLoggedIn(true);
       } else {
-        // Retrieve custom username from localStorage or fallback to Google name
+
         const storedUsername = localStorage.getItem("exechat_username") || name;
         const storedDisplayName = localStorage.getItem("exechat_display_name") || name;
         setUserName(storedUsername);
@@ -727,7 +667,6 @@ export default function App() {
         playNotifySound();
       }
 
-      // Persist logged in state details
       localStorage.setItem("exechat_logged_in", "true");
       localStorage.setItem("exechat_email", email);
       localStorage.setItem("exechat_user_id", uid);
@@ -738,28 +677,25 @@ export default function App() {
     }
   };
 
-  // Helper to complete registration with custom or skipped name
   const handleCompleteRegistrationWithChosenName = (finalChosenName: string) => {
     const finalName = finalChosenName.trim() || googleDefaultName || "User";
     setUserName(finalName);
     setUserDisplayName(finalName);
-    
+
     localStorage.setItem("exechat_username", finalName);
     localStorage.setItem("exechat_display_name", finalName);
-    
+
     const activeUid = localStorage.getItem("exechat_user_id") || userId || "google-user";
     localStorage.setItem(`exechat_has_registered_${activeUid}`, "true");
-    
+
     setShowRegisterModal(false);
     playNotifySound();
   };
 
-  // Google Login click handler (fallback trigger)
   const handleGoogleLoginClick = () => {
-    // Left for compatibility in settings layouts
+
   };
 
-  // Logout handler
   const handleLogout = () => {
     localStorage.removeItem("exechat_logged_in");
     localStorage.removeItem("exechat_email");
@@ -778,7 +714,6 @@ export default function App() {
     playNotifySound();
   };
 
-  // Claim Daily Credits (stub)
   const handleClaimDailyCredits = async () => {
     setErrorText("Kredit harian tidak diperlukan di versi ExeChat Premium (Kredit Tidak Terbatas).");
   };
@@ -802,7 +737,7 @@ export default function App() {
 
     setUserName(trimmed);
     setUserDisplayName(trimmed);
-    
+
     localStorage.setItem("exechat_username", trimmed);
     localStorage.setItem("exechat_display_name", trimmed);
     const activeUid = userId || localStorage.getItem("exechat_user_id");
@@ -815,7 +750,7 @@ export default function App() {
   };
 
   const createNewSession = (initialMsg?: string) => {
-    // Generate a random, elegant 8-character chat ID (like '929e1x20')
+
     const chars = "abcdefghijklmnopqrstuvwxyz0123456789";
     let randomId = "";
     for (let i = 0; i < 8; i++) {
@@ -837,7 +772,6 @@ export default function App() {
     return id;
   };
 
-  // Delete a session
   const deleteSession = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
     setSessions((prev) => prev.filter((s) => s.id !== id));
@@ -851,14 +785,12 @@ export default function App() {
     }
   };
 
-  // Trigger renaming mode
   const startRenameSession = (id: string, title: string, e: React.MouseEvent) => {
     e.stopPropagation();
     setEditingSessionId(id);
     setEditTitleInput(title);
   };
 
-  // Save renamed session title
   const saveRenameSession = (id: string, e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (!editTitleInput.trim()) return;
@@ -869,7 +801,6 @@ export default function App() {
     setEditingSessionId(null);
   };
 
-  // Select Preset Icon component helper
   const getPresetIcon = (iconName: string, className = "h-4 w-4") => {
     switch (iconName) {
       case "Sparkles":
@@ -885,14 +816,12 @@ export default function App() {
     }
   };
 
-  // Send message implementation
   const handleSendMessage = async (textToSend?: string) => {
     const text = (textToSend || inputMessage).trim();
     if (!text || isGenerating) return;
 
     setErrorText(null);
 
-    // 1. Duplicate check (Anti-spam)
     let targetSessionId = currentSessionId;
     const activeSessionObj = sessions.find((s) => s.id === targetSessionId);
     if (activeSessionObj && activeSessionObj.messages.length > 0) {
@@ -906,19 +835,18 @@ export default function App() {
       }
     }
 
-    // 2. Gibberish / Keymash check (Anti-spam)
     const isKeymash = (str: string): boolean => {
       const s = str.trim().toLowerCase();
       if (s.length < 8) return false;
-      // Repetitive characters (e.g., aaaaaaaa)
+
       if (/([a-zA-Z0-9])\1{5,}/.test(s)) return true;
-      // Repetitive patterns (e.g. asdfasdfasdf)
+
       if (s.length > 12) {
         const chunks = s.match(/.{4}/g) || [];
         const uniqueChunks = new Set(chunks);
         if (chunks.length > 3 && uniqueChunks.size <= 2) return true;
       }
-      // Long keymash without spaces or vowels
+
       if (!s.includes(" ") && s.length > 15 && !/[aeiouy]/.test(s)) return true;
       return false;
     };
@@ -928,7 +856,6 @@ export default function App() {
       return;
     }
 
-    // Capture any selected file attachment before resetting the state
     const attachmentObj = selectedFile ? {
       type: (selectedFile.mime?.startsWith("audio/") ? "audio" : selectedFile.mime?.startsWith("image/") ? "image" : "file") as "audio" | "image" | "file",
       name: selectedFile.name,
@@ -936,14 +863,12 @@ export default function App() {
       size: selectedFile.size,
       mime: selectedFile.mime,
       textContent: selectedFile.textContent,
-      base64: selectedFile.base64,
     } : null;
 
     playNotifySound();
     setInputMessage("");
-    setSelectedFile(null); // Clear selected file state for next inputs
+    setSelectedFile(null); 
 
-    // Get or create session
     if (!targetSessionId) {
       targetSessionId = createNewSession(text);
     }
@@ -956,11 +881,10 @@ export default function App() {
       attachment: attachmentObj,
     };
 
-    // Add user message to state
     setSessions((prev) =>
       prev.map((s) => {
         if (s.id === targetSessionId) {
-          // Auto-rename session if it's the first message and still "Obrolan Baru"
+
           const shouldRename = s.title === "Obrolan Baru" && s.messages.length === 0;
           return {
             ...s,
@@ -972,7 +896,6 @@ export default function App() {
       })
     );
 
-    // Prepare assistant placeholder
     const assistantMsgId = "msg_" + Date.now() + "_assistant";
     const assistantPlaceholder: Message = {
       id: assistantMsgId,
@@ -981,7 +904,6 @@ export default function App() {
       timestamp: Date.now(),
     };
 
-    // Add empty assistant response to state for streaming
     setSessions((prev) =>
       prev.map((s) => {
         if (s.id === targetSessionId) {
@@ -997,7 +919,6 @@ export default function App() {
     setIsGenerating(true);
     scrollToBottom("smooth");
 
-    // Retrieve active configuration for this API call
     const activeSessionState = sessions.find((s) => s.id === targetSessionId);
     const apiModel = activeSessionState ? activeSessionState.model : selectedModelId;
     const apiPreset = SYSTEM_PRESETS.find(
@@ -1005,11 +926,9 @@ export default function App() {
     ) || SYSTEM_PRESETS[0];
     const apiTemp = activeSessionState ? activeSessionState.temperature : temperature;
 
-    // Build complete message payload
     const updatedSession = sessions.find((s) => s.id === targetSessionId);
     const conversationHistory = updatedSession ? [...updatedSession.messages, userMessage] : [userMessage];
 
-    // Format for backend (convert to standard content schema)
     const formattedHistory = conversationHistory.map((m) => {
       let content = m.content;
       if (m.role === "user" && m.attachment) {
@@ -1025,80 +944,15 @@ export default function App() {
       };
     });
 
-    // Build complete system instruction with active presets and memory
     let finalInstruction = apiPreset.instruction;
     if (memories.length > 0) {
       finalInstruction += "\n\n[MEMORI AI (Ingatan pengguna yang tersimpan)]:\n" + memories.map((m, idx) => `${idx + 1}. ${m}`).join("\n");
     }
 
-
-
-    // Setup abort controller
     const controller = new AbortController();
     abortControllerRef.current = controller;
 
     try {
-      
-      const isRunwareModel = apiModel === "bytedance:seedream@5.0-pro";
-
-      if (isRunwareModel) {
-        const imgResponse = await fetch("/api/image/generate", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            prompt: finalInstruction + "\nUser prompt: " + text,
-            initImage: attachmentObj?.base64 || null,
-            model: apiModel
-          }),
-          signal: controller.signal,
-        });
-
-        if (!imgResponse.ok) {
-          const errData = await imgResponse.json().catch(() => ({}));
-          throw new Error(errData.error || "Server sedang sibuk tidak bisa memproses request.");
-        }
-        
-        const imgData = await imgResponse.json();
-        const item = imgData?.data?.[0];
-        const imageUrl = item?.url || "";
-        const itemType = item?.type || "image";
-        
-        if (imageUrl || item?.text) {
-          let finalOutput = "";
-          if (itemType === "video") {
-            finalOutput = `Berikut video yang dihasilkan:\n\n<video src="${imageUrl}" controls className="max-w-full rounded-xl border border-zinc-800 shadow-lg" style="max-height: 400px;" />`;
-          } else if (itemType === "audio") {
-            finalOutput = `Berikut audio yang dihasilkan:\n\n<audio src="${imageUrl}" controls className="w-full mt-2" />`;
-          } else if (itemType === "3d") {
-            finalOutput = `Berikut model 3D yang dihasilkan:\n\n📦 **[Download 3D Mesh (GLTF/OBJ)](${imageUrl})**`;
-          } else if (itemType === "text") {
-            finalOutput = item?.text || imageUrl;
-          } else {
-            finalOutput = `Berikut gambar yang dihasilkan:\n\n![Generated Image](${imageUrl})`;
-          }
-
-          setSessions((prev) =>
-            prev.map((s) => {
-              if (s.id === targetSessionId) {
-                return {
-                  ...s,
-                  messages: s.messages.map((m) =>
-                    m.id === assistantMsgId ? { ...m, content: finalOutput } : m
-                  ),
-                };
-              }
-              return s;
-            })
-          );
-        } else {
-          throw new Error("Gagal mendapatkan hasil dari AI.");
-        }
-        
-        setIsGenerating(false);
-        abortControllerRef.current = null;
-        return;
-      }
-
       const response = await fetch("/api/chat/stream", {
         method: "POST",
         headers: {
@@ -1133,7 +987,6 @@ export default function App() {
         buffer += decoder.decode(value, { stream: true });
         const lines = buffer.split("\n");
 
-        // Keep last incomplete line in buffer
         buffer = lines.pop() || "";
 
         for (const line of lines) {
@@ -1142,7 +995,6 @@ export default function App() {
 
           const dataString = trimmed.substring(6);
 
-          // Finished flag
           if (dataString === "[DONE]") {
             break;
           }
@@ -1153,7 +1005,7 @@ export default function App() {
               throw new Error(parsed.error);
             }
             if (parsed.text) {
-              // Append to assistant message
+
               setSessions((prev) =>
                 prev.map((s) => {
                   if (s.id === targetSessionId) {
@@ -1173,9 +1025,9 @@ export default function App() {
           } catch (e: any) {
             const messageLower = (dataString || "").toLowerCase();
             const errMsg = (e && e.message) ? e.message.toLowerCase() : "";
-            // Detect Cerebras rate-limit / busy messages and show user-friendly text
+
             if (errMsg.includes("cerebras") || messageLower.includes("too_many_requests") || messageLower.includes("queue_exceeded") || errMsg.includes("queue_exceeded") || errMsg.includes("too_many_requests")) {
-              // Replace the assistant message with a friendly busy notice
+
               setSessions((prev) =>
                 prev.map((s) => {
                   if (s.id === targetSessionId) {
@@ -1203,9 +1055,9 @@ export default function App() {
         console.log("Stream generation aborted by user.");
       } else {
         const msg = (err && err.message) ? err.message.toLowerCase() : "";
-        if (msg.includes("cerebras") || msg.includes("too_many_requests") || msg.includes("queue_exceeded") || msg.includes("429") || msg.includes("sibuk") || msg.includes("banyak request")) {
-          // Friendly user message for busy/rate-limited backend
-          setErrorText(err.message || "Server sedang sibuk. Silakan coba lagi nanti.");
+        if (msg.includes("cerebras") || msg.includes("too_many_requests") || msg.includes("queue_exceeded") || msg.includes("429")) {
+
+          setErrorText("Server sedang sibuk. Silakan coba lagi nanti.");
           setSessions((prev) =>
             prev.map((s) => {
               if (s.id === targetSessionId) {
@@ -1213,7 +1065,7 @@ export default function App() {
                   ...s,
                   messages: s.messages.map((m) =>
                     m.id === assistantMsgId && m.content === ""
-                      ? { ...m, content: err.message || "Server sedang sibuk saat ini. Silakan coba lagi nanti." }
+                      ? { ...m, content: "Server sedang sibuk saat ini. Silakan coba lagi nanti." }
                       : m
                   ),
                 };
@@ -1225,7 +1077,7 @@ export default function App() {
         } else {
           console.error("Stream reader error:", err);
           setErrorText(err.message || "Terjadi kesalahan saat memproses jawaban.");
-          // Append error notice to message
+
           setSessions((prev) =>
             prev.map((s) => {
               if (s.id === targetSessionId) {
@@ -1233,7 +1085,7 @@ export default function App() {
                   ...s,
                   messages: s.messages.map((m) =>
                     m.id === assistantMsgId && m.content === ""
-                      ? { ...m, content: err.message || "Terjadi kesalahan koneksi atau konfigurasi API Key. Silakan muat ulang (refresh) halaman jika masalah berlanjut." }
+                      ? { ...m, content: "Terjadi kesalahan koneksi atau konfigurasi API Key. Silakan muat ulang (refresh) halaman jika masalah berlanjut." }
                       : m
                   ),
                 };
@@ -1249,7 +1101,6 @@ export default function App() {
     }
   };
 
-  // Stop Generation
   const handleStopGeneration = () => {
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
@@ -1257,7 +1108,6 @@ export default function App() {
     }
   };
 
-  // Copy individual message text
   const copyMessageToClipboard = (msgId: string, text: string) => {
     navigator.clipboard.writeText(text);
     setCopiedMessageId(msgId);
@@ -1266,25 +1116,21 @@ export default function App() {
     }, 2000);
   };
 
-  // Regenerate assistant response
   const handleRegenerateMessage = async (assistantMsgId: string) => {
     if (isGenerating || !currentSessionId) return;
-    
+
     const activeSessionObj = sessions.find((s) => s.id === currentSessionId);
     if (!activeSessionObj) return;
 
-    // Find the index of the assistant message to regenerate
     const msgIndex = activeSessionObj.messages.findIndex((m) => m.id === assistantMsgId);
     if (msgIndex === -1) return;
 
-    // Find the user message before this assistant message
     const priorMessages = activeSessionObj.messages.slice(0, msgIndex);
     const userMessage = priorMessages[priorMessages.length - 1];
     if (!userMessage || userMessage.role !== "user") {
       return;
     }
 
-    // Reset the target assistant message content to empty in state
     setSessions((prev) =>
       prev.map((s) => {
         if (s.id === currentSessionId) {
@@ -1303,14 +1149,12 @@ export default function App() {
     setIsGenerating(true);
     setErrorText(null);
 
-    // Retrieve active configuration for this API call
     const apiModel = activeSessionObj.model || selectedModelId;
     const apiPreset = SYSTEM_PRESETS.find(
       (p) => p.id === (activeSessionObj.systemInstructionId || selectedPresetId)
     ) || SYSTEM_PRESETS[0];
     const apiTemp = activeSessionObj.temperature || temperature;
 
-    // Format prior messages for payload
     const formattedHistory = priorMessages.map((m) => {
       let content = m.content;
       if (m.role === "user" && m.attachment) {
@@ -1326,81 +1170,16 @@ export default function App() {
       };
     });
 
-    // Build system instruction
     let finalInstruction = apiPreset.instruction;
     if (memories.length > 0) {
       finalInstruction += "\n\n[MEMORI AI (Ingatan pengguna yang tersimpan)]:\n" + memories.map((m, idx) => `${idx + 1}. ${m}`).join("\n");
     }
 
-    // Setup abort controller
     const controller = new AbortController();
     abortControllerRef.current = controller;
 
     try {
-      
-      const isRunwareModel = apiModel === "bytedance:seedream@5.0-pro";
-
-      if (isRunwareModel) {
-        const lastUserMsg = priorMessages.filter(m => m.role === 'user').pop();
-        const textToGen = lastUserMsg ? lastUserMsg.content : "";
-        
-        const imgResponse = await fetch("/api/image/generate", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            prompt: finalInstruction + "\nUser prompt: " + textToGen,
-            initImage: lastUserMsg?.attachment?.base64 || null,
-            model: apiModel
-          }),
-          signal: controller.signal,
-        });
-
-        if (!imgResponse.ok) {
-          const errData = await imgResponse.json().catch(() => ({}));
-          throw new Error(errData.error || "Server sedang sibuk tidak bisa memproses request.");
-        }
-        
-        const imgData = await imgResponse.json();
-        const item = imgData?.data?.[0];
-        const imageUrl = item?.url || "";
-        const itemType = item?.type || "image";
-        
-        if (imageUrl || item?.text) {
-          let finalOutput = "";
-          if (itemType === "video") {
-            finalOutput = `Berikut video yang dihasilkan:\n\n<video src="${imageUrl}" controls className="max-w-full rounded-xl border border-zinc-800 shadow-lg" style="max-height: 400px;" />`;
-          } else if (itemType === "audio") {
-            finalOutput = `Berikut audio yang dihasilkan:\n\n<audio src="${imageUrl}" controls className="w-full mt-2" />`;
-          } else if (itemType === "3d") {
-            finalOutput = `Berikut model 3D yang dihasilkan:\n\n📦 **[Download 3D Mesh (GLTF/OBJ)](${imageUrl})**`;
-          } else if (itemType === "text") {
-            finalOutput = item?.text || imageUrl;
-          } else {
-            finalOutput = `Berikut gambar yang dihasilkan:\n\n![Generated Image](${imageUrl})`;
-          }
-
-          setSessions((prev) =>
-            prev.map((s) => {
-              if (s.id === currentSessionId) {
-                return {
-                  ...s,
-                  messages: s.messages.map((m) =>
-                    m.id === assistantMsgId ? { ...m, content: finalOutput } : m
-                  ),
-                };
-              }
-              return s;
-            })
-          );
-        } else {
-          throw new Error("Gagal mendapatkan hasil dari AI.");
-        }
-        
-        setIsGenerating(false);
-        abortControllerRef.current = null;
-        return;
-      }
-const response = await fetch("/api/chat/stream", {
+      const response = await fetch("/api/chat/stream", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -1444,7 +1223,7 @@ const response = await fetch("/api/chat/stream", {
               const parsed = JSON.parse(trimmed.substring(5));
               if (parsed.text) {
                 accumulatedText += parsed.text;
-                // Update specific message in state
+
                 setSessions((prev) =>
                   prev.map((s) => {
                     if (s.id === currentSessionId) {
@@ -1461,7 +1240,7 @@ const response = await fetch("/api/chat/stream", {
                 );
               }
             } catch (err) {
-              // ignore parse errors for non-json
+
             }
           }
         }
@@ -1476,7 +1255,6 @@ const response = await fetch("/api/chat/stream", {
     }
   };
 
-  // Voice Text-to-Speech Handler
   const handleToggleSpeak = (msgId: string, text: string) => {
     if (!ttsSynthRef.current) return;
 
@@ -1485,24 +1263,23 @@ const response = await fetch("/api/chat/stream", {
       setSpeakingMessageId(null);
     } else {
       ttsSynthRef.current.cancel();
-      
-      // Filter out markdown formatting tags for cleaner reading
+
       const cleanText = text
-        .replace(/```[\s\S]*?```/g, "") // remove code blocks
+        .replace(/```[\s\S]*?```/g, "") 
         .replace(/`([^`]+)`/g, "$1") // inline code
         .replace(/\*\*([^*]+)\*\*/g, "$1") // bold
         .replace(/\*([^*]+)\*/g, "$1") // italic
         .replace(/[#*>_\-]/g, ""); // structural chars
 
       const utterance = new SpeechSynthesisUtterance(cleanText);
-      
+
       // Try to find Indonesian or standard English voice
       const voices = ttsSynthRef.current.getVoices();
       const idVoice = voices.find((v) => v.lang.startsWith("id") || v.lang.startsWith("ID"));
       if (idVoice) {
         utterance.voice = idVoice;
       }
-      
+
       utterance.onend = () => {
         setSpeakingMessageId(null);
       };
@@ -1758,7 +1535,7 @@ const response = await fetch("/api/chat/stream", {
             Masuk dengan Google
           </button>
         )}
-        
+
         <div className="text-center text-zinc-600 text-[10px] select-none pt-0.5">
           © 2026 ExeChat version 1
         </div>
@@ -1855,9 +1632,7 @@ const response = await fetch("/api/chat/stream", {
   }
 
   return (
-    <>
-      {showCodeEditor && <CodeEditorMode onClose={() => setShowCodeEditor(false)} isDark={systemIsDark} />}
-      <div className="flex h-screen w-full overflow-hidden bg-zinc-950 font-sans text-zinc-100 antialiased selection:bg-zinc-700/80">
+    <div className="flex h-screen w-full overflow-hidden bg-zinc-950 font-sans text-zinc-100 antialiased selection:bg-zinc-700/80">
       {/* Hidden file input for file uploads */}
       <input
         ref={fileInputRef}
@@ -1874,7 +1649,7 @@ const response = await fetch("/api/chat/stream", {
 
       {/* Main Grid: Left Rail, Expandable Sidebar & Right Chat Workspace */}
       <div className="flex w-full h-full relative z-10">
-        
+
         {/* DESKTOP NARROW LEFT RAIL (Gemini style) */}
         <div className={`hidden md:flex flex-col items-center justify-between py-6 w-16 h-full shrink-0 border-r ${curTheme.border} ${curTheme.sidebarBg} z-20 select-none`}>
           {/* Top: Sparkles Logo & Toggle */}
@@ -2021,7 +1796,7 @@ const response = await fetch("/api/chat/stream", {
 
          {/* WORKSPACE AREA */}
         <main className={`flex-1 h-full flex ${curTheme.mainBg} relative overflow-hidden`}>
-          
+
           {/* CHAT SECTION */}
           <div className="flex-1 h-full flex flex-col min-w-0">
                   {/* Chat Workspace Header */}
@@ -2083,7 +1858,7 @@ const response = await fetch("/api/chat/stream", {
             {/* Chat Area Scrollable */}
             <div className="flex-1 overflow-y-auto px-3.5 md:px-8 py-4 md:py-6 relative z-0 scrollbar-thin">
               <div className="max-w-3xl mx-auto h-full flex flex-col">
-                
+
                 {/* Empty / Welcome State */}
                 {!currentSession || currentSession.messages.length === 0 ? (
                   <div className="flex-1 flex flex-col justify-center items-center py-8 md:py-14 max-w-2xl mx-auto w-full px-2 text-center">
@@ -2137,7 +1912,7 @@ const response = await fetch("/api/chat/stream", {
                       <div className={`rounded-[calc(1rem-1.5px)] p-3 md:p-4 transition-all duration-300 focus-within:shadow-md ${
                         isDark ? "bg-[#1e1f20]" : "bg-[#f0f4f9]"
                       }`}>
-                      
+
                       {/* Selected File Display */}
                       {selectedFile && (
                         <div className={`mb-3.5 p-2 px-3 rounded-xl border flex items-center gap-2.5 text-xs animate-fadeIn ${
@@ -2164,7 +1939,7 @@ const response = await fetch("/api/chat/stream", {
                           </button>
                         </div>
                       )}
-                      
+
                       {/* Textarea with Upload Button */}
                       <div className="flex items-end gap-2">
                         {/* Upload button - left side */}
@@ -2292,7 +2067,6 @@ const response = await fetch("/api/chat/stream", {
                                 : "bg-transparent border-transparent p-0"
                             }`}
                           >
-
 
                              {/* Message content */}
                              {isUser ? (
@@ -2476,7 +2250,7 @@ const response = await fetch("/api/chat/stream", {
                     )}
                   </div>
                 )}
-                
+
                 {/* Scroll Anchor */}
                 <div ref={chatBottomRef} />
               </div>
@@ -2499,7 +2273,7 @@ const response = await fetch("/api/chat/stream", {
             {currentSession && currentSession.messages.length > 0 && (
               <div className="p-2.5 md:p-4 border-t border-zinc-900 bg-zinc-950/80 shrink-0 z-10">
                 <div className="max-w-3xl mx-auto relative">
-                  
+
                   {/* Quick actions box directly above inputs */}
                   <div className="flex flex-wrap items-center justify-between gap-1.5 mb-2 md:mb-3 text-[10px] md:text-xs text-zinc-500 px-0.5">
                     <div className="flex flex-wrap items-center gap-1.5 md:gap-2">
@@ -2689,7 +2463,7 @@ const response = await fetch("/api/chat/stream", {
 
                 {/* Tab Content Container */}
                 <div className="flex-1 overflow-y-auto p-6 md:p-8 max-w-4xl mx-auto w-full space-y-6">
-                  
+
                   {/* TAB 1: AKUN & PROFIL */}
                   {settingsTab === "akun" && (
                     <div className="space-y-6 animate-fadeIn">
@@ -2697,7 +2471,7 @@ const response = await fetch("/api/chat/stream", {
                         <h3 className={`text-xs font-semibold tracking-wider font-mono uppercase mb-4 ${isDark ? "text-zinc-500" : "text-zinc-400"}`}>
                           Status Keanggotaan
                         </h3>
-                        
+
                         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
                           <div className="flex items-center gap-4">
                             {userPhoto ? (
@@ -2797,7 +2571,7 @@ const response = await fetch("/api/chat/stream", {
                                 Simpan Nama
                               </button>
                             </div>
-                            
+
                             {redeemFeedback && (
                               <p className="text-[11px] text-emerald-500 font-sans tracking-wide">
                                 ✓ {redeemFeedback}
@@ -2820,7 +2594,7 @@ const response = await fetch("/api/chat/stream", {
                         <p className={`text-xs ${isDark ? "text-zinc-500" : "text-zinc-500"}`}>
                           Engine menentukan kecerdasan di balik tanggapan asisten Anda.
                         </p>
-                        
+
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           {MODEL_OPTIONS.map((m) => {
                             const isSelected = currentSession
@@ -2887,7 +2661,7 @@ const response = await fetch("/api/chat/stream", {
                         <p className={`text-xs ${isDark ? "text-zinc-500" : "text-zinc-500"}`}>
                           Ubah kepribadian, gaya bicara, dan keahlian kognitif Hexky dalam merespon pesan.
                         </p>
-                        
+
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           {SYSTEM_PRESETS.map((preset) => {
                             const isSelected = currentSession
@@ -3422,7 +3196,7 @@ const response = await fetch("/api/chat/stream", {
                     >
                       Simpan & Lanjutkan
                     </button>
-                    
+
                     <button
                       onClick={() => handleCompleteRegistrationWithChosenName(googleDefaultName)}
                       className={`w-full py-2.5 px-4 rounded-xl border font-medium text-xs transition-colors duration-150 cursor-pointer text-center ${
@@ -3538,7 +3312,5 @@ const response = await fetch("/api/chat/stream", {
         </main>
       </div>
     </div>
-    </>
   );
 }
-

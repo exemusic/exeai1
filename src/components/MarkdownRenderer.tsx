@@ -1,12 +1,11 @@
 import React, { useState } from "react";
-import { Copy, Check, Terminal, X } from "lucide-react";
+import { Copy, Check, Terminal } from "lucide-react";
 
 interface MarkdownRendererProps {
   content: string;
 }
 
 export function MarkdownRenderer({ content }: MarkdownRendererProps) {
-  const [viewImage, setViewImage] = useState<string | null>(null);
   const [copiedText, setCopiedText] = useState<string | null>(null);
 
   const handleCopy = (text: string) => {
@@ -17,13 +16,12 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps) {
 
   if (!content) return null;
 
-  // Split content by triple backticks to separate code blocks from prose
   const parts = content.split(/(```[\s\S]*?```)/g);
 
   return (
     <div className="space-y-4 text-zinc-800 dark:text-zinc-100 font-sans leading-relaxed text-[15px]">
       {parts.map((part, index) => {
-        // Code Block
+
         if (part.startsWith("```")) {
           const match = part.match(/```(\w*)\n([\s\S]*?)```/);
           const language = match ? match[1] : "code";
@@ -35,7 +33,7 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps) {
               key={index}
               className="my-4 overflow-hidden rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950 font-mono text-sm shadow-lg shadow-black/40"
             >
-              {/* Header */}
+
               <div className="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800/80 bg-zinc-100/80 dark:bg-zinc-900/60 px-4 py-2 text-xs text-zinc-500 dark:text-zinc-400 select-none">
                 <div className="flex items-center gap-2">
                   <Terminal className="h-3.5 w-3.5 text-zinc-500" />
@@ -58,7 +56,7 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps) {
                   )}
                 </button>
               </div>
-              {/* Code Area */}
+
               <div className="max-h-64 overflow-y-auto overflow-x-auto p-4 scrollbar-thin scrollbar-thumb-zinc-300 dark:scrollbar-thumb-zinc-850">
                 <pre className="text-zinc-700 dark:text-zinc-300 leading-normal select-text">
                   <code>{code.trim()}</code>
@@ -68,7 +66,6 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps) {
           );
         }
 
-        // Prose (Text content)
         const lines = part.split("\n");
         const renderedElements: React.ReactNode[] = [];
         let listBuffer: { type: "ul" | "ol"; items: React.ReactNode[] } | null = null;
@@ -92,7 +89,7 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps) {
         };
 
         const renderInlineStyles = (text: string): React.ReactNode[] => {
-          // Parse: **bold**, *italic*, `code`
+
           const inlineParts = text.split(/(\*\*.*?\*\*|\*.*?\*|`.*?`)/g);
           return inlineParts.map((inlinePart, subIdx) => {
             if (inlinePart.startsWith("**") && inlinePart.endsWith("**")) {
@@ -126,14 +123,12 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps) {
         lines.forEach((line, lineIdx) => {
           const trimmed = line.trim();
 
-          // Horizontal rule
           if (trimmed === "---" || trimmed === "***" || trimmed === "___") {
             flushListBuffer(lineIdx);
             renderedElements.push(<hr key={lineIdx} className="my-5 border-zinc-850 border-t" />);
             return;
           }
 
-          // Headings
           if (trimmed.startsWith("### ")) {
             flushListBuffer(lineIdx);
             renderedElements.push(
@@ -162,7 +157,6 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps) {
             return;
           }
 
-          // Blockquotes
           if (trimmed.startsWith("> ")) {
             flushListBuffer(lineIdx);
             renderedElements.push(
@@ -176,7 +170,6 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps) {
             return;
           }
 
-          // Unordered Lists
           const ulMatch = line.match(/^(\s*)([-*+])\s+(.*)/);
           if (ulMatch) {
             const listContent = ulMatch[3];
@@ -191,7 +184,6 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps) {
             return;
           }
 
-          // Ordered Lists
           const olMatch = line.match(/^(\s*)(\d+)\.\s+(.*)/);
           if (olMatch) {
             const listContent = olMatch[3];
@@ -206,13 +198,11 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps) {
             return;
           }
 
-          // Empty Line
           if (trimmed === "") {
             flushListBuffer(lineIdx);
             return;
           }
 
-          // Regular Paragraph
           flushListBuffer(lineIdx);
           renderedElements.push(
             <p key={lineIdx} className="text-zinc-700 dark:text-zinc-300 leading-relaxed mb-3 last:mb-0">
@@ -221,20 +211,10 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps) {
           );
         });
 
-        // Flush any remaining list buffer
         flushListBuffer(`end-${index}`);
 
         return <div key={index}>{renderedElements}</div>;
       })}
-      {viewImage && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4" onClick={() => setViewImage(null)}>
-          <img src={viewImage} className="max-w-full max-h-full rounded-lg object-contain shadow-2xl" />
-          <button className="absolute top-4 right-4 bg-zinc-900 text-white p-2 rounded-full hover:bg-zinc-800" onClick={() => setViewImage(null)}>
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-      )}
     </div>
   );
 }
-

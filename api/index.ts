@@ -1,6 +1,5 @@
 import express from "express";
 import dotenv from "dotenv";
-import crypto from "crypto";
 
 // Load environment variables
 dotenv.config();
@@ -206,139 +205,9 @@ app.post("/api/chat/stream", async (req, res) => {
     res.write("data: [DONE]\n\n");
   } catch (error: any) {
     console.warn("Cerebras Proxy Error:", error && error.message ? error.message : error);
-    res.write(`data: ${JSON.stringify({ error: "Server sedang sibuk terlalu banyak request." })}\n\n`);
+    res.write(`data: ${JSON.stringify({ error: "Server mengalami masalah internal. Silakan coba lagi nanti." })}\n\n`);
   } finally {
     res.end();
-  }
-});
-
-
-// Helper to extract result from completed Runware task object
-function extractRunwareResult(task: any) {
-  if (!task) return null;
-  
-  const urlKeys = ["imageURL", "url"];
-  for (const key of urlKeys) {
-    if (task[key]) {
-      return { type: "image", value: task[key] };
-    }
-  }
-  return null;
-}
-
-// Temporary route to search Runware models
-app.get("/api/models", async (req, res) => {
-  try {
-    const q = (req.query.q as string) || "stable";
-    const runwareApiKey = process.env.RUNWARE_API_KEY;
-    if (!runwareApiKey) {
-      return res.status(400).json({ error: "RUNWARE_API_KEY not found" });
-    }
-    const task = {
-      taskType: "modelSearch",
-      taskUUID: "search-models-" + Date.now(),
-      search: q,
-      limit: 10
-    };
-    const response = await fetch("https://api.runware.ai/v1", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${runwareApiKey}`
-      },
-      body: JSON.stringify([task])
-    });
-    if (!response.ok) {
-      return res.status(response.status).json({ error: await response.text() });
-    }
-    const data = await response.json();
-    return res.json(data);
-  } catch (err: any) {
-    return res.status(500).json({ error: err.message });
-  }
-});
-
-// Runware AI generation endpoint supporting only Seedream 5.0 Pro image generation
-app.post("/api/image/generate", async (req, res) => {
-  try {
-    const { prompt, initImage } = req.body;
-    const runwareApiKey = process.env.RUNWARE_API_KEY;
-
-    if (!runwareApiKey) {
-      return res.status(400).json({ 
-        error: "Runware API Key belum dikonfigurasi di secrets. Silakan tambahkan RUNWARE_API_KEY melalui menu Settings." 
-      });
-    }
-
-    const taskType = "imageInference";
-    const taskUUID = crypto.randomUUID();
-
-    // Use model: 100 as an integer to prevent PHP type mismatch errors in the Runware backend
-    const task: any = {
-      taskType,
-      taskUUID,
-      model: 100, 
-      positivePrompt: prompt,
-      width: 512,
-      height: 512
-    };
-
-    if (initImage) {
-      task.image = initImage;
-    }
-
-    console.log("Sending task to Runware:", JSON.stringify(task));
-
-    const response = await fetch("https://api.runware.ai/v1", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${runwareApiKey}`
-      },
-      body: JSON.stringify([task])
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error("Runware response not OK:", errorText);
-      return res.status(response.status).json({ error: errorText });
-    }
-
-    const responseData = await response.json();
-    console.log("Runware Response:", JSON.stringify(responseData));
-
-    // Resolve task results
-    let tasksList = Array.isArray(responseData) ? responseData : (responseData?.data || []);
-    if (tasksList.length === 0 && responseData && responseData.taskUUID) {
-      tasksList = [responseData];
-    }
-
-    if (tasksList.length === 0) {
-      return res.status(500).json({ error: "Runware did not return any task data." });
-    }
-
-    const completedTask = tasksList[0];
-    if (completedTask?.error) {
-      return res.status(500).json({ error: completedTask.errorMessage || "Gagal melakukan generasi di Runware." });
-    }
-
-    const result = extractRunwareResult(completedTask);
-    if (!result) {
-      return res.status(500).json({ error: "No valid image URL found in Runware response." });
-    }
-
-    res.json({
-      data: [
-        {
-          url: result.value,
-          type: result.type,
-          cost: completedTask.cost || 0
-        }
-      ]
-    });
-  } catch (error: any) {
-    console.error("Runware Generation Error:", error);
-    res.status(500).json({ error: error?.message || "Server sedang sibuk tidak bisa memproses request dengan Runware." });
   }
 });
 

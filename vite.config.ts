@@ -1,39 +1,11 @@
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
-import fs from 'fs';
 import {defineConfig} from 'vite';
 
 export default defineConfig(() => {
   return {
-    plugins: [
-      react(), 
-      tailwindcss(),
-      {
-        name: 'resolve-extensionless-code-editor',
-        resolveId(source, importer) {
-          if (source.includes('CodeEditorMode') && !source.endsWith('.tsx')) {
-            if (importer) {
-              const resolved = path.resolve(path.dirname(importer), source);
-              return resolved.endsWith('.tsx') ? resolved : resolved + '.tsx';
-            }
-          }
-          return null;
-        },
-        load(id) {
-          if (id.includes('CodeEditorMode.tsx')) {
-            if (fs.existsSync(id)) {
-              return fs.readFileSync(id, 'utf-8');
-            }
-            const extensionlessPath = id.slice(0, -4);
-            if (fs.existsSync(extensionlessPath)) {
-              return fs.readFileSync(extensionlessPath, 'utf-8');
-            }
-          }
-          return null;
-        }
-      }
-    ],
+    plugins: [react(), tailwindcss()],
     resolve: {
       alias: {
         '@': path.resolve(__dirname, '.'),
