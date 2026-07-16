@@ -620,6 +620,74 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
     return cleaned.trim();
   };
 
+  // Extract files from standard markdown code blocks when JSON parsing is impossible or failed
+  const extractFilesFromMarkdownBlocks = (text: string, currentFiles: VirtualFile[]): VirtualFile[] | null => {
+    const codeBlockRegex = /```([a-zA-Z0-9_-]*)\n([\s\S]*?)\n```/g;
+    const blocks: { lang: string; content: string; index: number }[] = [];
+    let match;
+    while ((match = codeBlockRegex.exec(text)) !== null) {
+      blocks.push({
+        lang: match[1],
+        content: match[2],
+        index: match.index
+      });
+    }
+
+    if (blocks.length === 0) return null;
+
+    const extracted: VirtualFile[] = [];
+    let lastSearchIndex = 0;
+    for (let i = 0; i < blocks.length; i++) {
+      const block = blocks[i];
+      const precedingText = text.substring(lastSearchIndex, block.index).trim();
+      lastSearchIndex = block.index + block.content.length + 8;
+
+      const fileRegex = /\b([a-zA-Z0-9_-]+\.(?:html|css|js|json))\b/gi;
+      let fileMatch;
+      const fileMatches: string[] = [];
+      while ((fileMatch = fileRegex.exec(precedingText)) !== null) {
+        fileMatches.push(fileMatch[1]);
+      }
+
+      if (fileMatches.length > 0) {
+        const mappedPath = fileMatches[fileMatches.length - 1];
+        const existingIdx = extracted.findIndex(f => f.path.toLowerCase() === mappedPath.toLowerCase());
+        if (existingIdx !== -1) {
+          extracted[existingIdx].content = block.content;
+        } else {
+          extracted.push({
+            path: mappedPath,
+            content: block.content
+          });
+        }
+      } else {
+        const lang = block.lang.toLowerCase();
+        let fallbackPath = "";
+        if (lang === "html") {
+          fallbackPath = "index.html";
+        } else if (lang === "css") {
+          fallbackPath = "style.css";
+        } else if (lang === "js" || lang === "javascript") {
+          fallbackPath = "app.js";
+        }
+
+        if (fallbackPath) {
+          const existingIdx = extracted.findIndex(f => f.path.toLowerCase() === fallbackPath.toLowerCase());
+          if (existingIdx !== -1) {
+            extracted[existingIdx].content = block.content;
+          } else {
+            extracted.push({
+              path: fallbackPath,
+              content: block.content
+            });
+          }
+        }
+      }
+    }
+
+    return extracted.length > 0 ? extracted : null;
+  };
+
   // Attempt to parse or extract a valid JSON array from the response text
   const tryExtractJsonArray = (text: string): VirtualFile[] | null => {
     let cleanText = text.trim();
@@ -887,16 +955,35 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
       const displayableText = cleanDisplayContent(fullText);
       setAiStreamingText(fullText);
       
-      const editedFiles = tryExtractJsonArray(fullText);
+      let editedFiles = tryExtractJsonArray(fullText);
+      if (!editedFiles || editedFiles.length === 0) {
+        console.log("JSON parsing failed or empty. Attempting markdown block extraction fallback...");
+        editedFiles = extractFilesFromMarkdownBlocks(fullText, files);
+      }
+
       if (editedFiles && Array.isArray(editedFiles) && editedFiles.length > 0) {
         // Backup current state for Restore button before updating
         const oldFiles = [...files];
         
-        setFiles(editedFiles);
+        // Merge the edited files into existing files securely to avoid wiping out unmodified files
+        const mergedFiles = [...files];
+        editedFiles.forEach((editedFile) => {
+          const index = mergedFiles.findIndex(f => f.path.toLowerCase() === editedFile.path.toLowerCase());
+          if (index !== -1) {
+            mergedFiles[index] = {
+              ...mergedFiles[index],
+              content: editedFile.content
+            };
+          } else {
+            mergedFiles.push(editedFile);
+          }
+        });
+
+        setFiles(mergedFiles);
         setPreviewKey(prev => prev + 1);
         
         // Refresh live preview once AI finishes writing the edits
-        refreshPreview(editedFiles);
+        refreshPreview(mergedFiles);
         
         // Finalize the chat history with backup snapshots
         setChatHistory(prev => prev.map(msg => 
