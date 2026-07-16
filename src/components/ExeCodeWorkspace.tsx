@@ -23,7 +23,10 @@ import {
   Play,
   FileCode,
   FileJson,
-  Code
+  Code,
+  Share2,
+  Cloud,
+  Eye
 } from "lucide-react";
 import JSZip from "jszip";
 
@@ -161,7 +164,7 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose }: ExeCodeWorkspace
     return localStorage.getItem("execode_project_name") || "Proyek ExeCode";
   });
 
-  // Settings for Supabase
+  // Settings for Supabase under the hood (Cloud Storage)
   const [supabaseUrl, setSupabaseUrl] = useState<string>(() => {
     return localStorage.getItem("execode_sb_url") || "https://knmjalxisidyduzwfwnp.supabase.co";
   });
@@ -173,7 +176,7 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose }: ExeCodeWorkspace
   });
   const [isServerConfigured, setIsServerConfigured] = useState<boolean>(false);
 
-  const [showConfigModal, setShowConfigModal] = useState<boolean>(false);
+  const [viewMode, setViewMode] = useState<"code" | "split" | "preview">("split");
   const [aiPrompt, setAiPrompt] = useState<string>("");
   const [isAIEditing, setIsAIEditing] = useState<boolean>(false);
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
@@ -194,7 +197,13 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose }: ExeCodeWorkspace
     localStorage.setItem("execode_project_name", projectName);
   }, [projectName]);
 
-  // Check Supabase configurations on server side
+  // Handle setting status message
+  const triggerStatus = (text: string, type: "success" | "error" | "info" = "info") => {
+    setStatusMessage({ text, type });
+    setTimeout(() => setStatusMessage(null), 5000);
+  };
+
+  // Check Supabase configurations on server side & load URL routing
   useEffect(() => {
     fetch("/api/supabase/config")
       .then(res => res.json())
@@ -206,13 +215,61 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose }: ExeCodeWorkspace
           }
         }
       })
-      .catch(err => console.warn("Gagal mendapatkan konfigurasi Supabase server:", err));
+      .catch(err => console.warn("Gagal mendapatkan konfigurasi cloud:", err));
+
+    // Handle /project/:projectId loading
+    const match = window.location.pathname.match(/^\/project\/([^/]+)/);
+    if (match) {
+      const projectId = decodeURIComponent(match[1]);
+      setProjectName(projectId);
+      
+      triggerStatus(`Menghubungkan ke Cloud Sandbox...`, "info");
+      
+      fetch("/api/supabase/load", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          projectName: projectId,
+          bucket: "execode"
+        })
+      })
+      .then(res => {
+        if (!res.ok) throw new Error("Project tidak ditemukan di cloud.");
+        return res.json();
+      })
+      .then(data => {
+        if (data.files && data.files.length > 0) {
+          setFiles(data.files);
+          setActiveFilePath("index.html");
+          triggerStatus(`Berhasil memuat '${projectId}' dari cloud!`, "success");
+        } else {
+          triggerStatus(`Project '${projectId}' kosong atau belum ada file.`, "info");
+        }
+      })
+      .catch(err => {
+        console.warn(err);
+        triggerStatus(`Project '${projectId}' belum tersimpan di cloud atau nama salah.`, "info");
+      });
+    }
   }, []);
 
-  // Handle setting status message
-  const triggerStatus = (text: string, type: "success" | "error" | "info" = "info") => {
-    setStatusMessage({ text, type });
-    setTimeout(() => setStatusMessage(null), 5000);
+  const handleShareProject = () => {
+    if (!projectName.trim()) {
+      triggerStatus("Nama project tidak boleh kosong!", "error");
+      return;
+    }
+    const slug = encodeURIComponent(projectName.trim());
+    const shareUrl = `${window.location.origin}/project/${slug}`;
+    
+    navigator.clipboard.writeText(shareUrl)
+      .then(() => {
+        triggerStatus("Link project berhasil disalin ke clipboard!", "success");
+      })
+      .catch(() => {
+        triggerStatus(`Gagal menyalin. Ini link Anda: ${shareUrl}`, "info");
+      });
   };
 
   // Update File Content in editor
@@ -624,13 +681,13 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose }: ExeCodeWorkspace
   };
 
   return (
-    <div className={`fixed inset-0 z-50 flex flex-col backdrop-blur-xl ${isDark ? "bg-zinc-950/98 text-zinc-100" : "bg-zinc-50/98 text-zinc-900"}`}>
+    <div className={`fixed inset-0 z-50 flex flex-col backdrop-blur-xl ${isDark ? "bg-zinc-950 text-zinc-100" : "bg-zinc-50 text-zinc-900"}`}>
       
       {/* HEADER BAR */}
-      <div className={`px-6 py-4 flex items-center justify-between border-b ${isDark ? "border-zinc-800 bg-zinc-950" : "border-zinc-200 bg-white"} shrink-0`}>
+      <div className={`px-5 py-3 flex items-center justify-between border-b ${isDark ? "border-zinc-850 bg-zinc-950" : "border-zinc-200 bg-white"} shrink-0`}>
         <div className="flex items-center gap-3">
-          <div className="p-2 bg-amber-500 rounded-xl text-white shadow-md">
-            <Code className="h-5 w-5" />
+          <div className="p-2 bg-amber-500 rounded-lg text-white">
+            <Code className="h-4 w-4" />
           </div>
           <div>
             <div className="flex items-center gap-2">
@@ -638,49 +695,83 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose }: ExeCodeWorkspace
                 type="text" 
                 value={projectName}
                 onChange={(e) => setProjectName(e.target.value)}
-                className={`font-display font-bold text-base focus:outline-none focus:border-b border-dashed focus:border-amber-500 ${isDark ? "text-zinc-100 bg-transparent" : "text-zinc-850 bg-transparent"}`}
+                className={`font-sans font-medium text-sm focus:outline-none focus:border-b border-dashed focus:border-amber-500 ${isDark ? "text-zinc-100 bg-transparent" : "text-zinc-800 bg-transparent"}`}
                 placeholder="Nama Project"
               />
-              <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-amber-500/10 text-amber-500 border border-amber-500/20">
+              <span className="text-[10px] font-normal uppercase tracking-wider px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-500 border border-amber-500/20">
                 Workspace
               </span>
             </div>
-            <p className="text-[10px] text-zinc-500 font-mono mt-0.5">Edit, Deploy & Pratinjau Real-Time Anda</p>
+            <p className="text-[10px] text-zinc-500 font-sans">Edit, Deploy & Pratinjau Real-Time Anda</p>
           </div>
+        </div>
+
+        {/* MIDDLE SEGMENTED VIEWMODE CONTROL */}
+        <div className="flex items-center bg-zinc-900 p-1 rounded-xl border border-zinc-800 shrink-0">
+          <button
+            onClick={() => setViewMode("code")}
+            className={`px-3 py-1.5 rounded-lg text-xs transition-all ${
+              viewMode === "code" 
+                ? "bg-amber-500 text-white font-medium" 
+                : "text-zinc-400 hover:text-zinc-200"
+            }`}
+          >
+            Kode Editor
+          </button>
+          <button
+            onClick={() => setViewMode("split")}
+            className={`hidden md:block px-3 py-1.5 rounded-lg text-xs transition-all ${
+              viewMode === "split" 
+                ? "bg-amber-500 text-white font-medium" 
+                : "text-zinc-400 hover:text-zinc-200"
+            }`}
+          >
+            Split Screen
+          </button>
+          <button
+            onClick={() => setViewMode("preview")}
+            className={`px-3 py-1.5 rounded-lg text-xs transition-all ${
+              viewMode === "preview" 
+                ? "bg-amber-500 text-white font-medium" 
+                : "text-zinc-400 hover:text-zinc-200"
+            }`}
+          >
+            Live Preview
+          </button>
         </div>
 
         {/* Global Action Tools */}
         <div className="flex items-center gap-2">
           {/* Status Message Overlay toast */}
           {statusMessage && (
-            <div className={`mr-4 px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 shadow-md animate-fade-in ${
+            <div className={`mr-2 px-3 py-1.5 rounded-lg text-xs font-normal flex items-center gap-1.5 shadow-sm animate-fade-in ${
               statusMessage.type === "success" 
                 ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20" 
                 : statusMessage.type === "error"
                   ? "bg-rose-500/10 text-rose-500 border border-rose-500/20"
                   : "bg-amber-500/10 text-amber-500 border border-amber-500/20"
             }`}>
-              {statusMessage.type === "success" ? <CheckCircle2 className="h-3.5 w-3.5" /> : <AlertCircle className="h-3.5 w-3.5" />}
+              {statusMessage.type === "success" ? <CheckCircle2 className="h-3 w-3" /> : <AlertCircle className="h-3 w-3" />}
               <span>{statusMessage.text}</span>
             </div>
           )}
 
           <button
-            onClick={() => setShowConfigModal(true)}
-            className={`p-2.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 border transition-all ${
+            onClick={handleShareProject}
+            className={`p-2 rounded-xl text-xs font-medium flex items-center gap-1.5 border transition-all ${
               isDark 
                 ? "bg-zinc-900 border-zinc-800 text-zinc-300 hover:bg-zinc-800" 
                 : "bg-white border-zinc-200 text-zinc-600 hover:bg-zinc-100"
             }`}
-            title="Konfigurasi Supabase Storage"
+            title="Bagikan Link Proyek ini"
           >
-            <Settings className="h-4 w-4 text-amber-500" />
-            <span>Setup Supabase</span>
+            <Share2 className="h-4 w-4 text-amber-500" />
+            <span>Bagikan Link</span>
           </button>
 
           <button
             onClick={handleDownloadZip}
-            className="p-2.5 rounded-xl text-xs font-bold bg-amber-600 hover:bg-amber-500 text-white flex items-center gap-1.5 shadow-md transition-all duration-200"
+            className="p-2 rounded-xl text-xs font-medium bg-amber-600 hover:bg-amber-500 text-white flex items-center gap-1.5 transition-all duration-200"
             title="Download Project ZIP"
           >
             <Download className="h-4 w-4" />
@@ -691,7 +782,7 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose }: ExeCodeWorkspace
             onClick={() => {
               if (fileInputRef.current) fileInputRef.current.click();
             }}
-            className={`p-2.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 border transition-all ${
+            className={`p-2 rounded-xl text-xs font-medium flex items-center gap-1.5 border transition-all ${
               isDark 
                 ? "bg-zinc-900 border-zinc-800 text-zinc-300 hover:bg-zinc-800" 
                 : "bg-white border-zinc-200 text-zinc-600 hover:bg-zinc-100"
@@ -711,22 +802,28 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose }: ExeCodeWorkspace
 
           <button
             onClick={() => setIsFullscreen(!isFullscreen)}
-            className={`p-2.5 rounded-xl border transition-all ${
+            className={`p-2 rounded-xl border transition-all ${
               isDark 
                 ? "bg-zinc-900 border-zinc-800 text-zinc-300 hover:bg-zinc-800" 
                 : "bg-white border-zinc-200 text-zinc-600 hover:bg-zinc-100"
             }`}
             title="Fullscreen Toggle"
           >
-            {isFullscreen ? <Minimize2 className="h-4.5 w-4.5" /> : <Maximize2 className="h-4.5 w-4.5" />}
+            {isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
           </button>
 
           <button
-            onClick={onClose}
-            className="p-2.5 rounded-xl bg-rose-500/10 text-rose-500 hover:bg-rose-500 hover:text-white transition-all shadow-sm"
+            onClick={() => {
+              // Reset path to / when closing project workspace if we are in /project/
+              if (window.location.pathname.startsWith("/project/")) {
+                window.history.pushState({}, "", "/");
+              }
+              onClose();
+            }}
+            className="p-2 rounded-xl bg-rose-500/10 text-rose-500 hover:bg-rose-500 hover:text-white transition-all"
             title="Tutup Workspace"
           >
-            <X className="h-4.5 w-4.5" />
+            <X className="h-4 w-4" />
           </button>
         </div>
       </div>
@@ -821,61 +918,57 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose }: ExeCodeWorkspace
             })}
           </div>
 
-          {/* SUPABASE DEPLOY/SYNC COMPONENT */}
+          {/* CLOUD SANDBOX PERSISTENCE */}
           <div className={`p-4 border-t shrink-0 ${isDark ? "border-zinc-850 bg-zinc-950/40" : "border-zinc-200 bg-zinc-100/30"}`}>
             <div className="flex items-center gap-1.5 mb-3">
-              <Database className="h-4 w-4 text-amber-500 animate-pulse" />
-              <span className="text-xs font-bold text-zinc-400">Supabase Cloud Sync</span>
+              <Cloud className="h-4 w-4 text-amber-500 animate-pulse" />
+              <span className="text-xs font-medium text-zinc-400">Penyimpanan Cloud ExeChat</span>
             </div>
 
-            {supabaseUrl && supabaseAnonKey ? (
-              <div className="space-y-2">
-                <div className="flex gap-2">
-                  <button
-                    onClick={handleUploadToSupabase}
-                    className="flex-1 py-2 px-3 rounded-lg text-[11px] font-bold bg-indigo-600 hover:bg-indigo-500 text-white flex items-center justify-center gap-1 shadow transition-all"
-                    title="Simpan file saat ini ke Supabase Storage"
-                  >
-                    <Upload className="h-3.5 w-3.5" />
-                    <span>Upload Cloud</span>
-                  </button>
-
-                  <button
-                    onClick={handleLoadFromSupabase}
-                    className="flex-1 py-2 px-3 rounded-lg text-[11px] font-bold bg-teal-600 hover:bg-teal-500 text-white flex items-center justify-center gap-1 shadow transition-all"
-                    title="Tarik file dari Supabase Storage"
-                  >
-                    <Download className="h-3.5 w-3.5" />
-                    <span>Download</span>
-                  </button>
-                </div>
+            <div className="space-y-2">
+              <div className="flex gap-2">
+                <button
+                  onClick={handleUploadToSupabase}
+                  className="flex-1 py-2 px-3 rounded-lg text-[11px] font-medium bg-amber-600 hover:bg-amber-500 text-white flex items-center justify-center gap-1 shadow transition-all"
+                  title="Simpan file saat ini ke Cloud ExeChat"
+                >
+                  <Upload className="h-3.5 w-3.5" />
+                  <span>Simpan Cloud</span>
+                </button>
 
                 <button
-                  onClick={handleDeleteProjectSupabase}
-                  className="w-full py-1.5 px-3 rounded-lg text-[10px] font-medium border border-rose-500/20 text-rose-500 hover:bg-rose-500/10 flex items-center justify-center gap-1 transition-all"
-                  title="Hapus berkas project dari bucket Supabase agar tidak numpuk"
+                  onClick={handleLoadFromSupabase}
+                  className="flex-1 py-2 px-3 rounded-lg text-[11px] font-medium bg-zinc-850 hover:bg-zinc-800 text-zinc-200 border border-zinc-700/60 flex items-center justify-center gap-1 shadow transition-all"
+                  title="Tarik file dari Cloud ExeChat"
                 >
-                  <Trash2 className="h-3 w-3" />
-                  <span>Bersihkan Storage</span>
+                  <Download className="h-3.5 w-3.5" />
+                  <span>Buka Cloud</span>
                 </button>
               </div>
-            ) : (
-              <div className="text-center p-3 rounded-xl border border-dashed border-zinc-850 bg-zinc-950/20">
-                <p className="text-[10px] text-zinc-500 leading-normal mb-2.5">Simpan project di awan, cegah data hilang.</p>
-                <button
-                  onClick={() => setShowConfigModal(true)}
-                  className="w-full py-1.5 px-3 rounded-lg text-[10px] font-bold bg-amber-500 text-white hover:bg-amber-450 transition-all flex items-center justify-center gap-1"
-                >
-                  <CloudLightning className="h-3.5 w-3.5" />
-                  <span>Koneksikan Supabase</span>
-                </button>
-              </div>
-            )}
+
+              <button
+                onClick={handleShareProject}
+                className="w-full py-2 px-3 rounded-lg text-[11px] font-medium border border-amber-500/20 text-amber-500 hover:bg-amber-500/10 flex items-center justify-center gap-1 transition-all"
+                title="Bagikan proyek ini"
+              >
+                <Share2 className="h-3.5 w-3.5" />
+                <span>Bagikan Link Proyek</span>
+              </button>
+
+              <button
+                onClick={handleDeleteProjectSupabase}
+                className="w-full py-1.5 px-3 rounded-lg text-[10px] font-normal border border-rose-500/10 text-rose-400 hover:bg-rose-500/10 flex items-center justify-center gap-1 transition-all"
+                title="Hapus proyek dari cloud"
+              >
+                <Trash2 className="h-3 w-3" />
+                <span>Bersihkan Penyimpanan</span>
+              </button>
+            </div>
           </div>
         </div>
 
         {/* PANEL TENGAH: CODE EDITOR WORKSPACE */}
-        <div className={`flex-1 flex flex-col min-w-0 ${isDark ? "bg-zinc-950" : "bg-white"}`}>
+        <div className={`min-w-0 ${viewMode === "preview" ? "hidden" : "flex-1 flex flex-col"} ${isDark ? "bg-zinc-950" : "bg-white"}`}>
           {/* Editor Header showing filename */}
           <div className={`px-4 py-3 border-b flex items-center justify-between shrink-0 ${isDark ? "border-zinc-850 bg-zinc-950" : "border-zinc-200 bg-zinc-50"}`}>
             <div className="flex items-center gap-2">
@@ -969,7 +1062,7 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose }: ExeCodeWorkspace
         </div>
 
         {/* PANEL KANAN: INTERACTIVE LIVE PREVIEW */}
-        <div className={`w-96 border-l flex flex-col shrink-0 ${isDark ? "border-zinc-850 bg-zinc-950" : "border-zinc-200 bg-zinc-100/20"}`}>
+        <div className={`border-l min-w-0 ${viewMode === "code" ? "hidden" : "flex-1 flex flex-col"} ${isDark ? "border-zinc-850 bg-zinc-950" : "border-zinc-200 bg-zinc-100/20"}`}>
           <div className="p-4 border-b border-zinc-850 flex items-center justify-between shrink-0 bg-zinc-950">
             <div className="flex items-center gap-2">
               <span className="text-xs font-bold uppercase tracking-wider text-zinc-400">Live Preview</span>
@@ -1055,113 +1148,7 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose }: ExeCodeWorkspace
 
       </div>
 
-      {/* SETUP / CONFIG MODAL (Supabase Credentials Drawer) */}
-      {showConfigModal && (
-        <div className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className={`w-full max-w-md rounded-2xl border p-6 shadow-2xl animate-fade-in ${
-            isDark ? "bg-zinc-900 border-zinc-850 text-zinc-100" : "bg-white border-zinc-200 text-zinc-900"
-          }`}>
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <Database className="h-5 w-5 text-amber-500 animate-bounce" />
-                <h3 className="font-display font-bold text-base">Konfigurasi Supabase Storage</h3>
-              </div>
-              <button
-                onClick={() => setShowConfigModal(false)}
-                className={`p-1.5 rounded-lg hover:bg-zinc-500/10 ${isDark ? "text-zinc-400" : "text-zinc-500"}`}
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
 
-            <div className="space-y-4 text-xs">
-              <div className="p-3 rounded-xl border border-amber-500/15 bg-amber-500/5 text-amber-500 leading-normal mb-3">
-                <p className="font-semibold mb-1">Panduan Pengaturan Bucket Supabase:</p>
-                <ol className="list-decimal list-inside space-y-1 text-[11px] leading-relaxed">
-                  <li>Buat akun gratis di <strong className="underline">https://supabase.com</strong>.</li>
-                  <li>Buat sebuah proyek baru lalu masuk ke tab <strong>Storage</strong>.</li>
-                  <li>Buat bucket baru bernama <strong>execode</strong> (atau nama kustom Anda).</li>
-                  <li>Pastikan bucket diatur sebagai <strong>Public</strong> agar file dapat diunggah dengan aman.</li>
-                  <li>Salin <strong>URL Proyek</strong> dan <strong>Anon Public Key</strong> Anda dari halaman <em>Project Settings &gt; API</em> lalu masukkan ke kolom di bawah.</li>
-                </ol>
-              </div>
-
-              <div>
-                <label className="block font-bold text-zinc-400 mb-1.5 uppercase tracking-wider text-[10px]">SUPABASE PROJECT URL</label>
-                <input
-                  type="text"
-                  value={supabaseUrl}
-                  onChange={(e) => setSupabaseUrl(e.target.value)}
-                  placeholder="https://xyzabcdefg.supabase.co"
-                  className={`w-full px-3 py-2 rounded-xl focus:outline-none border text-xs ${
-                    isDark ? "bg-zinc-950 border-zinc-800 text-zinc-200 focus:border-amber-500" : "bg-zinc-100 border-zinc-200 text-zinc-800 focus:border-amber-500"
-                  }`}
-                />
-              </div>
-
-              <div>
-                <label className="block font-bold text-zinc-400 mb-1.5 uppercase tracking-wider text-[10px]">SUPABASE ANON KEY / SERVICE ACCOUNT</label>
-                <input
-                  type="password"
-                  value={supabaseAnonKey}
-                  onChange={(e) => setSupabaseAnonKey(e.target.value)}
-                  placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCIsImNh..."
-                  className={`w-full px-3 py-2 rounded-xl focus:outline-none border text-xs ${
-                    isDark ? "bg-zinc-950 border-zinc-800 text-zinc-200 focus:border-amber-500" : "bg-zinc-100 border-zinc-200 text-zinc-800 focus:border-amber-500"
-                  }`}
-                />
-              </div>
-
-              <div>
-                <label className="block font-bold text-zinc-400 mb-1.5 uppercase tracking-wider text-[10px]">STORAGE BUCKET NAME</label>
-                <input
-                  type="text"
-                  value={supabaseBucket}
-                  onChange={(e) => setSupabaseBucket(e.target.value)}
-                  placeholder="execode"
-                  className={`w-full px-3 py-2 rounded-xl focus:outline-none border text-xs ${
-                    isDark ? "bg-zinc-950 border-zinc-800 text-zinc-200 focus:border-amber-500" : "bg-zinc-100 border-zinc-200 text-zinc-800 focus:border-amber-500"
-                  }`}
-                />
-              </div>
-
-              <div className="pt-2 flex justify-end gap-2">
-                <button
-                  onClick={() => {
-                    // Quick clear
-                    setSupabaseUrl("");
-                    setSupabaseAnonKey("");
-                    setSupabaseBucket("execode");
-                    localStorage.removeItem("execode_sb_url");
-                    localStorage.removeItem("execode_sb_key");
-                    localStorage.removeItem("execode_sb_bucket");
-                    triggerStatus("Koneksi Supabase berhasil diputuskan.", "info");
-                  }}
-                  className="px-4 py-2 rounded-xl font-semibold border border-rose-500/20 text-rose-500 hover:bg-rose-500/10 transition-colors"
-                >
-                  Disconnect API
-                </button>
-                <button
-                  onClick={() => {
-                    if (!supabaseUrl || !supabaseAnonKey || !supabaseBucket) {
-                      triggerStatus("Mohon lengkapi semua bidang isian!", "error");
-                      return;
-                    }
-                    localStorage.setItem("execode_sb_url", supabaseUrl);
-                    localStorage.setItem("execode_sb_key", supabaseAnonKey);
-                    localStorage.setItem("execode_sb_bucket", supabaseBucket);
-                    setShowConfigModal(false);
-                    triggerStatus("Kredensial Supabase berhasil disimpan secara lokal dan aman!", "success");
-                  }}
-                  className="px-4 py-2 rounded-xl font-bold bg-amber-500 text-white hover:bg-amber-450 transition-colors shadow-md"
-                >
-                  Simpan Konfigurasi
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
     </div>
   );

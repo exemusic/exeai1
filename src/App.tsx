@@ -129,7 +129,9 @@ export default function App() {
   const [globalWebSearchEnabled, setGlobalWebSearchEnabled] = useState(false);
   const [temperature, setTemperature] = useState(0.7);
   const [showSettings, setShowSettings] = useState(false);
-  const [showExeCode, setShowExeCode] = useState(false);
+  const [showExeCode, setShowExeCode] = useState(() => {
+    return typeof window !== "undefined" && window.location.pathname.startsWith("/project/");
+  });
   const [settingsTab, setSettingsTab] = useState<"akun" | "model" | "tampilan" | "ingatan">("akun");
   const [cookieConsent, setCookieConsent] = useState<string | null>(() => {
     return localStorage.getItem("exechat_cookie_consent") || null;

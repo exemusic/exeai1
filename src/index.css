@@ -1,9 +1,9 @@
-@import url('https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700;800&family=Roboto:wght@300;400;500;700;900&family=JetBrains+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&family=JetBrains+Mono:wght@400;500&display=swap');
 @import "tailwindcss";
 
 @theme {
-  --font-sans: "Geist", "Roboto", ui-sans-serif, system-ui, sans-serif;
-  --font-display: "Geist", "Roboto", sans-serif;
+  --font-sans: "Roboto", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Roboto", sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
 }
 
@@ -12,7 +12,7 @@
 /* Base style overrides */
 body {
   font-family: var(--font-sans);
-  font-weight: 500;
+  font-weight: 400;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -41,14 +41,14 @@ p,
 span,
 small,
 li {
-  font-weight: 500;
+  font-weight: 400;
 }
 
 button,
 input,
 textarea,
 select {
-  font-weight: 600;
+  font-weight: 500;
 }
 
 /* Custom modern scrollbars */
