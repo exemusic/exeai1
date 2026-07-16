@@ -479,7 +479,9 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
       </script>
     `;
 
-    if (finalHtml.includes("</head>")) {
+    if (finalHtml.includes("<head>")) {
+      finalHtml = finalHtml.replace("<head>", `<head>\n${errorHandlingScript}`);
+    } else if (finalHtml.includes("</head>")) {
       finalHtml = finalHtml.replace("</head>", `${errorHandlingScript}\n</head>`);
     } else {
       finalHtml = errorHandlingScript + finalHtml;
@@ -621,28 +623,110 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
 
   // Attempt to parse or extract a valid JSON array from the response text
   const tryExtractJsonArray = (text: string): VirtualFile[] | null => {
-    // 1. Try matching using markdown block with open/close backticks
+    // 1. First, extract the core JSON text block (either inside markdown backticks or the whole text)
+    let jsonText = text;
     const jsonBlockRegex = /```json\s*([\s\S]*?)\s*(?:```|$)/;
     const match = text.match(jsonBlockRegex);
     if (match && match[1]) {
+      jsonText = match[1].trim();
+    } else {
+      jsonText = text.replace(/^```json/, "").replace(/```$/, "").trim();
+    }
+
+    // 2. Try standard parsing
+    try {
+      const parsed = JSON.parse(jsonText);
+      if (Array.isArray(parsed)) return parsed;
+    } catch (e) {
+      console.warn("Standard JSON parsing failed. Attempting cleanup of trailing commas...", e);
       try {
-        const parsed = JSON.parse(match[1].trim());
-        if (Array.isArray(parsed)) return parsed;
-      } catch (e) {
-        // Fallback to custom cleaning of the matched content
-        const cleanedMatched = match[1]
+        const cleanedMatched = jsonText
           .trim()
           .replace(/,(\s*[\]}])/g, "$1"); // remove trailing commas before close bracket/brace
-        try {
-          const parsed = JSON.parse(cleanedMatched);
-          if (Array.isArray(parsed)) return parsed;
-        } catch (innerErr) {
-          // ignore inner error and proceed to general extraction
-        }
+        const parsed = JSON.parse(cleanedMatched);
+        if (Array.isArray(parsed)) return parsed;
+      } catch (e2) {
+        // Fallback to custom scanner
       }
     }
 
-    // 2. Try looking for [...] somewhere in the text
+    // 3. Robust manual regex scanner extraction (handles raw newlines and unescaped double quotes)
+    console.log("Standard parsing failed. Commencing robust manual scanner...");
+    try {
+      const extractedFiles: VirtualFile[] = [];
+      
+      // Look for all instances of "path": "filename"
+      const pathRegex = /"path"\s*:\s*"([^"]+)"/g;
+      const pathMatches: { path: string; index: number; lastIndex: number }[] = [];
+      let pathMatch;
+      while ((pathMatch = pathRegex.exec(jsonText)) !== null) {
+        pathMatches.push({
+          path: pathMatch[1],
+          index: pathMatch.index,
+          lastIndex: pathRegex.lastIndex
+        });
+      }
+
+      if (pathMatches.length > 0) {
+        for (let i = 0; i < pathMatches.length; i++) {
+          const currentPath = pathMatches[i].path;
+          const startOfSearch = pathMatches[i].lastIndex;
+          const endOfSearch = (i + 1 < pathMatches.length) ? pathMatches[i + 1].index : jsonText.length;
+          
+          const searchSub = jsonText.substring(startOfSearch, endOfSearch);
+          
+          // Locate the "content": " block
+          const contentKeyRegex = /"content"\s*:\s*"/;
+          const contentMatch = searchSub.match(contentKeyRegex);
+          if (!contentMatch) continue;
+          
+          const contentStartIndex = searchSub.indexOf(contentMatch[0]) + contentMatch[0].length;
+          const contentSearchSub = searchSub.substring(contentStartIndex);
+          
+          // Find the ending quote which is a '"' followed by an object/array closing pattern
+          let endQuoteIndex = -1;
+          let lastQuoteIdx = contentSearchSub.lastIndexOf('"');
+          while (lastQuoteIdx !== -1) {
+            const afterQuote = contentSearchSub.substring(lastQuoteIdx + 1);
+            if (/^\s*\}\s*(?:,|\s*\]|\s*\{|\s*$)/.test(afterQuote)) {
+              endQuoteIndex = lastQuoteIdx;
+              break;
+            }
+            lastQuoteIdx = contentSearchSub.lastIndexOf('"', lastQuoteIdx - 1);
+          }
+          
+          if (endQuoteIndex === -1) {
+            // Fallback: search backwards for the last quote in the entire substring
+            endQuoteIndex = contentSearchSub.lastIndexOf('"');
+          }
+          
+          if (endQuoteIndex !== -1) {
+            let contentValue = contentSearchSub.substring(0, endQuoteIndex);
+            
+            // Clean up backslash escapes standard in JSON
+            contentValue = contentValue
+              .replace(/\\n/g, "\n")
+              .replace(/\\t/g, "\t")
+              .replace(/\\"/g, '"')
+              .replace(/\\\\/g, "\\");
+              
+            extractedFiles.push({
+              path: currentPath,
+              content: contentValue
+            });
+          }
+        }
+
+        if (extractedFiles.length > 0) {
+          console.log("Successfully parsed files using robust manual parser:", extractedFiles.map(f => f.path));
+          return extractedFiles;
+        }
+      }
+    } catch (err) {
+      console.error("Robust manual parsing failed too:", err);
+    }
+
+    // 4. Try looking for [...] somewhere in the text as a last resort
     const startIdx = text.indexOf("[");
     const endIdx = text.lastIndexOf("]");
     if (startIdx !== -1 && endIdx !== -1 && endIdx > startIdx) {
@@ -651,7 +735,6 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
         const parsed = JSON.parse(candidate.trim());
         if (Array.isArray(parsed)) return parsed;
       } catch (e) {
-        // Let's try cleaning trailing commas
         try {
           const cleanedCandidate = candidate
             .replace(/,(\s*[\]}])/g, "$1")
@@ -662,15 +745,6 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
           // fallback
         }
       }
-    }
-
-    // 3. Fallback to raw JSON parsing of the entire text after trimming markdown indicators
-    try {
-      const rawText = text.replace(/^```json/, "").replace(/```$/, "").trim();
-      const parsed = JSON.parse(rawText);
-      if (Array.isArray(parsed)) return parsed;
-    } catch (e) {
-      // ignore
     }
 
     return null;
