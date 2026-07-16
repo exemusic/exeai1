@@ -27,7 +27,15 @@ import {
   Share2,
   Cloud,
   Eye,
-  ChevronDown
+  ChevronDown,
+  Send,
+  ThumbsUp,
+  ThumbsDown,
+  RotateCcw,
+  ArrowLeft,
+  Volume2,
+  Lock,
+  Menu
 } from "lucide-react";
 import JSZip from "jszip";
 import { MODEL_OPTIONS } from "../presets";
@@ -35,6 +43,14 @@ import { MODEL_OPTIONS } from "../presets";
 interface VirtualFile {
   path: string;
   content: string;
+}
+
+interface ChatMessage {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+  timestamp: string;
+  filesSnapshot?: VirtualFile[];
 }
 
 interface ExeCodeWorkspaceProps {
@@ -172,19 +188,13 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
   });
   const [showModelDropdown, setShowModelDropdown] = useState<boolean>(false);
 
-  // Settings for Supabase under the hood (Cloud Storage)
-  const [supabaseUrl, setSupabaseUrl] = useState<string>(() => {
-    return localStorage.getItem("execode_sb_url") || "https://knmjalxisidyduzwfwnp.supabase.co";
-  });
-  const [supabaseAnonKey, setSupabaseAnonKey] = useState<string>(() => {
-    return localStorage.getItem("execode_sb_key") || "";
-  });
-  const [supabaseBucket, setSupabaseBucket] = useState<string>(() => {
-    return localStorage.getItem("execode_sb_bucket") || "execode";
-  });
+  // Settings for cloud saving
+  const [supabaseUrl, setSupabaseUrl] = useState<string>("https://knmjalxisidyduzwfwnp.supabase.co");
+  const [supabaseAnonKey, setSupabaseAnonKey] = useState<string>("");
+  const [supabaseBucket, setSupabaseBucket] = useState<string>("execode");
   const [isServerConfigured, setIsServerConfigured] = useState<boolean>(false);
 
-  const [viewMode, setViewMode] = useState<"code" | "split" | "preview">("split");
+  const [activeRightTab, setActiveRightTab] = useState<"preview" | "code">("preview");
   const [aiPrompt, setAiPrompt] = useState<string>("");
   const [isAIEditing, setIsAIEditing] = useState<boolean>(false);
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
@@ -193,8 +203,31 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
   const [newFileName, setNewFileName] = useState<string>("");
   const [showNewFileInput, setShowNewFileInput] = useState<boolean>(false);
   const [statusMessage, setStatusMessage] = useState<{ text: string; type: "success" | "error" | "info" } | null>(null);
+  
+  // ExeAI Chat Session
+  const [chatHistory, setChatHistory] = useState<ChatMessage[]>(() => {
+    const saved = localStorage.getItem("execode_chat_history");
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        // fail silent
+      }
+    }
+    return [
+      {
+        id: "initial",
+        role: "assistant",
+        content: "Halo! Saya adalah Asisten AI ExeCode Anda. Beritahu saya apa yang ingin Anda buat atau ubah pada aplikasi web ini, dan saya akan memperbarui kodenya secara real-time!",
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      }
+    ];
+  });
+
+  const [runtimeError, setRuntimeError] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
   const activeFile = files.find(f => f.path === activeFilePath) || files[0];
 
   useEffect(() => {
@@ -205,13 +238,32 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
     localStorage.setItem("execode_project_name", projectName);
   }, [projectName]);
 
+  useEffect(() => {
+    localStorage.setItem("execode_chat_history", JSON.stringify(chatHistory));
+  }, [chatHistory]);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [chatHistory]);
+
   // Handle setting status message
   const triggerStatus = (text: string, type: "success" | "error" | "info" = "info") => {
     setStatusMessage({ text, type });
     setTimeout(() => setStatusMessage(null), 5000);
   };
 
-  // Check Supabase configurations on server side & load URL routing
+  // Listen to Preview Errors posted from iframe
+  useEffect(() => {
+    const handleMessage = (e: MessageEvent) => {
+      if (e.data && e.data.type === "PREVIEW_ERROR") {
+        setRuntimeError(e.data.message);
+      }
+    };
+    window.addEventListener("message", handleMessage);
+    return () => window.removeEventListener("message", handleMessage);
+  }, []);
+
+  // Fetch Supabase configurations & handle project auto-routing
   useEffect(() => {
     fetch("/api/supabase/config")
       .then(res => res.json())
@@ -225,7 +277,6 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
       })
       .catch(err => console.warn("Gagal mendapatkan konfigurasi cloud:", err));
 
-    // Handle /project/:projectId loading
     const match = window.location.pathname.match(/^\/project\/([^/]+)/);
     if (match) {
       const projectId = decodeURIComponent(match[1]);
@@ -260,8 +311,21 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
         console.warn(err);
         triggerStatus(`Project '${projectId}' belum tersimpan di cloud atau nama salah.`, "info");
       });
+    } else {
+      // Auto-generate unique project ID and rewrite URL
+      const randomId = "proj-" + Math.random().toString(36).substring(2, 10);
+      setProjectName(randomId);
+      window.history.pushState(null, "", `/project/${randomId}`);
+      triggerStatus(`Membuat Sandbox Baru: ${randomId}`, "success");
     }
   }, []);
+
+  // Sync / project slug update helper
+  const handleProjectNameChange = (newName: string) => {
+    const sanitized = newName.replace(/[^a-zA-Z0-9-_]/g, "");
+    setProjectName(sanitized);
+    window.history.replaceState(null, "", `/project/${sanitized}`);
+  };
 
   const handleShareProject = () => {
     if (!projectName.trim()) {
@@ -308,7 +372,9 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
     const errorHandlingScript = `
       <script>
         window.addEventListener('error', function(e) {
-          console.error("Runtime Error: " + e.message + " at " + e.filename + ":" + e.lineno);
+          console.error("Runtime Error: " + e.message);
+          window.parent.postMessage({ type: "PREVIEW_ERROR", message: e.message }, "*");
+          
           const errDiv = document.createElement('div');
           errDiv.style.position = 'fixed';
           errDiv.style.bottom = '10px';
@@ -386,7 +452,7 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
     }
     triggerStatus(`Berkas '${pathToDelete}' berhasil dihapus.`, "success");
     
-    // Also trigger clean-up on Supabase if keys exist
+    // Also trigger clean-up on Supabase
     if (supabaseUrl && supabaseAnonKey) {
       deleteSingleFileFromSupabase(pathToDelete);
     }
@@ -437,7 +503,6 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
       await Promise.all(filePromises);
 
       if (extractedFiles.length > 0) {
-        // Ensure index.html exists
         const hasHtml = extractedFiles.some(f => f.path.toLowerCase() === "index.html");
         if (!hasHtml) {
           extractedFiles.push({
@@ -457,11 +522,40 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
     }
   };
 
+  // Clean-up markdown blocks to show only pure descriptions in chat bubbles
+  const cleanDisplayContent = (text: string) => {
+    let cleaned = text.replace(/```json[\s\S]*?(```|$)/g, "");
+    cleaned = cleaned.replace(/```[\s\S]*?(```|$)/g, "");
+    return cleaned.trim();
+  };
+
   // Call API server-side to let Gemini automatically edit our source code based on a prompt!
-  const handleSendPromptToAI = async () => {
-    if (!aiPrompt.trim()) return;
+  const handleSendPromptToAI = async (overridePrompt?: string) => {
+    const promptToSend = overridePrompt || aiPrompt;
+    if (!promptToSend.trim()) return;
+
+    setRuntimeError(null);
+    setAiPrompt("");
+
+    // Append user message
+    const userMsg: ChatMessage = {
+      id: "usr-" + Date.now(),
+      role: "user",
+      content: promptToSend,
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    };
+
+    // Append empty assistant message for streaming
+    const assistantMsgId = "ai-" + Date.now();
+    const tempAssistantMsg: ChatMessage = {
+      id: assistantMsgId,
+      role: "assistant",
+      content: "AI sedang membaca berkas dan menganalisis pengeditan...",
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    };
+
+    setChatHistory(prev => [...prev, userMsg, tempAssistantMsg]);
     setIsAIEditing(true);
-    triggerStatus("AI sedang menganalisis workspace dan memproses pengeditan kode...", "info");
 
     try {
       const response = await fetch("/api/chat/stream", {
@@ -472,18 +566,20 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
           messages: [
             {
               role: "user",
-              content: `Instruksi Pengguna: "${aiPrompt}"\n\n` +
+              content: `Instruksi Pengguna: "${promptToSend}"\n\n` +
                 `Berikut adalah seluruh daftar file di workspace saya beserta isi kodenya saat ini:\n\n` +
                 JSON.stringify(files, null, 2) + "\n\n" +
-                `Tolong edit berkas-berkas di atas sesuai instruksi saya. Anda harus merespons kembali dengan format JSON valid berisi array dari seluruh file lengkap yang telah Anda perbarui. Contoh format respons:\n` +
+                `Tolong edit berkas-berkas di atas sesuai instruksi saya. Tuliskan penjelasan ringkas mengenai perubahan Anda dalam bahasa Indonesia, kemudian berikan respons format JSON valid berisi array dari seluruh file lengkap yang telah Anda perbarui di dalam satu blok kode \`\`\`json. Contoh format respons:\n` +
+                `Beberapa perubahan yang saya lakukan: ... penjelasan singkat ...\n\n` +
+                `\`\`\`json\n` +
                 `[\n` +
                 `  { "path": "index.html", "content": "...kode baru..." },\n` +
                 `  { "path": "app.js", "content": "...kode baru..." }\n` +
-                `]\n\n` +
+                `]\n` +
+                `\`\`\`\n\n` +
                 `Aturan penting:\n` +
-                `1. Berikan HANYA format JSON valid di dalam blok kode \`\`\`json. Jangan ada penjelasan teks lain sebelum atau sesudahnya agar aplikasi saya dapat menguraikannya langsung.\n` +
-                `2. Jangan hapus file penting, edit file index.html atau app.js sesuai kebutuhan, atau buat file baru jika diperlukan.\n` +
-                `3. Tautan/Link yang Anda buat harus rapi, valid, lengkap (jangan menyingkat dengan ellipsis).`
+                `1. Berikan penjelasan ringkas, lalu sertakan HANYA format JSON valid di dalam blok kode \`\`\`json. Jangan menyingkat kode dengan ellipsis.\n` +
+                `2. Jangan hapus file penting, edit file index.html atau app.js sesuai kebutuhan, atau buat file baru jika diperlukan.`
             }
           ]
         })
@@ -493,7 +589,6 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
         throw new Error(`API server returned error (${response.status})`);
       }
 
-      // Stream parsing or simple reading
       const reader = response.body;
       if (!reader) throw new Error("Gagal membaca aliran data respons AI.");
 
@@ -519,47 +614,77 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
                 const parsed = JSON.parse(dataStr);
                 if (parsed.text) {
                   fullText += parsed.text;
+                  
+                  // Live-update the streaming text (filtering out ugly raw JSON blocks on the fly)
+                  const displayable = cleanDisplayContent(fullText);
+                  setChatHistory(prev => prev.map(msg => 
+                    msg.id === assistantMsgId 
+                      ? { ...msg, content: displayable || "Menyusun perubahan kode..." } 
+                      : msg
+                  ));
                 }
               } catch (e) {
-                // Ignore parsing errors
+                // Ignore
               }
             }
           }
         }
       }
 
+      // Final complete content parsing
+      const displayableText = cleanDisplayContent(fullText);
+      
       // Try to extract JSON from response markdown block
-      let jsonStr = fullText.trim();
+      let jsonStr = "";
       const jsonBlockRegex = /```json\s*([\s\S]*?)\s*```/;
-      const match = jsonStr.match(jsonBlockRegex);
+      const match = fullText.match(jsonBlockRegex);
       if (match && match[1]) {
         jsonStr = match[1];
       } else {
         // Strip markdown backticks if any
-        jsonStr = jsonStr.replace(/^```json/, "").replace(/```$/, "");
+        jsonStr = fullText.replace(/^```json/, "").replace(/```$/, "");
       }
 
       const editedFiles = JSON.parse(jsonStr.trim());
       if (Array.isArray(editedFiles) && editedFiles.length > 0) {
+        // Backup current state for Restore button before updating
+        const oldFiles = [...files];
+        
         setFiles(editedFiles);
-        setAiPrompt("");
         setPreviewKey(prev => prev + 1);
-        triggerStatus("Workspace Anda berhasil diperbarui oleh ExeAI secara real-time!", "success");
+        
+        // Finalize the chat history with backup snapshots
+        setChatHistory(prev => prev.map(msg => 
+          msg.id === assistantMsgId 
+            ? { 
+                ...msg, 
+                content: displayableText || "Saya telah memperbarui berkas kode Anda sesuai permintaan.", 
+                filesSnapshot: oldFiles 
+              } 
+            : msg
+        ));
+        
+        triggerStatus("Workspace Anda berhasil diperbarui oleh ExeAI!", "success");
       } else {
         throw new Error("Format respons JSON tidak sesuai ekspektasi.");
       }
     } catch (err: any) {
       console.error("AI Code Edit Error: ", err);
-      triggerStatus(`AI gagal memodifikasi kode: ${err.message}. Silakan coba instruksi yang lebih detail.`, "error");
+      setChatHistory(prev => prev.map(msg => 
+        msg.id === assistantMsgId 
+          ? { ...msg, content: `Gagal memodifikasi kode: ${err.message}. Mohon kirim ulang prompt Anda.` } 
+          : msg
+      ));
+      triggerStatus(`Gagal memproses AI edit: ${err.message}`, "error");
     } finally {
       setIsAIEditing(false);
     }
   };
 
-  // Sync Project Files to Supabase Storage
+  // Sync Project Files to Cloud ExeChat (via Supabase backend routes)
   const handleUploadToSupabase = async () => {
     try {
-      triggerStatus("Menyiapkan berkas untuk diunggah ke Supabase Storage...", "info");
+      triggerStatus("Menyimpan berkas Anda ke Cloud ExeChat...", "info");
 
       const headers: Record<string, string> = {
         "Content-Type": "application/json"
@@ -580,22 +705,17 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Gagal mengunggah.");
 
-      // Save credentials in local storage for convenience
-      localStorage.setItem("execode_sb_url", supabaseUrl);
-      localStorage.setItem("execode_sb_key", supabaseAnonKey);
-      localStorage.setItem("execode_sb_bucket", supabaseBucket);
-
-      triggerStatus("Project berhasil diunggah dan disinkronkan ke Supabase Storage!", "success");
+      triggerStatus("Project berhasil disimpan di Cloud ExeChat!", "success");
     } catch (err: any) {
       console.error(err);
-      triggerStatus(`Gagal unggah ke Supabase: ${err.message}`, "error");
+      triggerStatus(`Gagal mengunggah: ${err.message}`, "error");
     }
   };
 
-  // Load project from Supabase Storage
+  // Load project from Cloud Sandbox
   const handleLoadFromSupabase = async () => {
     try {
-      triggerStatus(`Mencari file proyek '${projectName}' di Supabase...`, "info");
+      triggerStatus(`Membuka proyek '${projectName}' dari Cloud...`, "info");
 
       const headers: Record<string, string> = {
         "Content-Type": "application/json"
@@ -618,16 +738,52 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
       if (data.files && data.files.length > 0) {
         setFiles(data.files);
         setActiveFilePath("index.html");
-        triggerStatus(`Berhasil memuat ${data.files.length} berkas dari Supabase!`, "success");
+        setPreviewKey(prev => prev + 1);
+        triggerStatus(`Berhasil membuka proyek '${projectName}' dari cloud!`, "success");
+      } else {
+        triggerStatus(`Proyek '${projectName}' kosong atau belum tersimpan.`, "info");
       }
     } catch (err: any) {
       console.error(err);
-      triggerStatus(`Gagal memuat: ${err.message}`, "error");
+      triggerStatus(`Gagal menarik proyek: ${err.message}`, "error");
     }
   };
 
-  // Helper: Delete single file from Supabase
-  const deleteSingleFileFromSupabase = async (fileName: string) => {
+  // Delete project from Supabase Cloud
+  const handleDeleteProjectSupabase = async () => {
+    const confirmClear = window.confirm(`Apakah Anda yakin ingin menghapus seluruh penyimpanan Cloud untuk proyek '${projectName}'? Tindakan ini tidak bisa dibatalkan.`);
+    if (!confirmClear) return;
+
+    try {
+      await deleteProjectFromSupabase();
+      triggerStatus("Seluruh penyimpanan cloud proyek berhasil dibersihkan!", "success");
+    } catch (err: any) {
+      triggerStatus(`Gagal membersihkan cloud: ${err.message}`, "error");
+    }
+  };
+
+  const deleteProjectFromSupabase = async () => {
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json"
+    };
+    if (supabaseUrl) headers["x-supabase-url"] = supabaseUrl;
+    if (supabaseAnonKey) headers["x-supabase-key"] = supabaseAnonKey;
+
+    const response = await fetch("/api/supabase/delete", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        projectName,
+        bucket: supabaseBucket
+      })
+    });
+    if (!response.ok) {
+      const errData = await response.json();
+      throw new Error(errData.error || "Gagal menghapus file.");
+    }
+  };
+
+  const deleteSingleFileFromSupabase = async (filePath: string) => {
     try {
       const headers: Record<string, string> = {
         "Content-Type": "application/json"
@@ -640,119 +796,115 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
         headers,
         body: JSON.stringify({
           projectName,
-          fileName,
-          bucket: supabaseBucket
+          bucket: supabaseBucket,
+          filePath
         })
       });
-      console.log(`Single file ${fileName} deleted on Supabase storage.`);
-    } catch (e) {
-      // Quiet fail if not configured
-    }
-  };
-
-  // Helper: Delete whole project files from Supabase (prevent storage leaks)
-  const deleteProjectFromSupabase = async () => {
-    try {
-      const headers: Record<string, string> = {
-        "Content-Type": "application/json"
-      };
-      if (supabaseUrl) headers["x-supabase-url"] = supabaseUrl;
-      if (supabaseAnonKey) headers["x-supabase-key"] = supabaseAnonKey;
-
-      const response = await fetch("/api/supabase/delete", {
-        method: "POST",
-        headers,
-        body: JSON.stringify({
-          projectName,
-          bucket: supabaseBucket
-        })
-      });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "Gagal menghapus.");
     } catch (err) {
-      console.warn("Supabase cleaning skipped or failed:", err);
+      console.warn("Gagal menghapus single file cloud:", err);
     }
   };
 
-  // Button to wipe project from Supabase
-  const handleDeleteProjectSupabase = async () => {
-    if (!window.confirm(`Apakah Anda yakin ingin menghapus seluruh file proyek '${projectName}' dari Supabase Storage? Tindakan ini tidak dapat dibatalkan.`)) {
-      return;
-    }
+  // Simple Markdown elements parser
+  const renderMessageContent = (content: string) => {
+    const lines = content.split("\n");
+    return (
+      <div className="space-y-2 text-zinc-300 text-xs leading-relaxed font-sans font-normal">
+        {lines.map((line, idx) => {
+          if (line.trim().startsWith("```json") || line.trim().startsWith("```") || line.trim().startsWith("]")) {
+            return null;
+          }
+          
+          // Bullet list items
+          if (line.trim().startsWith("* ") || line.trim().startsWith("- ")) {
+            const text = line.replace(/^[\s*-]+/, "").trim();
+            return (
+              <ul key={idx} className="list-disc pl-4 space-y-1 my-1">
+                <li className="text-zinc-300">{parseInlineFormatting(text)}</li>
+              </ul>
+            );
+          }
+          
+          // Headers
+          if (line.trim().startsWith("### ")) {
+            return (
+              <h4 key={idx} className="text-xs font-bold text-zinc-100 mt-3 mb-1 uppercase tracking-wider text-amber-500">
+                {parseInlineFormatting(line.replace("### ", ""))}
+              </h4>
+            );
+          }
+          if (line.trim().startsWith("## ")) {
+            return (
+              <h3 key={idx} className="text-sm font-bold text-zinc-100 mt-4 mb-2 border-b border-zinc-800 pb-1">
+                {parseInlineFormatting(line.replace("## ", ""))}
+              </h3>
+            );
+          }
+          
+          if (!line.trim()) return <div key={idx} className="h-1" />;
+          
+          return (
+            <p key={idx} className="leading-relaxed">
+              {parseInlineFormatting(line)}
+            </p>
+          );
+        })}
+      </div>
+    );
+  };
 
-    try {
-      await deleteProjectFromSupabase();
-      triggerStatus("Seluruh file proyek berhasil dibersihkan dari Supabase Storage sehingga kapasitas tidak menumpuk!", "success");
-    } catch (err: any) {
-      triggerStatus(`Gagal menghapus file di Supabase: ${err.message}`, "error");
-    }
+  const parseInlineFormatting = (text: string) => {
+    const regex = /(\*\*.*?\*\*|`.*?`)/g;
+    const splitParts = text.split(regex);
+    
+    return splitParts.map((part, i) => {
+      if (part.startsWith("**") && part.endsWith("**")) {
+        return <strong key={i} className="font-semibold text-zinc-100">{part.slice(2, -2)}</strong>;
+      }
+      if (part.startsWith("`") && part.endsWith("`")) {
+        return <code key={i} className="bg-zinc-900 border border-zinc-800 text-amber-400 font-mono text-[11px] px-1 py-0.5 rounded">{part.slice(1, -1)}</code>;
+      }
+      return part;
+    });
   };
 
   return (
-    <div className={`fixed inset-0 z-50 flex flex-col backdrop-blur-xl ${isDark ? "bg-zinc-950 text-zinc-100" : "bg-zinc-50 text-zinc-900"}`}>
+    <div className={`fixed inset-0 z-50 flex flex-col backdrop-blur-xl ${isDark ? "bg-zinc-950 text-zinc-100 font-sans" : "bg-zinc-50 text-zinc-900 font-sans"}`}>
       
-      {/* HEADER BAR */}
+      {/* HEADER BAR (Visual Match: ExeChat brand with start/share/remix actions) */}
       <div className={`px-5 py-3 flex items-center justify-between border-b ${isDark ? "border-zinc-850 bg-zinc-950" : "border-zinc-200 bg-white"} shrink-0`}>
+        {/* Left: Back to start */}
         <div className="flex items-center gap-3">
-          <div className="p-2 bg-amber-500 rounded-lg text-white">
-            <Code className="h-4 w-4" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <input 
-                type="text" 
-                value={projectName}
-                onChange={(e) => setProjectName(e.target.value)}
-                className={`font-sans font-medium text-sm focus:outline-none focus:border-b border-dashed focus:border-amber-500 ${isDark ? "text-zinc-100 bg-transparent" : "text-zinc-800 bg-transparent"}`}
-                placeholder="Nama Project"
-              />
-              <span className="text-[10px] font-normal uppercase tracking-wider px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-500 border border-amber-500/20">
-                Workspace
-              </span>
-            </div>
-            <p className="text-[10px] text-zinc-500 font-sans">Edit, Deploy & Pratinjau Real-Time Anda</p>
-          </div>
-        </div>
-
-        {/* MIDDLE SEGMENTED VIEWMODE CONTROL */}
-        <div className="flex items-center bg-zinc-900 p-1 rounded-xl border border-zinc-800 shrink-0">
           <button
-            onClick={() => setViewMode("code")}
-            className={`px-3 py-1.5 rounded-lg text-xs transition-all ${
-              viewMode === "code" 
-                ? "bg-amber-500 text-white font-medium" 
-                : "text-zinc-400 hover:text-zinc-200"
+            onClick={() => {
+              if (window.location.pathname.startsWith("/project/")) {
+                window.history.pushState({}, "", "/");
+              }
+              onClose();
+            }}
+            className={`px-3 py-1.5 rounded-xl text-xs font-normal flex items-center gap-1.5 border transition-all ${
+              isDark 
+                ? "bg-zinc-900 border-zinc-800 text-zinc-300 hover:bg-zinc-800" 
+                : "bg-white border-zinc-200 text-zinc-600 hover:bg-zinc-100"
             }`}
           >
-            Kode Editor
-          </button>
-          <button
-            onClick={() => setViewMode("split")}
-            className={`hidden md:block px-3 py-1.5 rounded-lg text-xs transition-all ${
-              viewMode === "split" 
-                ? "bg-amber-500 text-white font-medium" 
-                : "text-zinc-400 hover:text-zinc-200"
-            }`}
-          >
-            Split Screen
-          </button>
-          <button
-            onClick={() => setViewMode("preview")}
-            className={`px-3 py-1.5 rounded-lg text-xs transition-all ${
-              viewMode === "preview" 
-                ? "bg-amber-500 text-white font-medium" 
-                : "text-zinc-400 hover:text-zinc-200"
-            }`}
-          >
-            Live Preview
+            <ArrowLeft className="h-4 w-4 text-zinc-400" />
+            <span>Back to start</span>
           </button>
         </div>
 
-        {/* Global Action Tools */}
+        {/* Center: Brand name "ExeChat" */}
         <div className="flex items-center gap-2">
-          {/* Status Message Overlay toast */}
+          <span className="font-sans font-bold text-base tracking-tight text-zinc-100">ExeChat</span>
+          <span className="text-[10px] font-normal uppercase tracking-wider px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-500 border border-amber-500/20">
+            ExeCode
+          </span>
+        </div>
+
+        {/* Right: Remix, Share, Publish, Fullscreen */}
+        <div className="flex items-center gap-2">
           {statusMessage && (
-            <div className={`mr-2 px-3 py-1.5 rounded-lg text-xs font-normal flex items-center gap-1.5 shadow-sm animate-fade-in ${
+            <div className={`mr-2 px-3 py-1.5 rounded-lg text-[11px] font-normal flex items-center gap-1.5 shadow-sm animate-fade-in ${
               statusMessage.type === "success" 
                 ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20" 
                 : statusMessage.type === "error"
@@ -764,362 +916,298 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
             </div>
           )}
 
-          <button
-            onClick={handleShareProject}
-            className={`p-2 rounded-xl text-xs font-medium flex items-center gap-1.5 border transition-all ${
-              isDark 
-                ? "bg-zinc-900 border-zinc-800 text-zinc-300 hover:bg-zinc-800" 
-                : "bg-white border-zinc-200 text-zinc-600 hover:bg-zinc-100"
-            }`}
-            title="Bagikan Link Proyek ini"
-          >
-            <Share2 className="h-4 w-4 text-amber-500" />
-            <span>Bagikan Link</span>
-          </button>
-
-          <button
-            onClick={handleDownloadZip}
-            className="p-2 rounded-xl text-xs font-medium bg-amber-600 hover:bg-amber-500 text-white flex items-center gap-1.5 transition-all duration-200"
-            title="Download Project ZIP"
-          >
-            <Download className="h-4 w-4" />
-            <span>Unduh ZIP</span>
-          </button>
-
+          {/* Remix button */}
           <button
             onClick={() => {
-              if (fileInputRef.current) fileInputRef.current.click();
+              const confirmRemix = window.confirm("Apakah Anda yakin ingin me-Remix proyek ini? Semua file akan diatur ulang dan ID baru akan dibuat.");
+              if (confirmRemix) {
+                const randomId = "proj-" + Math.random().toString(36).substring(2, 10);
+                setFiles(DEFAULT_FILES);
+                setActiveFilePath("index.html");
+                setProjectName(randomId);
+                setChatHistory([
+                  {
+                    id: "initial",
+                    role: "assistant",
+                    content: "Halo! Saya adalah Asisten AI ExeCode Anda. Beritahu saya apa yang ingin Anda buat atau ubah pada aplikasi web ini, dan saya akan memperbarui kodenya secara real-time!",
+                    timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                  }
+                ]);
+                window.history.pushState(null, "", `/project/${randomId}`);
+                triggerStatus("Proyek berhasil di-Remix dengan ID Sandbox baru!", "success");
+              }
             }}
-            className={`p-2 rounded-xl text-xs font-medium flex items-center gap-1.5 border transition-all ${
+            className={`px-3 py-1.5 rounded-xl text-xs font-normal flex items-center gap-1.5 border transition-all ${
               isDark 
                 ? "bg-zinc-900 border-zinc-800 text-zinc-300 hover:bg-zinc-800" 
                 : "bg-white border-zinc-200 text-zinc-600 hover:bg-zinc-100"
             }`}
-            title="Unggah Kode ZIP"
+            title="Remix Proyek"
           >
-            <Upload className="h-4 w-4 text-indigo-400" />
-            <span>Unggah ZIP</span>
+            <RefreshCw className="h-3.5 w-3.5 text-indigo-400" />
+            <span>Remix</span>
           </button>
-          <input 
-            type="file" 
-            ref={fileInputRef} 
-            onChange={handleZipUploadChange} 
-            accept=".zip" 
-            className="hidden" 
-          />
+
+          {/* Share button */}
+          <button
+            onClick={handleShareProject}
+            className={`px-3 py-1.5 rounded-xl text-xs font-normal flex items-center gap-1.5 border transition-all ${
+              isDark 
+                ? "bg-zinc-900 border-zinc-800 text-zinc-300 hover:bg-zinc-800" 
+                : "bg-white border-zinc-200 text-zinc-600 hover:bg-zinc-100"
+            }`}
+            title="Bagikan Link Proyek"
+          >
+            <Share2 className="h-3.5 w-3.5 text-amber-500" />
+            <span>Share</span>
+          </button>
+
+          {/* Publish / Sync button */}
+          <button
+            onClick={handleUploadToSupabase}
+            className="px-3 py-1.5 rounded-xl text-xs font-normal bg-amber-500 hover:bg-amber-450 text-white flex items-center gap-1.5 transition-all shadow-md active:scale-95 cursor-pointer"
+            title="Simpan Proyek ke Cloud"
+          >
+            <Upload className="h-3.5 w-3.5" />
+            <span>Publish</span>
+          </button>
 
           <button
             onClick={() => setIsFullscreen(!isFullscreen)}
-            className={`p-2 rounded-xl border transition-all ${
+            className={`p-1.5 rounded-xl border transition-all ${
               isDark 
                 ? "bg-zinc-900 border-zinc-800 text-zinc-300 hover:bg-zinc-800" 
                 : "bg-white border-zinc-200 text-zinc-600 hover:bg-zinc-100"
             }`}
-            title="Fullscreen Toggle"
+            title={isFullscreen ? "Show Chat Panel" : "Hide Chat Panel (Fullscreen)"}
           >
-            {isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
-          </button>
-
-          <button
-            onClick={() => {
-              // Reset path to / when closing project workspace if we are in /project/
-              if (window.location.pathname.startsWith("/project/")) {
-                window.history.pushState({}, "", "/");
-              }
-              onClose();
-            }}
-            className="p-2 rounded-xl bg-rose-500/10 text-rose-500 hover:bg-rose-500 hover:text-white transition-all"
-            title="Tutup Workspace"
-          >
-            <X className="h-4 w-4" />
+            {isFullscreen ? <Minimize2 className="h-4 w-4 text-zinc-400" /> : <Maximize2 className="h-4 w-4 text-zinc-400" />}
           </button>
         </div>
       </div>
 
       {/* CORE WORKSPACE GRID */}
-      <div className="flex-1 flex overflow-hidden min-h-0 relative">
+      <div className="flex-1 flex overflow-hidden min-h-0 relative bg-zinc-950">
         
-        {/* PANEL KIRI: FILE TREE EXPLORER & CLOUD STORAGE SYNC */}
-        <div className={`w-64 border-r flex flex-col shrink-0 ${isDark ? "border-zinc-850 bg-zinc-950" : "border-zinc-200 bg-zinc-100/40"}`}>
-          <div className="p-4 border-b border-zinc-850 flex items-center justify-between">
-            <span className="text-xs font-bold tracking-wider uppercase text-zinc-500">Berkas Project</span>
+        {/* PANEL KIRI: AI CHAT CONVERSATION (Styled like Google AI Studio) */}
+        <div className={`border-r flex flex-col shrink-0 border-zinc-850 bg-[#121214] transition-all duration-300 ${
+          isFullscreen ? "w-0 overflow-hidden border-none opacity-0" : "w-96 md:w-[380px]"
+        }`}>
+          {/* Chat Header */}
+          <div className="p-4 border-b border-zinc-850 flex items-center justify-between bg-zinc-950/40">
+            <div className="flex items-center gap-2">
+              <Sparkles className="h-4 w-4 text-amber-500" />
+              <span className="text-xs font-semibold tracking-tight text-zinc-200">Gemini</span>
+            </div>
+            
+            {/* Start New Chat/Reset */}
             <button
-              onClick={() => setShowNewFileInput(!showNewFileInput)}
-              className="p-1 rounded hover:bg-amber-500/10 text-amber-500 transition-colors"
-              title="Buat File Baru"
+              onClick={() => {
+                const conf = window.confirm("Mulai percakapan AI baru? Riwayat obrolan di workspace ini akan dibersihkan.");
+                if (conf) {
+                  setChatHistory([
+                    {
+                      id: "initial",
+                      role: "assistant",
+                      content: "Halo! Saya adalah Asisten AI ExeCode Anda. Beritahu saya apa yang ingin Anda buat atau ubah pada aplikasi web ini, dan saya akan memperbarui kodenya secara real-time!",
+                      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                    }
+                  ]);
+                  triggerStatus("Riwayat percakapan dibersihkan.", "info");
+                }
+              }}
+              className="p-1 rounded-lg hover:bg-zinc-900 text-zinc-400 hover:text-zinc-200 transition-all"
+              title="Mulai Percakapan Baru"
             >
               <Plus className="h-4 w-4" />
             </button>
           </div>
 
-          {/* New file inline input */}
-          {showNewFileInput && (
-            <div className="p-3 border-b border-zinc-800/50 bg-amber-500/5 flex flex-col gap-2">
-              <input
-                type="text"
-                value={newFileName}
-                onChange={(e) => setNewFileName(e.target.value)}
-                placeholder="namafile.html, app.js..."
-                className={`w-full px-2.5 py-1.5 text-xs rounded border focus:outline-none ${
-                  isDark ? "bg-zinc-900 border-zinc-800 text-zinc-200 focus:border-amber-500" : "bg-white border-zinc-200 text-zinc-800 focus:border-amber-500"
-                }`}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") handleAddFile();
-                }}
-              />
-              <div className="flex justify-end gap-1.5">
-                <button
-                  onClick={() => setShowNewFileInput(false)}
-                  className="px-2 py-1 text-[10px] font-semibold rounded text-zinc-400 hover:bg-zinc-850"
-                >
-                  Batal
-                </button>
-                <button
-                  onClick={handleAddFile}
-                  className="px-2.5 py-1 text-[10px] font-bold rounded bg-amber-500 text-white"
-                >
-                  Tambah
-                </button>
-              </div>
-            </div>
-          )}
+          {/* Chat Metadata & Model Dropdown Selection */}
+          <div className="px-4 py-2 border-b border-zinc-850/50 bg-zinc-950/20 text-[10px] text-zinc-500 flex items-center justify-between font-mono shrink-0">
+            <span>{MODEL_OPTIONS.find(m => m.id === selectedModel)?.name || "Gemini 3.5 Flash"} • Ran successfully</span>
+            
+            <div className="relative">
+              <button
+                onClick={() => setShowModelDropdown(!showModelDropdown)}
+                className="text-[10px] text-amber-500 hover:text-amber-400 font-medium flex items-center gap-1 transition-all"
+              >
+                <span>Ubah Model</span>
+                <ChevronDown className="h-3 w-3" />
+              </button>
 
-          {/* LIST FILES */}
-          <div className="flex-1 overflow-y-auto p-2.5 space-y-1">
-            {files.map(file => {
-              const isActive = file.path === activeFilePath;
-              const isHtml = file.path.endsWith(".html");
-              const isJs = file.path.endsWith(".js");
-              const isJson = file.path.endsWith(".json");
-              
+              {showModelDropdown && (
+                <div className="absolute top-full right-0 mt-1 z-50 w-64 rounded-xl border p-1 shadow-2xl bg-zinc-900 border-zinc-800 text-zinc-100 max-h-64 overflow-y-auto">
+                  <div className="px-2.5 py-1 mb-1 border-b border-zinc-800/20">
+                    <span className="text-[9px] font-bold uppercase tracking-wider text-zinc-500">Pilih Model AI</span>
+                  </div>
+                  <div className="space-y-0.5">
+                    {MODEL_OPTIONS.map((m) => {
+                      const isSel = selectedModel === m.id;
+                      return (
+                        <button
+                          key={m.id}
+                          type="button"
+                          onClick={() => {
+                            setSelectedModel(m.id);
+                            setShowModelDropdown(false);
+                            triggerStatus(`Model AI diubah ke '${m.name}'`, "success");
+                          }}
+                          className={`w-full text-left px-2.5 py-1.5 rounded-lg text-[11px] flex flex-col gap-0.5 transition-all ${
+                            isSel
+                              ? "bg-amber-500/10 text-amber-400 border border-amber-500/15"
+                              : "text-zinc-400 hover:bg-zinc-800/40 hover:text-zinc-200"
+                          }`}
+                        >
+                          <div className="flex items-center justify-between w-full">
+                            <span className={`font-semibold ${isSel ? "text-amber-400" : "text-zinc-300"}`}>{m.name}</span>
+                            <span className="text-[8px] px-1 bg-zinc-950 text-zinc-500 rounded border border-zinc-800">{m.badge}</span>
+                          </div>
+                          <span className="text-[9px] text-zinc-500 line-clamp-1">{m.description}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Messages Area */}
+          <div className="flex-1 overflow-y-auto p-4 space-y-4 flex flex-col">
+            {chatHistory.map((message) => {
+              const isUsr = message.role === "user";
               return (
                 <div
-                  key={file.path}
-                  className={`group w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium cursor-pointer transition-all ${
-                    isActive 
-                      ? "bg-amber-500/10 text-amber-500 border border-amber-500/20" 
-                      : "text-zinc-400 hover:bg-zinc-900/50 hover:text-zinc-200"
-                  }`}
-                  onClick={() => setActiveFilePath(file.path)}
+                  key={message.id}
+                  className={`flex flex-col ${isUsr ? "items-end" : "items-start"} space-y-1`}
                 >
-                  <div className="flex items-center gap-2 min-w-0">
-                    {isHtml ? <Code className="h-4 w-4 text-orange-400 shrink-0" /> :
-                     isJs ? <FileCode className="h-4 w-4 text-yellow-400 shrink-0" /> :
-                     isJson ? <FileJson className="h-4 w-4 text-emerald-400 shrink-0" /> :
-                     <File className="h-4 w-4 text-zinc-400 shrink-0" />}
-                    <span className="truncate">{file.path}</span>
+                  {/* Speaker identity label */}
+                  <span className="text-[10px] text-zinc-500 font-medium px-1">
+                    {isUsr ? "Anda" : "Gemini"}
+                  </span>
+
+                  {/* Message Bubble */}
+                  <div
+                    className={`px-3.5 py-2.5 rounded-2xl text-xs max-w-[85%] leading-relaxed ${
+                      isUsr
+                        ? "bg-zinc-900 border border-zinc-800 text-zinc-200 rounded-tr-sm"
+                        : "bg-zinc-900/30 border border-zinc-900 text-zinc-300 rounded-tl-sm"
+                    }`}
+                  >
+                    {isUsr ? (
+                      <p className="font-sans font-normal whitespace-pre-wrap">{message.content}</p>
+                    ) : (
+                      renderMessageContent(message.content)
+                    )}
+
+                    {/* Snapshot Restore Action */}
+                    {!isUsr && message.filesSnapshot && (
+                      <div className="mt-3 pt-2 border-t border-zinc-800/50 flex items-center justify-between gap-4 flex-wrap">
+                        <div className="flex gap-1">
+                          <button className="p-1 rounded hover:bg-zinc-800 text-zinc-500 hover:text-zinc-300 transition-colors">
+                            <ThumbsUp className="h-3 w-3" />
+                          </button>
+                          <button className="p-1 rounded hover:bg-zinc-800 text-zinc-500 hover:text-zinc-300 transition-colors">
+                            <ThumbsDown className="h-3 w-3" />
+                          </button>
+                        </div>
+                        
+                        <button
+                          onClick={() => {
+                            if (message.filesSnapshot) {
+                              setFiles(message.filesSnapshot);
+                              setPreviewKey(prev => prev + 1);
+                              triggerStatus("Kode berhasil di-restore ke snapshot versi ini!", "success");
+                            }
+                          }}
+                          className="flex items-center gap-1 px-2 py-1 rounded-lg bg-zinc-950 border border-zinc-850 hover:bg-zinc-900 text-[10px] font-normal text-zinc-400 hover:text-zinc-200 transition-colors"
+                          title="Kembalikan file ke snapshot sebelum pengeditan ini"
+                        >
+                          <RotateCcw className="h-3 w-3 text-amber-500" />
+                          <span>Restore</span>
+                        </button>
+                      </div>
+                    )}
                   </div>
-                  {file.path !== "index.html" && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDeleteFile(file.path);
-                      }}
-                      className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-rose-500/10 text-rose-400 transition-all shrink-0"
-                      title="Hapus File"
-                    >
-                      <Trash className="h-3.5 w-3.5" />
-                    </button>
-                  )}
                 </div>
               );
             })}
+            <div ref={messagesEndRef} />
           </div>
 
-          {/* CLOUD SANDBOX PERSISTENCE */}
-          <div className={`p-4 border-t shrink-0 ${isDark ? "border-zinc-850 bg-zinc-950/40" : "border-zinc-200 bg-zinc-100/30"}`}>
-            <div className="flex items-center gap-1.5 mb-3">
-              <Cloud className="h-4 w-4 text-amber-500 animate-pulse" />
-              <span className="text-xs font-medium text-zinc-400">Penyimpanan Cloud ExeChat</span>
-            </div>
-
-            <div className="space-y-2">
-              <div className="flex gap-2">
-                <button
-                  onClick={handleUploadToSupabase}
-                  className="flex-1 py-2 px-3 rounded-lg text-[11px] font-medium bg-amber-600 hover:bg-amber-500 text-white flex items-center justify-center gap-1 shadow transition-all"
-                  title="Simpan file saat ini ke Cloud ExeChat"
-                >
-                  <Upload className="h-3.5 w-3.5" />
-                  <span>Simpan Cloud</span>
-                </button>
-
-                <button
-                  onClick={handleLoadFromSupabase}
-                  className="flex-1 py-2 px-3 rounded-lg text-[11px] font-medium bg-zinc-850 hover:bg-zinc-800 text-zinc-200 border border-zinc-700/60 flex items-center justify-center gap-1 shadow transition-all"
-                  title="Tarik file dari Cloud ExeChat"
-                >
-                  <Download className="h-3.5 w-3.5" />
-                  <span>Buka Cloud</span>
-                </button>
-              </div>
-
-              <button
-                onClick={handleShareProject}
-                className="w-full py-2 px-3 rounded-lg text-[11px] font-medium border border-amber-500/20 text-amber-500 hover:bg-amber-500/10 flex items-center justify-center gap-1 transition-all"
-                title="Bagikan proyek ini"
-              >
-                <Share2 className="h-3.5 w-3.5" />
-                <span>Bagikan Link Proyek</span>
-              </button>
-
-              <button
-                onClick={handleDeleteProjectSupabase}
-                className="w-full py-1.5 px-3 rounded-lg text-[10px] font-normal border border-rose-500/10 text-rose-400 hover:bg-rose-500/10 flex items-center justify-center gap-1 transition-all"
-                title="Hapus proyek dari cloud"
-              >
-                <Trash2 className="h-3 w-3" />
-                <span>Bersihkan Penyimpanan</span>
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* PANEL TENGAH: CODE EDITOR WORKSPACE */}
-        <div className={`min-w-0 ${viewMode === "preview" ? "hidden" : "flex-1 flex flex-col"} ${isDark ? "bg-zinc-950" : "bg-white"}`}>
-          {/* Editor Header showing filename */}
-          <div className={`px-4 py-3 border-b flex items-center justify-between shrink-0 ${isDark ? "border-zinc-850 bg-zinc-950" : "border-zinc-200 bg-zinc-50"}`}>
-            <div className="flex items-center gap-2">
-              <span className={`text-xs font-bold font-mono px-2 py-1 rounded bg-zinc-500/10 text-amber-500`}>
-                {activeFilePath}
-              </span>
-              <span className="text-[10px] text-zinc-500 font-mono">• Kode Sumber Utama</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] font-mono text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20 flex items-center gap-1 shrink-0">
-                <span className="h-1.5 w-1.5 bg-emerald-500 rounded-full animate-ping" />
-                Auto-Saved
-              </span>
-            </div>
-          </div>
-
-          {/* TextArea styled code editor */}
-          <div className="flex-1 flex relative font-mono overflow-hidden">
-            {/* Mock Line numbers */}
-            <div className={`w-12 select-none text-right pr-3 pt-4 text-xs font-mono border-r select-none ${
-              isDark ? "bg-zinc-950 border-zinc-850 text-zinc-600" : "bg-zinc-50 border-zinc-200 text-zinc-400"
-            }`}>
-              {Array.from({ length: Math.max(activeFile.content.split("\n").length, 30) }).map((_, i) => (
-                <div key={i} className="h-6 leading-6">{i + 1}</div>
-              ))}
-            </div>
-
-            {/* Editor Textarea */}
-            <textarea
-              value={activeFile.content}
-              onChange={handleEditorChange}
-              className={`flex-1 h-full p-4 text-xs font-mono focus:outline-none resize-none leading-6 leading-relaxed ${
-                isDark ? "bg-zinc-950 text-zinc-200 focus:bg-zinc-950" : "bg-white text-zinc-800"
-              }`}
-              spellCheck="false"
-            />
-          </div>
-
-          {/* AI ASSISTANT CONSOLE BOTTOM BAR (Cursor/AI Studio style) */}
-          <div className={`p-4 border-t ${isDark ? "border-zinc-850 bg-zinc-950/90" : "border-zinc-200 bg-zinc-50/80"}`}>
-            <div className="max-w-4xl mx-auto">
-              <div className="flex items-center justify-between gap-4 mb-2 flex-wrap">
-                <div className="flex items-center gap-2">
-                  <Sparkles className="h-4 w-4 text-amber-500 animate-pulse" />
-                  <span className="text-xs font-medium tracking-tight text-amber-500">ExeCode AI Assistant</span>
-                  <span className="text-[10px] text-zinc-500 hidden sm:inline">• Tulis prompt instruksi untuk mengedit atau membuat halaman secara otomatis</span>
+          {/* CODE STATUS INTERACTIVE BOX (Placed below chat log) */}
+          <div className="px-4 py-2 border-t border-zinc-850 bg-zinc-950/40 shrink-0">
+            {runtimeError ? (
+              <div className="p-2.5 rounded-xl border border-rose-500/10 bg-rose-500/5 flex items-center justify-between gap-2 text-xs">
+                <div className="flex items-center gap-2 min-w-0">
+                  <AlertCircle className="h-4 w-4 text-rose-500 shrink-0 animate-pulse" />
+                  <span className="text-rose-400 font-normal truncate">1 error running the code</span>
                 </div>
-
-                {/* Model Selector Dropdown */}
-                <div className="relative">
-                  <button
-                    onClick={() => setShowModelDropdown(!showModelDropdown)}
-                    className={`px-2.5 py-1 rounded-lg text-[10px] font-medium flex items-center gap-1.5 border transition-all ${
-                      isDark 
-                        ? "bg-zinc-900 border-zinc-800 text-zinc-300 hover:bg-zinc-850" 
-                        : "bg-white border-zinc-200 text-zinc-600 hover:bg-zinc-50"
-                    }`}
-                  >
-                    <span>Model: {MODEL_OPTIONS.find(m => m.id === selectedModel)?.name || selectedModel}</span>
-                    <ChevronDown className="h-3.5 w-3.5 text-zinc-400" />
-                  </button>
-
-                  {showModelDropdown && (
-                    <div className={`absolute bottom-full right-0 mb-1.5 z-50 w-72 rounded-xl border p-1 shadow-xl max-h-64 overflow-y-auto ${
-                      isDark ? "bg-zinc-900 border-zinc-800 text-zinc-100" : "bg-white border-zinc-200 text-zinc-900"
-                    }`}>
-                      <div className="px-2.5 py-1.5 border-b border-zinc-800/10 mb-1">
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Pilih Model AI</span>
-                      </div>
-                      <div className="space-y-0.5">
-                        {MODEL_OPTIONS.map((m) => {
-                          const isSel = selectedModel === m.id;
-                          return (
-                            <button
-                              key={m.id}
-                              type="button"
-                              onClick={() => {
-                                setSelectedModel(m.id);
-                                setShowModelDropdown(false);
-                                triggerStatus(`Model AI diubah ke '${m.name}'`, "success");
-                              }}
-                              className={`w-full text-left px-2.5 py-2 rounded-lg text-xs flex flex-col gap-0.5 transition-all ${
-                                isSel
-                                  ? "bg-amber-500/10 text-amber-400 border border-amber-500/20"
-                                  : "text-zinc-400 hover:bg-zinc-800/40 hover:text-zinc-200"
-                              }`}
-                            >
-                              <div className="flex items-center justify-between w-full">
-                                <span className={`font-medium ${isSel ? "text-amber-400" : "text-zinc-300"}`}>{m.name}</span>
-                                <span className={`text-[9px] px-1.5 py-0.5 rounded font-mono ${
-                                  isSel ? "bg-amber-500/20 text-amber-400" : "bg-zinc-950 border border-zinc-850 text-zinc-500"
-                                }`}>
-                                  {m.badge || "AI"}
-                                </span>
-                              </div>
-                              <span className="text-[9px] text-zinc-500 leading-normal line-clamp-2">{m.description}</span>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <div className="relative">
-                <input
-                  type="text"
-                  value={aiPrompt}
-                  onChange={(e) => setAiPrompt(e.target.value)}
-                  placeholder="Ketik instruksi: 'tambahkan navbar cantik', 'ubah tema tombol jadi modern', atau 'buat game tic-tac-toe'..."
-                  disabled={isAIEditing}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && !isAIEditing) handleSendPromptToAI();
+                <button
+                  onClick={() => {
+                    const fixPrompt = `Saya mendapat kesalahan berikut saat menjalankan program:\n\n"${runtimeError}"\n\nTolong bantu perbaiki bug ini dan update kodenya.`;
+                    handleSendPromptToAI(fixPrompt);
                   }}
-                  className={`w-full pl-4 pr-32 py-3 rounded-xl text-xs transition-all focus:outline-none focus:ring-1 focus:ring-amber-500/50 border ${
-                    isDark 
-                      ? "bg-zinc-900 border-zinc-800 text-zinc-100 placeholder-zinc-500 focus:bg-zinc-950" 
-                      : "bg-white border-zinc-200 text-zinc-850 placeholder-zinc-400 focus:bg-white focus:border-amber-500"
-                  }`}
-                />
-                
+                  disabled={isAIEditing}
+                  className="px-2.5 py-1 text-[11px] font-semibold bg-rose-500 hover:bg-rose-400 text-white rounded-lg transition-all cursor-pointer shadow"
+                >
+                  Fix
+                </button>
+              </div>
+            ) : (
+              <div className="p-2.5 rounded-xl border border-zinc-850 bg-zinc-950/30 flex items-center justify-between text-xs">
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                  <span className="text-zinc-400 font-normal">Semua file berjalan lancar</span>
+                </div>
+                <span className="text-[9px] font-mono text-emerald-500 bg-emerald-500/10 px-1.5 py-0.5 rounded">Ready</span>
+              </div>
+            )}
+          </div>
+
+          {/* PROMPT CHAT INPUT BAR */}
+          <div className="p-4 border-t border-zinc-850 bg-zinc-950/80">
+            <div className="relative flex flex-col bg-zinc-900 border border-zinc-800 focus-within:border-amber-500/50 rounded-2xl p-1.5 transition-all">
+              <textarea
+                value={aiPrompt}
+                onChange={(e) => setAiPrompt(e.target.value)}
+                placeholder="Tulis instruksi: 'tambahkan navbar cantik', 'ubah tombol jadi modern', atau 'buat game tic-tac-toe'..."
+                disabled={isAIEditing}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    if (!isAIEditing) handleSendPromptToAI();
+                  }
+                }}
+                className="w-full bg-transparent border-none focus:outline-none text-xs text-zinc-200 placeholder-zinc-500 resize-none px-2.5 pt-1.5 min-h-[44px] max-h-[140px] leading-relaxed"
+              />
+              
+              <div className="flex items-center justify-between px-2 pb-1.5 pt-1">
+                <div className="flex items-center gap-1.5 text-zinc-500">
+                  <button className="p-1.5 rounded-lg hover:bg-zinc-800 hover:text-zinc-300 transition-colors" title="Tambah aset">
+                    <Plus className="h-4 w-4" />
+                  </button>
+                  <button className="p-1.5 rounded-lg hover:bg-zinc-800 hover:text-zinc-300 transition-colors" title="Input suara">
+                    <Volume2 className="h-4 w-4" />
+                  </button>
+                </div>
+
                 <button
-                  onClick={handleSendPromptToAI}
+                  onClick={() => handleSendPromptToAI()}
                   disabled={isAIEditing || !aiPrompt.trim()}
-                  className={`absolute right-2 top-2 px-4 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all ${
+                  className={`p-2 rounded-xl transition-all ${
                     isAIEditing 
                       ? "bg-zinc-800 text-zinc-500 cursor-not-allowed" 
                       : !aiPrompt.trim()
-                        ? "bg-zinc-700/50 text-zinc-400"
-                        : "bg-amber-500 hover:bg-amber-450 text-white shadow-md cursor-pointer active:scale-95"
+                        ? "bg-zinc-800 text-zinc-500"
+                        : "bg-amber-500 hover:bg-amber-450 text-white shadow-md active:scale-95 cursor-pointer"
                   }`}
                 >
                   {isAIEditing ? (
-                    <>
-                      <RefreshCw className="h-3.5 w-3.5 animate-spin" />
-                      <span>Editing...</span>
-                    </>
+                    <RefreshCw className="h-4 w-4 animate-spin" />
                   ) : (
-                    <>
-                      <Sparkles className="h-3.5 w-3.5" />
-                      <span>Edit Kode</span>
-                    </>
+                    <Send className="h-4 w-4" />
                   )}
                 </button>
               </div>
@@ -1127,32 +1215,66 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
           </div>
         </div>
 
-        {/* PANEL KANAN: INTERACTIVE LIVE PREVIEW */}
-        <div className={`border-l min-w-0 ${viewMode === "code" ? "hidden" : "flex-1 flex flex-col"} ${isDark ? "border-zinc-850 bg-zinc-950" : "border-zinc-200 bg-zinc-100/20"}`}>
-          <div className="p-4 border-b border-zinc-850 flex items-center justify-between shrink-0 bg-zinc-950">
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-bold uppercase tracking-wider text-zinc-400">Live Preview</span>
+        {/* PANEL KANAN: WORKSPACE INTERACTIVE / CODE EDITOR PANE */}
+        <div className="flex-1 flex flex-col min-w-0 bg-zinc-950">
+          
+          {/* Segmented controls Preview vs Code */}
+          <div className="p-3 border-b border-zinc-850 bg-zinc-950 flex items-center justify-between shrink-0">
+            <div className="flex items-center bg-zinc-900 p-1 rounded-xl border border-zinc-850">
+              <button
+                onClick={() => setActiveRightTab("preview")}
+                className={`px-3.5 py-1.5 rounded-lg text-xs font-normal flex items-center gap-1.5 transition-all ${
+                  activeRightTab === "preview" 
+                    ? "bg-amber-500 text-white font-medium" 
+                    : "text-zinc-400 hover:text-zinc-200"
+                }`}
+              >
+                <span className="h-1.5 w-1.5 bg-current rounded-full" />
+                <span>Preview</span>
+              </button>
+              <button
+                onClick={() => setActiveRightTab("code")}
+                className={`px-3.5 py-1.5 rounded-lg text-xs font-normal transition-all ${
+                  activeRightTab === "code" 
+                    ? "bg-amber-500 text-white font-medium" 
+                    : "text-zinc-400 hover:text-zinc-200"
+                }`}
+              >
+                Code
+              </button>
             </div>
-            
-            {/* Device frame selector */}
-            <div className="flex items-center gap-1 bg-zinc-900/60 p-1 rounded-lg border border-zinc-800/80">
+
+            {/* Simulated Address path, refresh & reload controls */}
+            <div className="hidden sm:flex items-center gap-1 px-3 py-1 rounded-lg bg-zinc-900 border border-zinc-850 text-[11px] text-zinc-500 font-mono w-80 truncate">
+              <span className="text-zinc-600">/</span>
+              <span className="truncate text-zinc-400">{projectName.toLowerCase().replace(/\s+/g, "-")}</span>
+            </div>
+
+            <div className="flex items-center gap-1 bg-zinc-900/60 p-1 rounded-lg border border-zinc-850">
+              {activeRightTab === "preview" && (
+                <>
+                  <button
+                    onClick={() => setDeviceMode("desktop")}
+                    className={`p-1.5 rounded-md transition-all ${deviceMode === "desktop" ? "bg-amber-500/10 text-amber-500" : "text-zinc-400 hover:text-zinc-200"}`}
+                    title="Pratinjau Desktop"
+                  >
+                    <Monitor className="h-3.5 w-3.5" />
+                  </button>
+                  <button
+                    onClick={() => setDeviceMode("mobile")}
+                    className={`p-1.5 rounded-md transition-all ${deviceMode === "mobile" ? "bg-amber-500/10 text-amber-500" : "text-zinc-400 hover:text-zinc-200"}`}
+                    title="Pratinjau Smartphone"
+                  >
+                    <Smartphone className="h-3.5 w-3.5" />
+                  </button>
+                  <div className="h-4 w-px bg-zinc-800 mx-1" />
+                </>
+              )}
               <button
-                onClick={() => setDeviceMode("desktop")}
-                className={`p-1.5 rounded-md transition-all ${deviceMode === "desktop" ? "bg-amber-500 text-white shadow-sm" : "text-zinc-400 hover:text-zinc-200"}`}
-                title="Pratinjau Desktop"
-              >
-                <Monitor className="h-3.5 w-3.5" />
-              </button>
-              <button
-                onClick={() => setDeviceMode("mobile")}
-                className={`p-1.5 rounded-md transition-all ${deviceMode === "mobile" ? "bg-amber-500 text-white shadow-sm" : "text-zinc-400 hover:text-zinc-200"}`}
-                title="Pratinjau Smartphone"
-              >
-                <Smartphone className="h-3.5 w-3.5" />
-              </button>
-              <div className="h-4 w-px bg-zinc-800 mx-1" />
-              <button
-                onClick={() => setPreviewKey(prev => prev + 1)}
+                onClick={() => {
+                  setPreviewKey(prev => prev + 1);
+                  triggerStatus("Pratinjau berhasil dimuat ulang!", "success");
+                }}
                 className="p-1.5 text-zinc-400 hover:text-zinc-200 transition-colors"
                 title="Muat Ulang Preview"
               >
@@ -1161,60 +1283,245 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
             </div>
           </div>
 
-          {/* Simulated Browser Bar with Address */}
-          <div className="px-4 py-2 flex items-center gap-2 bg-zinc-900/40 border-b border-zinc-900 shrink-0">
-            <div className="flex gap-1">
-              <div className="w-2 h-2 rounded-full bg-rose-500" />
-              <div className="w-2 h-2 rounded-full bg-amber-500" />
-              <div className="w-2 h-2 rounded-full bg-emerald-500" />
-            </div>
-            <div className="flex-1 bg-zinc-900/80 rounded-md border border-zinc-800 px-3 py-1 text-[10px] text-zinc-500 font-mono flex items-center justify-between overflow-hidden">
-              <span className="truncate">https://execode.local/{projectName.toLowerCase().replace(/\s+/g, "-")}/preview</span>
-              <RefreshCw 
-                className="h-3 w-3 shrink-0 text-zinc-600 hover:text-zinc-400 cursor-pointer transition-colors" 
-                onClick={() => setPreviewKey(prev => prev + 1)}
-              />
-            </div>
-          </div>
-
-          {/* Interactive Frame Box */}
-          <div className="flex-1 flex items-center justify-center p-6 bg-zinc-900/20 overflow-hidden relative">
-            {deviceMode === "mobile" ? (
-              /* SMARTPHONE FRAME */
-              <div className="w-[280px] h-[540px] rounded-[36px] bg-zinc-950 border-[10px] border-zinc-900 shadow-2xl relative flex flex-col overflow-hidden animate-fade-in ring-1 ring-zinc-800/50">
-                {/* Speaker Grill / Notch */}
-                <div className="absolute top-0 left-1/2 transform -translate-x-1/2 w-28 h-6 bg-zinc-900 rounded-b-2xl z-20 flex items-center justify-center">
-                  <div className="w-12 h-1 bg-zinc-800 rounded-full" />
+          {/* Tab Content 1: Preview mode active */}
+          {activeRightTab === "preview" && (
+            <div className="flex-1 flex flex-col min-h-0">
+              {/* Simulated Browser Address bar */}
+              <div className="px-4 py-2 flex items-center gap-2 bg-zinc-950 border-b border-zinc-900/80 shrink-0">
+                <div className="flex gap-1.5">
+                  <div className="w-2.5 h-2.5 rounded-full bg-rose-500/80" />
+                  <div className="w-2.5 h-2.5 rounded-full bg-amber-500/80" />
+                  <div className="w-2.5 h-2.5 rounded-full bg-emerald-500/80" />
                 </div>
-                {/* Simulated Iframe container */}
-                <iframe
-                  key={previewKey}
-                  src={getCombinedPreviewBlob()}
-                  className="w-full h-full border-none rounded-[24px] bg-slate-950"
-                  sandbox="allow-scripts"
-                  title="Mobile App Preview"
-                />
-                {/* Bottom line home bar */}
-                <div className="absolute bottom-1.5 left-1/2 transform -translate-x-1/2 w-20 h-1 bg-zinc-800 rounded-full" />
+                <div className="flex-1 bg-zinc-900/70 rounded-md border border-zinc-850 px-3 py-1 text-[10px] text-zinc-500 font-mono flex items-center justify-between overflow-hidden">
+                  <span className="truncate">https://exechat.vercel.app/project/{projectName.toLowerCase().replace(/\s+/g, "-")}</span>
+                  <Lock className="h-3 w-3 shrink-0 text-zinc-600" />
+                </div>
               </div>
-            ) : (
-              /* DESKTOP BOX FRAME */
-              <div className="w-full h-full rounded-xl bg-slate-950 border border-zinc-850 shadow-2xl overflow-hidden flex flex-col">
-                <iframe
-                  key={previewKey}
-                  src={getCombinedPreviewBlob()}
-                  className="w-full h-full border-none bg-slate-950"
-                  sandbox="allow-scripts"
-                  title="Desktop App Preview"
-                />
+
+              {/* Sandbox interactive preview frame container */}
+              <div className="flex-1 flex items-center justify-center p-6 bg-zinc-900/20 overflow-hidden relative">
+                {deviceMode === "mobile" ? (
+                  /* SMARTPHONE CONTAINER FRAME */
+                  <div className="w-[280px] h-[540px] rounded-[36px] bg-zinc-950 border-[10px] border-zinc-900 shadow-2xl relative flex flex-col overflow-hidden animate-fade-in ring-1 ring-zinc-800/50">
+                    <div className="absolute top-0 left-1/2 transform -translate-x-1/2 w-28 h-6 bg-zinc-900 rounded-b-2xl z-20 flex items-center justify-center">
+                      <div className="w-12 h-1 bg-zinc-800 rounded-full" />
+                    </div>
+                    <iframe
+                      key={previewKey}
+                      src={getCombinedPreviewBlob()}
+                      className="w-full h-full border-none rounded-[24px] bg-slate-950"
+                      sandbox="allow-scripts"
+                      title="Mobile App Preview"
+                    />
+                    <div className="absolute bottom-1.5 left-1/2 transform -translate-x-1/2 w-20 h-1 bg-zinc-800 rounded-full" />
+                  </div>
+                ) : (
+                  /* DESKTOP CONTAINER FRAME */
+                  <div className="w-full h-full rounded-xl bg-slate-950 border border-zinc-850 shadow-2xl overflow-hidden flex flex-col">
+                    <iframe
+                      key={previewKey}
+                      src={getCombinedPreviewBlob()}
+                      className="w-full h-full border-none bg-slate-950"
+                      sandbox="allow-scripts"
+                      title="Desktop App Preview"
+                    />
+                  </div>
+                )}
               </div>
-            )}
-          </div>
+            </div>
+          )}
+
+          {/* Tab Content 2: Code editing and source exploring mode active */}
+          {activeRightTab === "code" && (
+            <div className="flex-1 flex overflow-hidden min-h-0">
+              
+              {/* Mini File list and storage section */}
+              <div className="w-56 border-r border-zinc-850 bg-zinc-950/60 flex flex-col shrink-0">
+                <div className="p-3 border-b border-zinc-850 flex items-center justify-between bg-zinc-950/25">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Daftar Berkas</span>
+                  <button
+                    onClick={() => setShowNewFileInput(!showNewFileInput)}
+                    className="p-1 rounded hover:bg-amber-500/10 text-amber-500 transition-colors"
+                    title="Buat File Baru"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+
+                {/* Inline new file name creator */}
+                {showNewFileInput && (
+                  <div className="p-3 border-b border-zinc-850 bg-amber-500/5 flex flex-col gap-2">
+                    <input
+                      type="text"
+                      value={newFileName}
+                      onChange={(e) => setNewFileName(e.target.value)}
+                      placeholder="style.css, app.js..."
+                      className="w-full px-2 py-1.5 text-xs rounded border border-zinc-800 bg-zinc-900 text-zinc-200 focus:outline-none focus:border-amber-500 font-mono"
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") handleAddFile();
+                      }}
+                    />
+                    <div className="flex justify-end gap-1.5">
+                      <button
+                        onClick={() => setShowNewFileInput(false)}
+                        className="px-2 py-0.5 text-[10px] font-normal text-zinc-400 hover:bg-zinc-800 rounded"
+                      >
+                        Batal
+                      </button>
+                      <button
+                        onClick={handleAddFile}
+                        className="px-2.5 py-0.5 text-[10px] font-semibold bg-amber-500 text-white rounded"
+                      >
+                        Tambah
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* File Navigator List items */}
+                <div className="flex-1 overflow-y-auto p-2 space-y-0.5">
+                  {files.map(file => {
+                    const isActive = file.path === activeFilePath;
+                    const isHtml = file.path.endsWith(".html");
+                    const isJs = file.path.endsWith(".js");
+                    const isJson = file.path.endsWith(".json");
+                    
+                    return (
+                      <div
+                        key={file.path}
+                        className={`group w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-normal font-mono cursor-pointer transition-all ${
+                          isActive 
+                            ? "bg-amber-500/10 text-amber-400 border border-amber-500/15" 
+                            : "text-zinc-400 hover:bg-zinc-900/60 hover:text-zinc-200"
+                        }`}
+                        onClick={() => setActiveFilePath(file.path)}
+                      >
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          {isHtml ? <Code className="h-3.5 w-3.5 text-orange-400 shrink-0" /> :
+                           isJs ? <FileCode className="h-3.5 w-3.5 text-yellow-400 shrink-0" /> :
+                           isJson ? <FileJson className="h-3.5 w-3.5 text-emerald-400 shrink-0" /> :
+                           <File className="h-3.5 w-3.5 text-zinc-400 shrink-0" />}
+                          <span className="truncate">{file.path}</span>
+                        </div>
+                        {file.path !== "index.html" && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteFile(file.path);
+                            }}
+                            className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-rose-500/10 text-rose-400 transition-all shrink-0"
+                            title="Hapus File"
+                          >
+                            <Trash className="h-3.5 w-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* CLOUD EXECHAT SETTINGS (Supabase integration fully abstracted) */}
+                <div className="p-3 border-t border-zinc-850 bg-zinc-950/40 shrink-0 space-y-3 font-sans">
+                  <div className="flex items-center gap-1.5">
+                    <Cloud className="h-3.5 w-3.5 text-amber-500" />
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Cloud ExeChat</span>
+                  </div>
+
+                  {/* Editable Project Slug Name input */}
+                  <div className="space-y-1">
+                    <label className="block text-[9px] font-medium text-zinc-500">NAMA & SLUG PROJECT</label>
+                    <input
+                      type="text"
+                      value={projectName}
+                      onChange={(e) => handleProjectNameChange(e.target.value)}
+                      placeholder="my-project-id"
+                      className="w-full px-2 py-1 text-xs font-mono rounded border border-zinc-800 bg-zinc-900 text-zinc-200 focus:outline-none focus:border-amber-500"
+                      title="Ubah nama project sekaligus memperbarui URL sandbox"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5 pt-1">
+                    <div className="flex gap-1.5">
+                      <button
+                        onClick={handleUploadToSupabase}
+                        className="flex-1 py-1.5 px-2 rounded-lg text-[10px] font-semibold bg-amber-600 hover:bg-amber-500 text-white flex items-center justify-center gap-1 transition-colors"
+                        title="Simpan file ke Cloud Sandbox"
+                      >
+                        <Upload className="h-3 w-3" />
+                        <span>Simpan</span>
+                      </button>
+                      <button
+                        onClick={handleLoadFromSupabase}
+                        className="flex-1 py-1.5 px-2 rounded-lg text-[10px] font-semibold bg-zinc-800 hover:bg-zinc-750 text-zinc-200 border border-zinc-700/50 flex items-center justify-center gap-1 transition-colors"
+                        title="Buka file dari Cloud Sandbox"
+                      >
+                        <Download className="h-3 w-3" />
+                        <span>Buka</span>
+                      </button>
+                    </div>
+
+                    <button
+                      onClick={handleShareProject}
+                      className="w-full py-1.5 px-2.5 rounded-lg text-[10px] font-medium border border-amber-500/20 text-amber-500 hover:bg-amber-500/10 flex items-center justify-center gap-1 transition-colors"
+                    >
+                      <Share2 className="h-3 w-3" />
+                      <span>Salin Link Proyek</span>
+                    </button>
+
+                    <button
+                      onClick={handleDeleteProjectSupabase}
+                      className="w-full py-1 px-2 rounded-lg text-[9px] font-normal border border-rose-500/10 text-rose-400 hover:bg-rose-500/10 flex items-center justify-center gap-1 transition-colors"
+                    >
+                      <Trash2 className="h-3 w-3" />
+                      <span>Bersihkan Cloud</span>
+                    </button>
+                  </div>
+                </div>
+
+              </div>
+
+              {/* Code text editor pane */}
+              <div className="flex-1 flex flex-col min-w-0">
+                <div className="px-4 py-2 border-b border-zinc-850 bg-zinc-950 flex items-center justify-between shrink-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px] font-bold font-mono px-2 py-0.5 rounded bg-zinc-500/10 text-amber-500 border border-amber-500/20">
+                      {activeFilePath}
+                    </span>
+                    <span className="text-[9px] text-zinc-500 font-mono hidden sm:inline">• Kode Sumber Utama</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[9px] font-mono text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/25 flex items-center gap-1 shrink-0">
+                      <span className="h-1.5 w-1.5 bg-emerald-500 rounded-full animate-ping" />
+                      Auto-Saved
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex-1 flex font-mono overflow-hidden relative">
+                  {/* Line Numbers column */}
+                  <div className="w-10 select-none text-right pr-2 pt-4 text-xs font-mono border-r border-zinc-850 bg-zinc-950 text-zinc-600">
+                    {Array.from({ length: Math.max(activeFile.content.split("\n").length, 30) }).map((_, i) => (
+                      <div key={i} className="h-6 leading-6 select-none">{i + 1}</div>
+                    ))}
+                  </div>
+
+                  {/* Actual Textarea Editor */}
+                  <textarea
+                    value={activeFile.content}
+                    onChange={handleEditorChange}
+                    className="flex-1 h-full p-4 text-xs font-mono focus:outline-none bg-zinc-950 text-zinc-200 focus:bg-zinc-950 resize-none leading-6 leading-relaxed"
+                    spellCheck="false"
+                  />
+                </div>
+              </div>
+
+            </div>
+          )}
+
         </div>
 
       </div>
-
-
 
     </div>
   );
