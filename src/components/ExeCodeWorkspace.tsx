@@ -457,10 +457,14 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
           };
           console.warn = function(...args) {
             originalWarn.apply(console, args);
+            const msgStr = args.map(arg => typeof arg === 'object' ? JSON.stringify(arg) : String(arg)).join(" ");
+            if (msgStr.includes("cdn.tailwindcss.com") || msgStr.includes("should not be used in production")) {
+              return;
+            }
             window.parent.postMessage({ 
               type: "PREVIEW_CONSOLE", 
               logType: "warn", 
-              message: args.map(arg => typeof arg === 'object' ? JSON.stringify(arg) : String(arg)).join(" ") 
+              message: msgStr 
             }, "*");
           };
           console.info = function(...args) {
@@ -615,6 +619,63 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
     return cleaned.trim();
   };
 
+  // Attempt to parse or extract a valid JSON array from the response text
+  const tryExtractJsonArray = (text: string): VirtualFile[] | null => {
+    // 1. Try matching using markdown block with open/close backticks
+    const jsonBlockRegex = /```json\s*([\s\S]*?)\s*(?:```|$)/;
+    const match = text.match(jsonBlockRegex);
+    if (match && match[1]) {
+      try {
+        const parsed = JSON.parse(match[1].trim());
+        if (Array.isArray(parsed)) return parsed;
+      } catch (e) {
+        // Fallback to custom cleaning of the matched content
+        const cleanedMatched = match[1]
+          .trim()
+          .replace(/,(\s*[\]}])/g, "$1"); // remove trailing commas before close bracket/brace
+        try {
+          const parsed = JSON.parse(cleanedMatched);
+          if (Array.isArray(parsed)) return parsed;
+        } catch (innerErr) {
+          // ignore inner error and proceed to general extraction
+        }
+      }
+    }
+
+    // 2. Try looking for [...] somewhere in the text
+    const startIdx = text.indexOf("[");
+    const endIdx = text.lastIndexOf("]");
+    if (startIdx !== -1 && endIdx !== -1 && endIdx > startIdx) {
+      const candidate = text.substring(startIdx, endIdx + 1);
+      try {
+        const parsed = JSON.parse(candidate.trim());
+        if (Array.isArray(parsed)) return parsed;
+      } catch (e) {
+        // Let's try cleaning trailing commas
+        try {
+          const cleanedCandidate = candidate
+            .replace(/,(\s*[\]}])/g, "$1")
+            .trim();
+          const parsed = JSON.parse(cleanedCandidate);
+          if (Array.isArray(parsed)) return parsed;
+        } catch (e2) {
+          // fallback
+        }
+      }
+    }
+
+    // 3. Fallback to raw JSON parsing of the entire text after trimming markdown indicators
+    try {
+      const rawText = text.replace(/^```json/, "").replace(/```$/, "").trim();
+      const parsed = JSON.parse(rawText);
+      if (Array.isArray(parsed)) return parsed;
+    } catch (e) {
+      // ignore
+    }
+
+    return null;
+  };
+
   // Call API server-side to let Gemini automatically edit our source code based on a prompt!
   const handleSendPromptToAI = async (overridePrompt?: string) => {
     const promptToSend = overridePrompt || aiPrompt;
@@ -723,19 +784,8 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
       const displayableText = cleanDisplayContent(fullText);
       setAiStreamingText(fullText);
       
-      // Try to extract JSON from response markdown block
-      let jsonStr = "";
-      const jsonBlockRegex = /```json\s*([\s\S]*?)\s*```/;
-      const match = fullText.match(jsonBlockRegex);
-      if (match && match[1]) {
-        jsonStr = match[1];
-      } else {
-        // Strip markdown backticks if any
-        jsonStr = fullText.replace(/^```json/, "").replace(/```$/, "");
-      }
-
-      const editedFiles = JSON.parse(jsonStr.trim());
-      if (Array.isArray(editedFiles) && editedFiles.length > 0) {
+      const editedFiles = tryExtractJsonArray(fullText);
+      if (editedFiles && Array.isArray(editedFiles) && editedFiles.length > 0) {
         // Backup current state for Restore button before updating
         const oldFiles = [...files];
         
@@ -758,7 +808,7 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
         
         triggerStatus("Workspace Anda berhasil diperbarui oleh ExeAI!", "success");
       } else {
-        throw new Error("Format respons JSON tidak sesuai ekspektasi.");
+        throw new Error("Format respons JSON tidak sesuai ekspektasi atau tidak dapat diparse.");
       }
     } catch (err: any) {
       console.error("AI Code Edit Error: ", err);
