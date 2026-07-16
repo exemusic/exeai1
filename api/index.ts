@@ -21,18 +21,12 @@ function getCreditCost(text: string): number {
 
 // Helper to get Cerebras API key
 function getCerebrasApiKey() {
-  return process.env.CEREBRAS_API_KEY || "csk-t4v6w2fwymkv2n6n24rm2j2xy9fh4pff59f5wcfjn5jkwepn";
+  return process.env.CEREBRAS_API_KEY;
 }
 
 // Helper to map UI model ID to actual Cerebras model ID
 function getCerebrasModel(uiModel: string): string {
-  const apiKey = getCerebrasApiKey();
-  // If using sandbox/fallback key, return the mock IDs as-is
-  if (apiKey === "csk-t4v6w2fwymkv2n6n24rm2j2xy9fh4pff59f5wcfjn5jkwepn" || apiKey.startsWith("csk-t4")) {
-    return uiModel || "gemma-4-31b";
-  }
-  
-  // Otherwise, map to standard official Cerebras API model IDs
+  // Map to standard official Cerebras API model IDs
   switch (uiModel) {
     case "gemma-4-31b":
       return "llama3.1-8b";
