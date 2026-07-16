@@ -66,11 +66,8 @@ async function runGeminiModel(
   res: any
 ): Promise<boolean> {
   const finalConfig = { ...config };
-  if (useSearch) {
-    finalConfig.tools = [{ googleSearch: {} }];
-  } else {
-    delete finalConfig.tools;
-  }
+  // Web search is disabled entirely per user request
+  delete finalConfig.tools;
 
   try {
     const responseStream = await ai.models.generateContentStream({
@@ -88,40 +85,6 @@ async function runGeminiModel(
   } catch (err: any) {
     const errString = String(err.message || JSON.stringify(err));
     console.error(`Gemini model ${modelName} failed with error:`, errString);
-    
-    // Fallback to NO search on the same model if search fails or hits quota
-    if (useSearch && (
-      errString.includes("RESOURCE_EXHAUSTED") || 
-      errString.includes("quota") || 
-      errString.includes("PERMISSION_DENIED") || 
-      errString.includes("not allowed") || 
-      errString.includes("Search") || 
-      errString.includes("tool")
-    )) {
-      console.warn(`Search failed on ${modelName}, falling back to direct answering...`);
-      res.write(`data: ${JSON.stringify({ text: "*(Mengoptimalkan pencarian dan memproses informasi secara langsung...)*\n\n" })}\n\n`);
-      
-      const retryConfig = { ...config };
-      delete retryConfig.tools;
-      
-      try {
-        const responseStream = await ai.models.generateContentStream({
-          model: modelName,
-          contents: contents,
-          config: retryConfig
-        });
-        for await (const chunk of responseStream) {
-          const text = chunk.text;
-          if (text) {
-            res.write(`data: ${JSON.stringify({ text })}\n\n`);
-          }
-        }
-        return true;
-      } catch (retryErr: any) {
-        throw retryErr;
-      }
-    }
-    
     throw err;
   }
 }

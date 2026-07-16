@@ -2176,7 +2176,7 @@ export default function App() {
                                     <span className="h-1.5 w-1.5 rounded-full bg-zinc-500 animate-[bounce_1s_infinite_300ms]" />
                                   </div>
                                   <span className="text-xs text-zinc-500 font-medium font-sans">
-                                    {currentSession?.model === "gemini-ai" ? "Ai sedang mencari info..." : "AI sedang berpikir..."}
+                                    AI sedang berpikir...
                                   </span>
                                 </div>
                               ) : (
