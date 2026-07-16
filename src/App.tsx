@@ -3016,6 +3016,7 @@ export default function App() {
                 isDark={isDark}
                 curTheme={curTheme}
                 onClose={() => setShowExeCode(false)}
+                defaultModelId={selectedModelId}
               />
             )}
           </AnimatePresence>
