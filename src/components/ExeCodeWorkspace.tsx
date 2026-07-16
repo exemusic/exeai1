@@ -845,7 +845,7 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
     return null;
   };
 
-  // Call API server-side to let Gemini automatically edit our source code based on a prompt!
+  // Call API server-side to let AI automatically edit our source code based on a prompt!
   const handleSendPromptToAI = async (overridePrompt?: string) => {
     const promptToSend = overridePrompt || aiPrompt;
     if (!promptToSend.trim()) return;
@@ -985,18 +985,20 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
         // Refresh live preview once AI finishes writing the edits
         refreshPreview(mergedFiles);
         
-        // Finalize the chat history with backup snapshots
+        // Finalize the chat history with backup snapshots and list of modified files
         setChatHistory(prev => prev.map(msg => 
           msg.id === assistantMsgId 
             ? { 
                 ...msg, 
-                content: displayableText || "Saya telah memperbarui berkas kode Anda sesuai permintaan.", 
+                content: (displayableText ? displayableText.trim() : "Saya telah memperbarui berkas kode Anda sesuai permintaan.") + "\n\n" + 
+                         `**Berkas yang diperbarui:**\n` + 
+                         editedFiles.map(f => `• \`${f.path}\``).join("\n"), 
                 filesSnapshot: oldFiles 
               } 
             : msg
         ));
         
-        triggerStatus("Workspace Anda berhasil diperbarui oleh ExeAI!", "success");
+        triggerStatus("Workspace Anda berhasil diperbarui!", "success");
       } else {
         throw new Error("Format respons JSON tidak sesuai ekspektasi atau tidak dapat diparse.");
       }
@@ -1201,7 +1203,7 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
     });
   };
 
-  const aiName = selectedModel.toLowerCase().includes("gemini") ? "Gemini" : "ExeAI";
+  const aiName = "AI";
 
   return (
     <div className={`fixed inset-0 z-50 flex flex-col backdrop-blur-xl ${isDark ? "bg-zinc-950 text-zinc-100 font-sans" : "bg-zinc-50 text-zinc-900 font-sans"}`}>
@@ -1250,52 +1252,6 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
               <span>{statusMessage.text}</span>
             </div>
           )}
-
-          {/* Remix button */}
-          <button
-            onClick={() => {
-              const confirmRemix = window.confirm("Apakah Anda yakin ingin me-Remix proyek ini? Semua file akan diatur ulang dan ID baru akan dibuat.");
-              if (confirmRemix) {
-                const randomId = "proj-" + Math.random().toString(36).substring(2, 10);
-                setFiles(DEFAULT_FILES);
-                setActiveFilePath("index.html");
-                setProjectName(randomId);
-                setChatHistory([
-                  {
-                    id: "initial",
-                    role: "assistant",
-                    content: "Halo! Saya adalah Asisten AI ExeCode Anda. Beritahu saya apa yang ingin Anda buat atau ubah pada aplikasi web ini, dan saya akan memperbarui kodenya secara real-time!",
-                    timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-                  }
-                ]);
-                window.history.pushState(null, "", `/project/${randomId}`);
-                triggerStatus("Proyek berhasil di-Remix dengan ID Sandbox baru!", "success");
-              }
-            }}
-            className={`px-3 py-1.5 rounded-xl text-xs font-normal flex items-center gap-1.5 border transition-all ${
-              isDark 
-                ? "bg-zinc-900 border-zinc-800 text-zinc-300 hover:bg-zinc-800" 
-                : "bg-white border-zinc-200 text-zinc-600 hover:bg-zinc-100"
-            }`}
-            title="Remix Proyek"
-          >
-            <RefreshCw className="h-3.5 w-3.5 text-indigo-400" />
-            <span>Remix</span>
-          </button>
-
-          {/* Share button */}
-          <button
-            onClick={handleShareProject}
-            className={`px-3 py-1.5 rounded-xl text-xs font-normal flex items-center gap-1.5 border transition-all ${
-              isDark 
-                ? "bg-zinc-900 border-zinc-800 text-zinc-300 hover:bg-zinc-800" 
-                : "bg-white border-zinc-200 text-zinc-600 hover:bg-zinc-100"
-            }`}
-            title="Bagikan Link Proyek"
-          >
-            <Share2 className="h-3.5 w-3.5 text-amber-500" />
-            <span>Share</span>
-          </button>
 
           {/* Publish / Sync button */}
           <button
@@ -1360,7 +1316,7 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
 
           {/* Chat Metadata & Model Dropdown Selection */}
           <div className="px-4 py-2 border-b border-zinc-850/50 bg-zinc-950/20 text-[10px] text-zinc-500 flex items-center justify-between font-mono shrink-0">
-            <span>{MODEL_OPTIONS.find(m => m.id === selectedModel)?.name || "Gemini 3.5 Flash"} • Ran successfully</span>
+            <span>{MODEL_OPTIONS.find(m => m.id === selectedModel)?.name || "AI Assistant"} • Ran successfully</span>
             
             <div className="relative">
               <button
@@ -1556,7 +1512,7 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
           {/* GORGEOUS GLASSMORPHIC AI THINKING OVERLAY */}
           {isAIEditing && (
             <div className="absolute inset-0 bg-zinc-950/95 backdrop-blur-md z-50 flex flex-col p-8 overflow-y-auto animate-fade-in font-sans">
-              <div className="max-w-2xl mx-auto w-full flex flex-col items-center space-y-6 my-auto">
+              <div className="max-w-md mx-auto w-full flex flex-col items-center space-y-6 my-auto">
                 {/* Dynamic Animated Pulse Ring */}
                 <div className="relative flex items-center justify-center">
                   <div className="w-20 h-20 rounded-full border-2 border-dashed border-amber-500/30 animate-spin duration-[8s]" />
@@ -1565,7 +1521,7 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
                 </div>
 
                 <div className="text-center space-y-2">
-                  <h3 className="text-sm font-bold tracking-tight text-zinc-100 uppercase">ExeAI Code Engine Active</h3>
+                  <h3 className="text-sm font-bold tracking-tight text-zinc-100 uppercase">AI Code Engine Active</h3>
                   <p className="text-xs text-zinc-400 font-mono">Status: Menghasilkan kode & menyusun file patch baru...</p>
                 </div>
 
@@ -1589,35 +1545,6 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
                     <span>Menulis ulang baris kode & menyusun file patch baru...</span>
                   </div>
                 </div>
-
-                {/* Real-time Streaming Explanation & Details */}
-                <div className="w-full flex flex-col gap-2 text-left">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 font-sans">Penjelasan Perubahan (Live Stream):</span>
-                  <div className="w-full max-h-40 overflow-y-auto p-4 rounded-xl bg-zinc-900/60 border border-zinc-800 text-zinc-300 text-xs leading-relaxed whitespace-pre-wrap font-sans">
-                    {cleanDisplayContent(aiStreamingText) || "Menyusun penjelasan perubahan..."}
-                  </div>
-                </div>
-
-                {/* Raw Output Preview Code Diff block */}
-                {aiStreamingText.includes("```json") && (
-                  <div className="w-full flex flex-col gap-2 text-left">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 font-sans">Berkas yang Sedang Diubah:</span>
-                    <div className="w-full max-h-48 overflow-y-auto p-3 rounded-xl bg-zinc-950 border border-zinc-850 font-mono text-[10px] text-zinc-400 whitespace-pre-wrap">
-                      {(() => {
-                        const match = aiStreamingText.match(/```json\s*([\s\S]*?)\s*(```|$)/);
-                        if (match) {
-                          return (
-                            <span className="text-amber-500/80">
-                              {match[1].slice(0, 1000)}
-                              {match[1].length > 1000 ? "\n... (Sisa baris kode terpotong untuk pratinjau)" : ""}
-                            </span>
-                          );
-                        }
-                        return "Menunggu format JSON patch...";
-                      })()}
-                    </div>
-                  </div>
-                )}
               </div>
             </div>
           )}
@@ -1702,7 +1629,7 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
                   <div className="w-2.5 h-2.5 rounded-full bg-emerald-500/80" />
                 </div>
                 <div className="flex-1 bg-zinc-900/70 rounded-md border border-zinc-850 px-3 py-1 text-[10px] text-zinc-500 font-mono flex items-center justify-between overflow-hidden">
-                  <span className="truncate">https://exechat.vercel.app/project/{projectName.toLowerCase().replace(/\s+/g, "-")}</span>
+                  <span className="truncate">https://exechat.vercel.app/{projectName.toLowerCase().replace(/\s+/g, "-")}/public</span>
                   <Lock className="h-3 w-3 shrink-0 text-zinc-600" />
                 </div>
               </div>

@@ -55,6 +55,7 @@ import { GoogleOAuthProvider, GoogleLogin } from "@react-oauth/google";
 import { jwtDecode } from "jwt-decode";
 import { MODEL_OPTIONS, SYSTEM_PRESETS, SUGGESTED_PROMPTS } from "./presets";
 import { ExeCodeWorkspace } from "./components/ExeCodeWorkspace";
+import { PublicProjectView } from "./components/PublicProjectView";
 
 const notifySoundUrl = new URL("../Sound/notify.mp3", import.meta.url).href;
 
@@ -508,6 +509,30 @@ export default function App() {
   const activeModel = MODEL_OPTIONS.find(
     (m) => m.id === (currentSession?.model || selectedModelId)
   ) || MODEL_OPTIONS[0];
+
+  // Check if we are visiting a public project URL
+  const publicProjectId = (() => {
+    if (typeof window === "undefined") return null;
+    const pathname = window.location.pathname;
+    
+    // Pattern 1: /project/:projectId/public
+    const match1 = pathname.match(/^\/project\/([^/]+)\/public\/?$/);
+    if (match1) return decodeURIComponent(match1[1]);
+    
+    // Pattern 2: /:projectId/public
+    const match2 = pathname.match(/^\/([^/]+)\/public\/?$/);
+    if (match2) {
+      const pid = decodeURIComponent(match2[1]);
+      if (pid !== "project" && pid !== "chat" && pid !== "api" && pid !== "api/chat/stream") {
+        return pid;
+      }
+    }
+    return null;
+  })();
+
+  if (publicProjectId) {
+    return <PublicProjectView projectId={publicProjectId} />;
+  }
 
   const activeTemp = currentSession ? currentSession.temperature : temperature;
 

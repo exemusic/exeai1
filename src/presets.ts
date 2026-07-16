@@ -24,6 +24,12 @@ export const MODEL_OPTIONS: ModelOption[] = [
     name: "Gemini AI",
     badge: "Google AI",
     description: "Model otomatis Google yang cerdas (Flash & Flash Lite). Otomatis beralih ke ExeAI jika kuota puncak tercapai.",
+  },
+  {
+    id: "llama-3.1-8b-instant",
+    name: "Llama 3.1 8B Instant",
+    badge: "Groq",
+    description: "Model super cepat Llama 3.1 8B Instant dari Groq dengan respons secepat kilat.",
   }
 ];
 

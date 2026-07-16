@@ -479,6 +479,123 @@ function handleGeminiError(err: any, res: any) {
   res.write(`data: ${JSON.stringify({ error: errMsg })}\n\n`);
 }
 
+async function streamGroq(messages: any[], systemInstruction: string, temperature: number, res: any) {
+  const apiKey = process.env.GROQ_API_KEY;
+  if (!apiKey) {
+    res.write(`data: ${JSON.stringify({ error: "Groq API Key (GROQ_API_KEY) belum dikonfigurasi di server. Silakan hubungi admin atau tambahkan ke .env." })}\n\n`);
+    return;
+  }
+
+  const systemMessage = {
+    role: "system",
+    content: systemInstruction || "Anda adalah Exe, asisten AI yang sangat pintar, ramah, dan solutif."
+  };
+
+  const mappedMessages = messages.map((m: any) => ({
+    role: m.role === "model" || m.role === "assistant" ? "assistant" : "user",
+    content: m.content
+  }));
+
+  const allMessages = [systemMessage, ...mappedMessages];
+
+  const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: "llama-3.1-8b-instant",
+      messages: allMessages,
+      temperature: temperature !== undefined ? Number(temperature) : 0.7,
+      stream: true,
+    }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Groq API Error (${response.status}): ${errorText}`);
+  }
+
+  const reader = response.body;
+  if (!reader) {
+    throw new Error("Response body from Groq is not readable");
+  }
+
+  const decoder = new TextDecoder("utf-8");
+  let buffer = "";
+
+  if (typeof (reader as any).getReader === "function") {
+    const webReader = (reader as any).getReader();
+    while (true) {
+      const { value, done } = await webReader.read();
+      if (done) break;
+
+      let decodedChunk = "";
+      if (typeof value === "string") {
+        decodedChunk = value;
+      } else if (value) {
+        decodedChunk = decoder.decode(value, { stream: true });
+      }
+      buffer += decodedChunk;
+      let lineEndIdx;
+      while ((lineEndIdx = buffer.indexOf("\n")) !== -1) {
+        const line = buffer.substring(0, lineEndIdx).trim();
+        buffer = buffer.substring(lineEndIdx + 1);
+
+        if (!line) continue;
+        if (line.startsWith("data: ")) {
+          const dataStr = line.substring(6).trim();
+          if (dataStr === "[DONE]") {
+            continue;
+          }
+          try {
+            const parsed = JSON.parse(dataStr);
+            const text = parsed.choices?.[0]?.delta?.content;
+            if (text) {
+              res.write(`data: ${JSON.stringify({ text })}\n\n`);
+            }
+          } catch (err) {
+            // Ignore parser errors
+          }
+        }
+      }
+    }
+  } else {
+    for await (const chunk of reader as any) {
+      let decodedChunk = "";
+      if (typeof chunk === "string") {
+        decodedChunk = chunk;
+      } else if (chunk) {
+        decodedChunk = decoder.decode(chunk, { stream: true });
+      }
+      buffer += decodedChunk;
+      let lineEndIdx;
+      while ((lineEndIdx = buffer.indexOf("\n")) !== -1) {
+        const line = buffer.substring(0, lineEndIdx).trim();
+        buffer = buffer.substring(lineEndIdx + 1);
+
+        if (!line) continue;
+        if (line.startsWith("data: ")) {
+          const dataStr = line.substring(6).trim();
+          if (dataStr === "[DONE]") {
+            continue;
+          }
+          try {
+            const parsed = JSON.parse(dataStr);
+            const text = parsed.choices?.[0]?.delta?.content;
+            if (text) {
+              res.write(`data: ${JSON.stringify({ text })}\n\n`);
+            }
+          } catch (err) {
+            // Ignore parser errors
+          }
+        }
+      }
+    }
+  }
+}
+
 app.post("/api/chat/stream", async (req, res) => {
   res.setHeader("Content-Type", "text/event-stream");
   res.setHeader("Cache-Control", "no-cache");
@@ -498,6 +615,12 @@ app.post("/api/chat/stream", async (req, res) => {
 
     if (!messages || !Array.isArray(messages)) {
       res.write(`data: ${JSON.stringify({ error: "Invalid or missing messages array" })}\n\n`);
+      return res.end();
+    }
+
+    if (model === "llama-3.1-8b-instant") {
+      await streamGroq(messages, systemInstruction, temperature, res);
+      res.write("data: [DONE]\n\n");
       return res.end();
     }
 
