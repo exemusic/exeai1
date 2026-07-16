@@ -616,117 +616,146 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
 
   // Clean-up markdown blocks to show only pure descriptions in chat bubbles
   const cleanDisplayContent = (text: string) => {
-    let cleaned = text.replace(/```json[\s\S]*?(```|$)/g, "");
-    cleaned = cleaned.replace(/```[\s\S]*?(```|$)/g, "");
+    let cleaned = text.replace(/```(?:json|javascript|js|html|typescript|ts)?[\s\S]*?(?:```|$)/gi, "");
     return cleaned.trim();
   };
 
   // Attempt to parse or extract a valid JSON array from the response text
   const tryExtractJsonArray = (text: string): VirtualFile[] | null => {
-    // 1. First, extract the core JSON text block (either inside markdown backticks or the whole text)
-    let jsonText = text;
-    const jsonBlockRegex = /```json\s*([\s\S]*?)\s*(?:```|$)/;
-    const match = text.match(jsonBlockRegex);
-    if (match && match[1]) {
-      jsonText = match[1].trim();
-    } else {
-      jsonText = text.replace(/^```json/, "").replace(/```$/, "").trim();
+    let cleanText = text.trim();
+    
+    // Extract JSON block if it resides in markdown code fences
+    const jsonBlockRegex = /```(?:json|javascript|js)?\s*([\s\S]*?)\s*(?:```|$)/i;
+    const blockMatch = cleanText.match(jsonBlockRegex);
+    if (blockMatch && blockMatch[1]) {
+      cleanText = blockMatch[1].trim();
     }
 
-    // 2. Try standard parsing
+    // 1. Try standard JSON.parse first
     try {
-      const parsed = JSON.parse(jsonText);
+      const parsed = JSON.parse(cleanText);
       if (Array.isArray(parsed)) return parsed;
     } catch (e) {
-      console.warn("Standard JSON parsing failed. Attempting cleanup of trailing commas...", e);
+      // Try to clean up trailing commas
       try {
-        const cleanedMatched = jsonText
-          .trim()
-          .replace(/,(\s*[\]}])/g, "$1"); // remove trailing commas before close bracket/brace
-        const parsed = JSON.parse(cleanedMatched);
+        const parsed = JSON.parse(cleanText.replace(/,(\s*[\]}])/g, "$1"));
         if (Array.isArray(parsed)) return parsed;
-      } catch (e2) {
-        // Fallback to custom scanner
-      }
+      } catch (e2) {}
     }
 
-    // 3. Robust manual regex scanner extraction (handles raw newlines and unescaped double quotes)
-    console.log("Standard parsing failed. Commencing robust manual scanner...");
-    try {
-      const extractedFiles: VirtualFile[] = [];
-      
-      // Look for all instances of "path": "filename"
-      const pathRegex = /"path"\s*:\s*"([^"]+)"/g;
-      const pathMatches: { path: string; index: number; lastIndex: number }[] = [];
-      let pathMatch;
-      while ((pathMatch = pathRegex.exec(jsonText)) !== null) {
+    // 2. Ultra-robust manual regex extractor that handles unquoted, single-quoted, backticked keys & values
+    console.log("Commencing ultra-robust file extractor...");
+    const extractedFiles: VirtualFile[] = [];
+    
+    // Regex matches keys like "path", 'path', path and supports value wrappers like ", ', or `
+    const pathRegex = /(?:"path"|'path'|\bpath\b)\s*:\s*(?:"([^"]+)"|'([^']+)'|`([^`]+)`)/gi;
+    const pathMatches: { path: string; index: number; lastIndex: number }[] = [];
+    let match;
+    while ((match = pathRegex.exec(cleanText)) !== null) {
+      const filePath = match[1] || match[2] || match[3];
+      if (filePath) {
         pathMatches.push({
-          path: pathMatch[1],
-          index: pathMatch.index,
+          path: filePath,
+          index: match.index,
           lastIndex: pathRegex.lastIndex
         });
       }
+    }
 
-      if (pathMatches.length > 0) {
-        for (let i = 0; i < pathMatches.length; i++) {
-          const currentPath = pathMatches[i].path;
-          const startOfSearch = pathMatches[i].lastIndex;
-          const endOfSearch = (i + 1 < pathMatches.length) ? pathMatches[i + 1].index : jsonText.length;
-          
-          const searchSub = jsonText.substring(startOfSearch, endOfSearch);
-          
-          // Locate the "content": " block
-          const contentKeyRegex = /"content"\s*:\s*"/;
-          const contentMatch = searchSub.match(contentKeyRegex);
-          if (!contentMatch) continue;
-          
-          const contentStartIndex = searchSub.indexOf(contentMatch[0]) + contentMatch[0].length;
-          const contentSearchSub = searchSub.substring(contentStartIndex);
-          
-          // Find the ending quote which is a '"' followed by an object/array closing pattern
-          let endQuoteIndex = -1;
-          let lastQuoteIdx = contentSearchSub.lastIndexOf('"');
-          while (lastQuoteIdx !== -1) {
-            const afterQuote = contentSearchSub.substring(lastQuoteIdx + 1);
-            if (/^\s*\}\s*(?:,|\s*\]|\s*\{|\s*$)/.test(afterQuote)) {
-              endQuoteIndex = lastQuoteIdx;
+    if (pathMatches.length > 0) {
+      for (let i = 0; i < pathMatches.length; i++) {
+        const currentPath = pathMatches[i].path;
+        const startOfSearch = pathMatches[i].lastIndex;
+        const endOfSearch = (i + 1 < pathMatches.length) ? pathMatches[i + 1].index : cleanText.length;
+        
+        const searchSub = cleanText.substring(startOfSearch, endOfSearch);
+        
+        // Locate content key with quote identifier: "content", 'content', or content
+        const contentKeyRegex = /(?:"content"|'content'|\bcontent\b)\s*:\s*(["'`])/i;
+        const contentMatch = searchSub.match(contentKeyRegex);
+        if (!contentMatch) continue;
+        
+        const quoteChar = contentMatch[1];
+        const contentStartIndex = searchSub.indexOf(contentMatch[0]) + contentMatch[0].length;
+        const contentSearchSub = searchSub.substring(contentStartIndex);
+        
+        let endQuoteIndex = -1;
+        
+        // Search backward for the matching unescaped closing quote character followed by structure endings
+        for (let j = contentSearchSub.length - 1; j >= 0; j--) {
+          if (contentSearchSub[j] === quoteChar) {
+            let backslashCount = 0;
+            let k = j - 1;
+            while (k >= 0 && contentSearchSub[k] === '\\') {
+              backslashCount++;
+              k--;
+            }
+            if (backslashCount % 2 !== 0) continue; // Escaped quote
+            
+            const after = contentSearchSub.substring(j + 1).trim();
+            if (after.startsWith("}") || after.startsWith(",") || after === "" || after.startsWith("]")) {
+              endQuoteIndex = j;
               break;
             }
-            lastQuoteIdx = contentSearchSub.lastIndexOf('"', lastQuoteIdx - 1);
           }
-          
-          if (endQuoteIndex === -1) {
-            // Fallback: search backwards for the last quote in the entire substring
-            endQuoteIndex = contentSearchSub.lastIndexOf('"');
+        }
+        
+        if (endQuoteIndex === -1) {
+          // Backward scan fallback for any unescaped quote character
+          for (let j = contentSearchSub.length - 1; j >= 0; j--) {
+            if (contentSearchSub[j] === quoteChar) {
+              let backslashCount = 0;
+              let k = j - 1;
+              while (k >= 0 && contentSearchSub[k] === '\\') {
+                backslashCount++;
+                k--;
+              }
+              if (backslashCount % 2 === 0) {
+                endQuoteIndex = j;
+                break;
+              }
+            }
           }
+        }
+        
+        if (endQuoteIndex !== -1) {
+          let contentValue = contentSearchSub.substring(0, endQuoteIndex);
           
-          if (endQuoteIndex !== -1) {
-            let contentValue = contentSearchSub.substring(0, endQuoteIndex);
-            
-            // Clean up backslash escapes standard in JSON
+          // Decode typical escaped structures depending on wrapper quote
+          if (quoteChar === '"') {
             contentValue = contentValue
               .replace(/\\n/g, "\n")
+              .replace(/\\r/g, "\r")
               .replace(/\\t/g, "\t")
               .replace(/\\"/g, '"')
               .replace(/\\\\/g, "\\");
-              
-            extractedFiles.push({
-              path: currentPath,
-              content: contentValue
-            });
+          } else if (quoteChar === "'") {
+            contentValue = contentValue
+              .replace(/\\n/g, "\n")
+              .replace(/\\r/g, "\r")
+              .replace(/\\t/g, "\t")
+              .replace(/\\'/g, "'")
+              .replace(/\\\\/g, "\\");
+          } else if (quoteChar === "`") {
+            contentValue = contentValue
+              .replace(/\\`/g, "`")
+              .replace(/\\\\/g, "\\");
           }
-        }
-
-        if (extractedFiles.length > 0) {
-          console.log("Successfully parsed files using robust manual parser:", extractedFiles.map(f => f.path));
-          return extractedFiles;
+          
+          extractedFiles.push({
+            path: currentPath,
+            content: contentValue
+          });
         }
       }
-    } catch (err) {
-      console.error("Robust manual parsing failed too:", err);
+
+      if (extractedFiles.length > 0) {
+        console.log("Successfully parsed files using robust manual parser:", extractedFiles.map(f => f.path));
+        return extractedFiles;
+      }
     }
 
-    // 4. Try looking for [...] somewhere in the text as a last resort
+    // 3. Fallback bracket look-up
     const startIdx = text.indexOf("[");
     const endIdx = text.lastIndexOf("]");
     if (startIdx !== -1 && endIdx !== -1 && endIdx > startIdx) {
@@ -741,9 +770,7 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
             .trim();
           const parsed = JSON.parse(cleanedCandidate);
           if (Array.isArray(parsed)) return parsed;
-        } catch (e2) {
-          // fallback
-        }
+        } catch (e2) {}
       }
     }
 
@@ -791,17 +818,19 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
               content: `Instruksi Pengguna: "${promptToSend}"\n\n` +
                 `Berikut adalah seluruh daftar file di workspace saya beserta isi kodenya saat ini:\n\n` +
                 JSON.stringify(files, null, 2) + "\n\n" +
-                `Tolong edit berkas-berkas di atas sesuai instruksi saya. Tuliskan penjelasan ringkas mengenai perubahan Anda dalam bahasa Indonesia, kemudian berikan respons format JSON valid berisi array dari seluruh file lengkap yang telah Anda perbarui di dalam satu blok kode \`\`\`json. Contoh format respons:\n` +
+                `PENTING (INSTRUKSI STRUKTUR & KEANDALAN):\n` +
+                `1. Berikan penjelasan ringkas (maksimal 2 kalimat) dalam bahasa Indonesia di luar blok kode JSON.\n` +
+                `2. Kemudian, berikan blok kode \`\`\`json berisi array berisi file-file yang Anda PERBARUI saja. JANGAN sertakan file yang tidak Anda edit sama sekali untuk menghemat token output!\n` +
+                `3. Tulis isi file baru secara LENGKAP di bagian "content". JANGAN PERNAH menyingkat isi file dengan ellipsis, komentar "// sisa kode" atau "/* ... */" karena itu akan merusak program pengguna.\n` +
+                `4. Agar aman dari batasan parsing JSON, usahakan meng-escape tanda kutip ganda (\`\"\`) di dalam kode Anda, atau gunakan tanda kutip tunggal (\`'\`) atau backticks (\`\` \` \`\`) dalam string kodenya.\n` +
+                `5. Jangan merusak atau menghapus file penting. Edit file index.html atau app.js sesuai kebutuhan, atau buat file baru jika diperlukan.\n\n` +
+                `Contoh format respons yang Anda HARUS ikuti:\n` +
                 `Beberapa perubahan yang saya lakukan: ... penjelasan singkat ...\n\n` +
                 `\`\`\`json\n` +
                 `[\n` +
-                `  { "path": "index.html", "content": "...kode baru..." },\n` +
-                `  { "path": "app.js", "content": "...kode baru..." }\n` +
+                `  { "path": "index.html", "content": "...kode baru lengkap..." }\n` +
                 `]\n` +
-                `\`\`\`\n\n` +
-                `Aturan penting:\n` +
-                `1. Berikan penjelasan ringkas, lalu sertakan HANYA format JSON valid di dalam blok kode \`\`\`json. Jangan menyingkat kode dengan ellipsis.\n` +
-                `2. Jangan hapus file penting, edit file index.html atau app.js sesuai kebutuhan, atau buat file baru jika diperlukan.`
+                `\`\`\``
             }
           ]
         })
