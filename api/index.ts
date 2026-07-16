@@ -361,7 +361,15 @@ app.post("/api/chat/stream", async (req, res) => {
   res.setHeader("X-Accel-Buffering", "no");
 
   try {
-    const { messages, systemInstruction, temperature, model = "gemma-4-31b", webSearchEnabled = false } = req.body;
+    const { messages, temperature, model = "gemma-4-31b", webSearchEnabled = false } = req.body;
+    let systemInstruction = req.body.systemInstruction;
+
+    const linkInstruction = "\n\n[ATURAN PENTING MENGENAI LINK/URL]:\n" +
+      "1. JANGAN PERNAH menyingkat/memotong URL atau menggunakan karakter ellipsis (contoh buruk: 'https://drive.google.com/\u2026', 'https://www.dropbox.com/\u2026').\n" +
+      "2. Selalu tulis URL lengkap yang valid, benar, dan fungsional dari situs web modern resmi yang bereputasi tinggi (misalnya: 'https://drive.google.com', 'https://www.dropbox.com', 'https://wetransfer.com', 'https://www.pcloud.com').\n" +
+      "3. Selalu format link/URL menggunakan format markdown link: `[Teks Deskriptif](URL)` (misalnya: `[Buka Google Drive](https://drive.google.com)`) agar tautan tersebut rapi, profesional, dan dapat diklik secara interaktif oleh pengguna di dalam obrolan.";
+
+    systemInstruction = (systemInstruction || "Anda adalah ExeAi, asisten AI modern yang sangat pintar, ramah, dan solutif.") + linkInstruction;
 
     if (!messages || !Array.isArray(messages)) {
       res.write(`data: ${JSON.stringify({ error: "Invalid or missing messages array" })}\n\n`);

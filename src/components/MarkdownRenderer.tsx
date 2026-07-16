@@ -167,34 +167,88 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps) {
         };
 
         const renderInlineStyles = (text: string): React.ReactNode[] => {
-
-          const inlineParts = text.split(/(\*\*.*?\*\*|\*.*?\*|`.*?`)/g);
-          return inlineParts.map((inlinePart, subIdx) => {
+          const inlineParts = text.split(/(\*\*.*?\*\*|\*.*?\*|`.*?`|\[.*?\]\(.*?\))/g);
+          return inlineParts.flatMap((inlinePart, subIdx) => {
             if (inlinePart.startsWith("**") && inlinePart.endsWith("**")) {
-              return (
+              return [
                 <strong key={subIdx} className="font-semibold text-zinc-900 dark:text-zinc-50">
                   {inlinePart.slice(2, -2)}
                 </strong>
-              );
+              ];
             }
             if (inlinePart.startsWith("*") && inlinePart.endsWith("*")) {
-              return (
-                <em key={subIdx} className="italic text-zinc-650 dark:text-zinc-300">
+              return [
+                <em key={subIdx} className="italic text-zinc-650 dark:text-zinc-350">
                   {inlinePart.slice(1, -1)}
                 </em>
-              );
+              ];
             }
             if (inlinePart.startsWith("`") && inlinePart.endsWith("`")) {
-              return (
+              return [
                 <code
                   key={subIdx}
-                  className="rounded bg-zinc-100 dark:bg-zinc-900/90 border border-zinc-200 dark:border-zinc-800 px-1.5 py-0.5 font-mono text-sm text-amber-600 dark:text-amber-400/90"
+                  className="rounded bg-zinc-100 dark:bg-zinc-900/90 border border-zinc-200 dark:border-zinc-800 px-1.5 py-0.5 font-mono text-xs text-amber-600 dark:text-amber-400/90"
                 >
                   {inlinePart.slice(1, -1)}
                 </code>
-              );
+              ];
             }
-            return inlinePart;
+            if (inlinePart.startsWith("[") && inlinePart.includes("](")) {
+              const match = inlinePart.match(/\[(.*?)\]\((.*?)\)/);
+              if (match) {
+                const linkText = match[1];
+                let linkUrl = match[2];
+                
+                // Clean truncated ellipsis from the end of the URL
+                linkUrl = linkUrl.replace(/[…\.\s]+$/, "").trim();
+                if (linkUrl.endsWith("/…") || linkUrl.endsWith("/...")) {
+                  linkUrl = linkUrl.replace(/\/…$/, "").replace(/\/\.\.\.$/, "");
+                }
+                
+                return [
+                  <a
+                    key={subIdx}
+                    href={linkUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-amber-600 dark:text-amber-450 font-semibold hover:underline inline-flex items-center gap-0.5 transition-all duration-200 decoration-amber-500/40 hover:decoration-amber-500"
+                  >
+                    {linkText}
+                    <svg className="w-3.5 h-3.5 inline-block shrink-0" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                    </svg>
+                  </a>
+                ];
+              }
+            }
+            
+            // For general text, split and find raw URLs
+            const urlRegex = /(https?:\/\/[^\s]+)/g;
+            const segments = inlinePart.split(urlRegex);
+            return segments.map((seg, segIdx) => {
+              if (seg.match(/^https?:\/\//)) {
+                // Clean truncated ellipsis from the end of the URL
+                let cleanUrl = seg.replace(/[…\.\s]+$/, "").trim();
+                if (cleanUrl.endsWith("/…") || cleanUrl.endsWith("/...")) {
+                  cleanUrl = cleanUrl.replace(/\/…$/, "").replace(/\/\.\.\.$/, "");
+                }
+                return (
+                  <a
+                    key={`url-${subIdx}-${segIdx}`}
+                    href={cleanUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-amber-600 dark:text-amber-455 font-semibold hover:underline inline-flex items-center gap-0.5 transition-all duration-200 decoration-amber-500/40 hover:decoration-amber-500 break-all"
+                  >
+                    {cleanUrl}
+                    <svg className="w-3.5 h-3.5 inline-block shrink-0" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                    </svg>
+                  </a>
+                );
+              }
+              return seg;
+            });
           });
         };
 
