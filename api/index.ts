@@ -57,6 +57,75 @@ app.post("/api/user/get-or-create-credits", (req, res) => {
   return res.json({ credits: 99999 });
 });
 
+async function runGeminiModel(
+  ai: any,
+  modelName: string,
+  contents: any[],
+  config: any,
+  useSearch: boolean,
+  res: any
+): Promise<boolean> {
+  const finalConfig = { ...config };
+  if (useSearch) {
+    finalConfig.tools = [{ googleSearch: {} }];
+  } else {
+    delete finalConfig.tools;
+  }
+
+  try {
+    const responseStream = await ai.models.generateContentStream({
+      model: modelName,
+      contents: contents,
+      config: finalConfig
+    });
+    for await (const chunk of responseStream) {
+      const text = chunk.text;
+      if (text) {
+        res.write(`data: ${JSON.stringify({ text })}\n\n`);
+      }
+    }
+    return true;
+  } catch (err: any) {
+    const errString = String(err.message || JSON.stringify(err));
+    console.error(`Gemini model ${modelName} failed with error:`, errString);
+    
+    // Fallback to NO search on the same model if search fails or hits quota
+    if (useSearch && (
+      errString.includes("RESOURCE_EXHAUSTED") || 
+      errString.includes("quota") || 
+      errString.includes("PERMISSION_DENIED") || 
+      errString.includes("not allowed") || 
+      errString.includes("Search") || 
+      errString.includes("tool")
+    )) {
+      console.warn(`Search failed on ${modelName}, falling back to direct answering...`);
+      res.write(`data: ${JSON.stringify({ text: "*(Mengoptimalkan pencarian dan memproses informasi secara langsung...)*\n\n" })}\n\n`);
+      
+      const retryConfig = { ...config };
+      delete retryConfig.tools;
+      
+      try {
+        const responseStream = await ai.models.generateContentStream({
+          model: modelName,
+          contents: contents,
+          config: retryConfig
+        });
+        for await (const chunk of responseStream) {
+          const text = chunk.text;
+          if (text) {
+            res.write(`data: ${JSON.stringify({ text })}\n\n`);
+          }
+        }
+        return true;
+      } catch (retryErr: any) {
+        throw retryErr;
+      }
+    }
+    
+    throw err;
+  }
+}
+
 async function streamGemini(messages: any[], systemInstruction: string, temperature: number, webSearchEnabled: boolean, res: any) {
   const geminiKey = process.env.GEMINI_API_KEY;
   if (!geminiKey) {
@@ -82,62 +151,153 @@ async function streamGemini(messages: any[], systemInstruction: string, temperat
     temperature: temperature !== undefined ? Number(temperature) : 0.7
   };
 
-  let useSearch = webSearchEnabled;
-  if (useSearch) {
-    config.tools = [{ googleSearch: {} }];
-  }
-
+  // 1. Try gemini-3.5-flash
   try {
-    const responseStream = await ai.models.generateContentStream({
-      model: "gemini-3.5-flash",
-      contents: contents,
-      config: config
-    });
-    for await (const chunk of responseStream) {
-      const text = chunk.text;
-      if (text) {
-        res.write(`data: ${JSON.stringify({ text })}\n\n`);
+    await runGeminiModel(ai, "gemini-3.5-flash", contents, config, webSearchEnabled, res);
+    return;
+  } catch (err1: any) {
+    const errStr = String(err1.message || JSON.stringify(err1));
+    console.warn("gemini-3.5-flash failed, attempting fallback to gemini-3.1-flash-lite...", errStr);
+    
+    // 2. Try gemini-3.1-flash-lite
+    try {
+      res.write(`data: ${JSON.stringify({ text: "*(Mengaktifkan mode hemat daya dan beralih ke engine Gemini Flash Lite...)*\n\n" })}\n\n`);
+      await runGeminiModel(ai, "gemini-3.1-flash-lite", contents, config, webSearchEnabled, res);
+      return;
+    } catch (err2: any) {
+      const errStr2 = String(err2.message || JSON.stringify(err2));
+      console.warn("gemini-3.1-flash-lite failed, attempting fallback to ExeAI (Cerebras)...", errStr2);
+      
+      // 3. Try ExeAI (Cerebras) - gemma-4-31b using llama3.1-8b under the hood
+      try {
+        res.write(`data: ${JSON.stringify({ text: "*(Sistem mendeteksi kapasitas puncak pada Google AI, mengalihkan secara dinamis ke ExeAI Engine...)*\n\n" })}\n\n`);
+        await runCerebrasModel("gemma-4-31b", messages, systemInstruction, temperature, res);
+      } catch (err3: any) {
+        // If all fallbacks fail, print the original/secondary error message
+        handleGeminiError(err2, res);
       }
     }
-  } catch (err: any) {
-    const errString = String(err.message || JSON.stringify(err));
-    
-    // If search was enabled and it failed due to quota, rate limit, permission, or search tool restrictions,
-    // gracefully fallback to answering WITHOUT search!
-    if (useSearch && (
-      errString.includes("RESOURCE_EXHAUSTED") || 
-      errString.includes("quota") || 
-      errString.includes("PERMISSION_DENIED") || 
-      errString.includes("not allowed") || 
-      errString.includes("Search") || 
-      errString.includes("tool")
-    )) {
-      console.warn("Google Search failed or quota exhausted on this key. Falling back to direct answering...", errString);
-      
-      // Send a helpful, clean notification message to the user that search is skipped due to free key quota
-      res.write(`data: ${JSON.stringify({ text: "*(Mengoptimalkan pencarian dan memproses informasi secara langsung...)*\n\n" })}\n\n`);
-      
-      // Remove the search tool from configuration and retry
-      const retryConfig = { ...config };
-      delete retryConfig.tools;
-      
-      try {
-        const responseStream = await ai.models.generateContentStream({
-          model: "gemini-3.5-flash",
-          contents: contents,
-          config: retryConfig
-        });
-        for await (const chunk of responseStream) {
-          const text = chunk.text;
-          if (text) {
-            res.write(`data: ${JSON.stringify({ text })}\n\n`);
+  }
+}
+
+async function runCerebrasModel(
+  model: string,
+  messages: any[],
+  systemInstruction: string,
+  temperature: number,
+  res: any
+) {
+  const apiKey = getCerebrasApiKey();
+  if (!apiKey) {
+    throw new Error("Cerebras API key is not configured");
+  }
+
+  const systemMessage = {
+    role: "system",
+    content: systemInstruction || "Anda adalah ExeAi, asisten AI modern yang sangat pintar, ramah, dan solutif."
+  };
+
+  const mappedMessages = messages.map((m: any) => ({
+    role: m.role === "model" ? "assistant" : "user",
+    content: m.content
+  }));
+
+  const allMessages = [systemMessage, ...mappedMessages];
+
+  const response = await fetch("https://api.cerebras.ai/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: getCerebrasModel(model),
+      messages: allMessages,
+      temperature: temperature !== undefined ? Number(temperature) : 0.7,
+      stream: true,
+    }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Cerebras API Error (${response.status}): ${errorText}`);
+  }
+
+  const reader = response.body;
+  if (!reader) {
+    throw new Error("Response body from Cerebras is not readable");
+  }
+
+  const decoder = new TextDecoder("utf-8");
+  let buffer = "";
+
+  if (typeof (reader as any).getReader === "function") {
+    const webReader = (reader as any).getReader();
+    while (true) {
+      const { value, done } = await webReader.read();
+      if (done) break;
+
+      let decodedChunk = "";
+      if (typeof value === "string") {
+        decodedChunk = value;
+      } else if (value) {
+        decodedChunk = decoder.decode(value, { stream: true });
+      }
+      buffer += decodedChunk;
+      let lineEndIdx;
+      while ((lineEndIdx = buffer.indexOf("\n")) !== -1) {
+        const line = buffer.substring(0, lineEndIdx).trim();
+        buffer = buffer.substring(lineEndIdx + 1);
+
+        if (!line) continue;
+        if (line.startsWith("data: ")) {
+          const dataStr = line.substring(6).trim();
+          if (dataStr === "[DONE]") {
+            continue;
+          }
+          try {
+            const parsed = JSON.parse(dataStr);
+            const text = parsed.choices?.[0]?.delta?.content;
+            if (text) {
+              res.write(`data: ${JSON.stringify({ text })}\n\n`);
+            }
+          } catch (err) {
+            // Ignore parser errors
           }
         }
-      } catch (retryErr: any) {
-        handleGeminiError(retryErr, res);
       }
-    } else {
-      handleGeminiError(err, res);
+    }
+  } else {
+    for await (const chunk of reader as any) {
+      let decodedChunk = "";
+      if (typeof chunk === "string") {
+        decodedChunk = chunk;
+      } else if (chunk) {
+        decodedChunk = decoder.decode(chunk, { stream: true });
+      }
+      buffer += decodedChunk;
+      let lineEndIdx;
+      while ((lineEndIdx = buffer.indexOf("\n")) !== -1) {
+        const line = buffer.substring(0, lineEndIdx).trim();
+        buffer = buffer.substring(lineEndIdx + 1);
+
+        if (!line) continue;
+        if (line.startsWith("data: ")) {
+          const dataStr = line.substring(6).trim();
+          if (dataStr === "[DONE]") {
+            continue;
+          }
+          try {
+            const parsed = JSON.parse(dataStr);
+            const text = parsed.choices?.[0]?.delta?.content;
+            if (text) {
+              res.write(`data: ${JSON.stringify({ text })}\n\n`);
+            }
+          } catch (err) {
+            // Ignore parser errors
+          }
+        }
+      }
     }
   }
 }
@@ -172,7 +332,7 @@ app.post("/api/chat/stream", async (req, res) => {
       return res.end();
     }
 
-    if (model === "gemini-3.5-flash" || webSearchEnabled) {
+    if (model === "gemini-ai" || model === "gemini-3.5-flash" || webSearchEnabled) {
       await streamGemini(messages, systemInstruction, temperature, webSearchEnabled, res);
       res.write("data: [DONE]\n\n");
       return res.end();

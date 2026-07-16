@@ -20,10 +20,10 @@ export const MODEL_OPTIONS: ModelOption[] = [
     description: "Model exeai-glm-4.7 berukuran efisien dengan batas konteks 8.192 token untuk respons secepat kilat.",
   },
   {
-    id: "gemini-3.5-flash",
-    name: "gemini-3.5-flash",
+    id: "gemini-ai",
+    name: "Gemini AI",
     badge: "Google AI",
-    description: "Model Gemini 3.5 Flash generasi terbaru dari Google dengan kecepatan luar biasa dan penalaran tingkat tinggi.",
+    description: "Model otomatis Google yang cerdas (Flash & Flash Lite). Otomatis beralih ke ExeAI jika kuota puncak tercapai.",
   }
 ];
 
