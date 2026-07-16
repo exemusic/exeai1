@@ -1,6 +1,7 @@
 import express from "express";
 import dotenv from "dotenv";
 import { GoogleGenAI } from "@google/genai";
+import { createClient } from "@supabase/supabase-js";
 
 dotenv.config();
 
@@ -55,6 +56,167 @@ app.get("/api/health", (req, res) => {
 // Secure endpoint to get or create guest credits (returns 99999 for unlimited use)
 app.post("/api/user/get-or-create-credits", (req, res) => {
   return res.json({ credits: 99999 });
+});
+
+// GET /api/supabase/config
+app.get("/api/supabase/config", (req, res) => {
+  const url = process.env.SUPABASE_URL || "https://knmjalxisidyduzwfwnp.supabase.co";
+  const hasServiceRole = !!process.env.SUPABASE_SERVICE_ROLE;
+  const hasAnonKey = !!process.env.SUPABASE_ANON_KEY;
+  res.json({
+    defaultUrl: "https://knmjalxisidyduzwfwnp.supabase.co",
+    url,
+    hasServiceRole,
+    hasAnonKey,
+    isConfigured: !!(url && (hasServiceRole || hasAnonKey))
+  });
+});
+
+// POST /api/supabase/upload
+app.post("/api/supabase/upload", async (req, res) => {
+  try {
+    const { projectName, files, bucket = "execode" } = req.body;
+    
+    // Header overrides or environment variables
+    const url = (req.headers["x-supabase-url"] as string) || process.env.SUPABASE_URL || "https://knmjalxisidyduzwfwnp.supabase.co";
+    const key = (req.headers["x-supabase-key"] as string) || process.env.SUPABASE_SERVICE_ROLE || process.env.SUPABASE_ANON_KEY;
+
+    if (!key) {
+      return res.status(400).json({ error: "Supabase API Key (Service Role atau Anon Key) belum dikonfigurasi di server." });
+    }
+
+    if (!projectName || !files || !Array.isArray(files)) {
+      return res.status(400).json({ error: "Data project atau file tidak lengkap." });
+    }
+
+    const supabase = createClient(url, key);
+
+    // 1. Clean up existing files under this project first to avoid duplication/leaks
+    try {
+      const folderPath = `projects/${projectName}`;
+      const { data: existingFiles } = await supabase.storage.from(bucket).list(folderPath);
+      if (existingFiles && existingFiles.length > 0) {
+        const filesToDelete = existingFiles.map(f => `${folderPath}/${f.name}`);
+        await supabase.storage.from(bucket).remove(filesToDelete);
+      }
+    } catch (cleanErr) {
+      console.warn("Supabase clean up step warning:", cleanErr);
+    }
+
+    // 2. Upload new files
+    for (const file of files) {
+      const filePath = `projects/${projectName}/${file.path}`;
+      const buffer = Buffer.from(file.content, "utf-8");
+      
+      const { error } = await supabase.storage
+        .from(bucket)
+        .upload(filePath, buffer, {
+          contentType: file.path.endsWith(".html") ? "text/html" : file.path.endsWith(".js") ? "application/javascript" : "text/plain",
+          upsert: true
+        });
+      
+      if (error) throw error;
+    }
+
+    res.json({ success: true, message: `Berhasil mengunggah ${files.length} file ke Supabase Storage.` });
+  } catch (error: any) {
+    console.error("Supabase Upload Error:", error);
+    res.status(500).json({ error: error.message || "Gagal mengunggah ke Supabase Storage." });
+  }
+});
+
+// POST /api/supabase/load
+app.post("/api/supabase/load", async (req, res) => {
+  try {
+    const { projectName, bucket = "execode" } = req.body;
+
+    const url = (req.headers["x-supabase-url"] as string) || process.env.SUPABASE_URL || "https://knmjalxisidyduzwfwnp.supabase.co";
+    const key = (req.headers["x-supabase-key"] as string) || process.env.SUPABASE_SERVICE_ROLE || process.env.SUPABASE_ANON_KEY;
+
+    if (!key) {
+      return res.status(400).json({ error: "Supabase API Key belum dikonfigurasi." });
+    }
+
+    if (!projectName) {
+      return res.status(400).json({ error: "Nama project tidak boleh kosong." });
+    }
+
+    const supabase = createClient(url, key);
+    const folderPath = `projects/${projectName}`;
+    
+    const { data: fileList, error: listError } = await supabase.storage
+      .from(bucket)
+      .list(folderPath);
+
+    if (listError) throw listError;
+    if (!fileList || fileList.length === 0) {
+      return res.status(404).json({ error: `Project '${projectName}' tidak ditemukan di bucket '${bucket}'.` });
+    }
+
+    const loadedFiles = [];
+    for (const item of fileList) {
+      const filePath = `${folderPath}/${item.name}`;
+      const { data, error: downloadError } = await supabase.storage
+        .from(bucket)
+        .download(filePath);
+
+      if (downloadError) throw downloadError;
+
+      const content = await data.text();
+      loadedFiles.push({
+        path: item.name,
+        content
+      });
+    }
+
+    res.json({ success: true, files: loadedFiles });
+  } catch (error: any) {
+    console.error("Supabase Load Error:", error);
+    res.status(500).json({ error: error.message || "Gagal memuat file dari Supabase Storage." });
+  }
+});
+
+// POST /api/supabase/delete
+app.post("/api/supabase/delete", async (req, res) => {
+  try {
+    const { projectName, fileName, bucket = "execode" } = req.body;
+
+    const url = (req.headers["x-supabase-url"] as string) || process.env.SUPABASE_URL || "https://knmjalxisidyduzwfwnp.supabase.co";
+    const key = (req.headers["x-supabase-key"] as string) || process.env.SUPABASE_SERVICE_ROLE || process.env.SUPABASE_ANON_KEY;
+
+    if (!key) {
+      return res.status(400).json({ error: "Supabase API Key belum dikonfigurasi." });
+    }
+
+    if (!projectName) {
+      return res.status(400).json({ error: "Nama project tidak boleh kosong." });
+    }
+
+    const supabase = createClient(url, key);
+
+    if (fileName) {
+      // Delete single file
+      const filePath = `projects/${projectName}/${fileName}`;
+      const { error } = await supabase.storage.from(bucket).remove([filePath]);
+      if (error) throw error;
+      res.json({ success: true, message: `File '${fileName}' berhasil dihapus dari Supabase Storage.` });
+    } else {
+      // Delete entire folder content
+      const folderPath = `projects/${projectName}`;
+      const { data: fileList, error: listError } = await supabase.storage.from(bucket).list(folderPath);
+      if (listError) throw listError;
+
+      if (fileList && fileList.length > 0) {
+        const filesToDelete = fileList.map(f => `${folderPath}/${f.name}`);
+        const { error: removeError } = await supabase.storage.from(bucket).remove(filesToDelete);
+        if (removeError) throw removeError;
+      }
+      res.json({ success: true, message: `Seluruh file project '${projectName}' berhasil dihapus dari Supabase Storage.` });
+    }
+  } catch (error: any) {
+    console.error("Supabase Delete Error:", error);
+    res.status(500).json({ error: error.message || "Gagal menghapus file di Supabase Storage." });
+  }
 });
 
 async function runGeminiModel(

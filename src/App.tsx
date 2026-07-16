@@ -10,6 +10,7 @@ import {
   Sparkles,
   Search,
   Code2,
+  Code,
   PenTool,
   Languages,
   ArrowRight,
@@ -53,6 +54,7 @@ import { MarkdownRenderer } from "./components/MarkdownRenderer";
 import { GoogleOAuthProvider, GoogleLogin } from "@react-oauth/google";
 import { jwtDecode } from "jwt-decode";
 import { MODEL_OPTIONS, SYSTEM_PRESETS, SUGGESTED_PROMPTS } from "./presets";
+import { ExeCodeWorkspace } from "./components/ExeCodeWorkspace";
 
 const notifySoundUrl = new URL("../Sound/notify.mp3", import.meta.url).href;
 
@@ -127,6 +129,7 @@ export default function App() {
   const [globalWebSearchEnabled, setGlobalWebSearchEnabled] = useState(false);
   const [temperature, setTemperature] = useState(0.7);
   const [showSettings, setShowSettings] = useState(false);
+  const [showExeCode, setShowExeCode] = useState(false);
   const [settingsTab, setSettingsTab] = useState<"akun" | "model" | "tampilan" | "ingatan">("akun");
   const [cookieConsent, setCookieConsent] = useState<string | null>(() => {
     return localStorage.getItem("exechat_cookie_consent") || null;
@@ -1448,13 +1451,14 @@ export default function App() {
         </div>
       </div>
 
-      {/* New Chat Button */}
-      <div className="px-4 pt-4 pb-2">
+      {/* New Chat & ExeCode Workspace buttons */}
+      <div className="px-4 pt-4 pb-2 flex flex-col gap-2">
        <button
           onClick={() => {
             playNotifySound();
             setCurrentSessionId(null);
             setShowSettings(false);
+            setShowExeCode(false);
             if (isMobile) setIsMobileSidebarOpen(false);
           }}
           className={`w-full flex items-center justify-center gap-2 rounded-xl font-semibold py-2.5 px-4 transition-all duration-200 text-xs tracking-wide border ${
@@ -1465,6 +1469,25 @@ export default function App() {
         >
           <Plus className="h-3.5 w-3.5 stroke-[2.5]" />
           <span>Chat Baru</span>
+        </button>
+
+        <button
+          onClick={() => {
+            playNotifySound();
+            setShowExeCode(true);
+            setShowSettings(false);
+            if (isMobile) setIsMobileSidebarOpen(false);
+          }}
+          className={`w-full flex items-center justify-center gap-2 rounded-xl font-semibold py-2.5 px-4 transition-all duration-200 text-xs tracking-wide border ${
+            showExeCode
+              ? "bg-amber-500/20 text-amber-500 border-amber-500/40"
+              : isDark 
+                ? "bg-zinc-900 hover:bg-zinc-850 text-zinc-200 border-zinc-800" 
+                : "bg-white hover:bg-zinc-50 text-zinc-700 border-zinc-200"
+          }`}
+        >
+          <Code className="h-3.5 w-3.5 text-amber-500" />
+          <span>ExeCode Workspace</span>
         </button>
       </div>
 
@@ -1767,7 +1790,23 @@ export default function App() {
 
             <button
               onClick={() => {
+                setShowExeCode(prev => !prev);
+                setShowSettings(false);
+              }}
+              className={`p-2.5 rounded-xl transition-all duration-200 ${
+                showExeCode 
+                  ? "bg-amber-500/10 text-amber-500" 
+                  : `hover:bg-zinc-500/10 ${resolvedTheme === "dark" ? "text-zinc-400 hover:text-white" : "text-zinc-600 hover:text-zinc-900"}`
+              }`}
+              title="ExeCode Workspace"
+            >
+              <Code className="h-4.5 w-4.5" />
+            </button>
+
+            <button
+              onClick={() => {
                 setShowSettings(prev => !prev);
+                setShowExeCode(false);
               }}
               className={`p-2.5 rounded-xl transition-all duration-200 ${
                 showSettings 
@@ -2965,6 +3004,17 @@ export default function App() {
 
                 </div>
               </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* EXECODE WORKSPACE COMPONENT OVERLAY */}
+          <AnimatePresence>
+            {showExeCode && (
+              <ExeCodeWorkspace
+                isDark={isDark}
+                curTheme={curTheme}
+                onClose={() => setShowExeCode(false)}
+              />
             )}
           </AnimatePresence>
 
