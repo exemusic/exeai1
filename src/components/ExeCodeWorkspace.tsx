@@ -28,6 +28,8 @@ import {
   Cloud,
   Eye,
   ChevronDown,
+  ChevronUp,
+  Terminal,
   Send,
   ThumbsUp,
   ThumbsDown,
@@ -226,6 +228,12 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
 
   const [runtimeError, setRuntimeError] = useState<string | null>(null);
 
+  // Optimasi preview & console logging
+  const [previewUrl, setPreviewUrl] = useState<string>("");
+  const [consoleLogs, setConsoleLogs] = useState<{ type: "log" | "error" | "warn" | "info"; text: string; timestamp: string }[]>([]);
+  const [isConsoleOpen, setIsConsoleOpen] = useState<boolean>(false);
+  const [aiStreamingText, setAiStreamingText] = useState<string>("");
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const activeFile = files.find(f => f.path === activeFilePath) || files[0];
@@ -252,11 +260,29 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
     setTimeout(() => setStatusMessage(null), 5000);
   };
 
-  // Listen to Preview Errors posted from iframe
+  // Listen to Preview Errors & Console logs posted from iframe
   useEffect(() => {
     const handleMessage = (e: MessageEvent) => {
-      if (e.data && e.data.type === "PREVIEW_ERROR") {
+      if (!e.data) return;
+      if (e.data.type === "PREVIEW_ERROR") {
         setRuntimeError(e.data.message);
+        setConsoleLogs(prev => [
+          ...prev,
+          {
+            type: "error",
+            text: e.data.message,
+            timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })
+          }
+        ]);
+      } else if (e.data.type === "PREVIEW_CONSOLE") {
+        setConsoleLogs(prev => [
+          ...prev,
+          {
+            type: e.data.logType || "log",
+            text: e.data.message,
+            timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })
+          }
+        ]);
       }
     };
     window.addEventListener("message", handleMessage);
@@ -265,6 +291,10 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
 
   // Fetch Supabase configurations & handle project auto-routing
   useEffect(() => {
+    // Load initial files preview
+    const initialFilesStr = localStorage.getItem("execode_files");
+    const initialFiles = initialFilesStr ? JSON.parse(initialFilesStr) : DEFAULT_FILES;
+    
     fetch("/api/supabase/config")
       .then(res => res.json())
       .then(data => {
@@ -302,13 +332,16 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
         if (data.files && data.files.length > 0) {
           setFiles(data.files);
           setActiveFilePath("index.html");
+          refreshPreview(data.files);
           triggerStatus(`Berhasil memuat '${projectId}' dari cloud!`, "success");
         } else {
+          refreshPreview(initialFiles);
           triggerStatus(`Project '${projectId}' kosong atau belum ada file.`, "info");
         }
       })
       .catch(err => {
         console.warn(err);
+        refreshPreview(initialFiles);
         triggerStatus(`Project '${projectId}' belum tersimpan di cloud atau nama salah.`, "info");
       });
     } else {
@@ -316,6 +349,7 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
       const randomId = "proj-" + Math.random().toString(36).substring(2, 10);
       setProjectName(randomId);
       window.history.pushState(null, "", `/project/${randomId}`);
+      refreshPreview(initialFiles);
       triggerStatus(`Membuat Sandbox Baru: ${randomId}`, "success");
     }
   }, []);
@@ -351,14 +385,19 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
   };
 
   // Generate Interactive HTML Bundle with CSS and JS injected for Live Preview
-  const getCombinedPreviewBlob = () => {
-    const htmlFile = files.find(f => f.path.toLowerCase() === "index.html");
-    const jsFile = files.find(f => f.path.toLowerCase() === "app.js");
-    const cssFile = files.find(f => f.path.toLowerCase() === "style.css");
+  const refreshPreview = (customFiles: VirtualFile[] = files) => {
+    // Release existing blob URL to free memory
+    if (previewUrl && previewUrl.startsWith("blob:")) {
+      URL.revokeObjectURL(previewUrl);
+    }
+
+    const htmlFile = customFiles.find(f => f.path.toLowerCase() === "index.html");
+    const jsFile = customFiles.find(f => f.path.toLowerCase() === "app.js");
+    const cssFile = customFiles.find(f => f.path.toLowerCase() === "style.css");
 
     let finalHtml = htmlFile ? htmlFile.content : "<h1>No index.html file found!</h1>";
 
-    // Inject styles if style.css exists and is not referenced
+    // Inject styles if style.css exists
     if (cssFile) {
       const styleTag = `<style>\n${cssFile.content}\n</style>`;
       if (finalHtml.includes("</head>")) {
@@ -368,9 +407,10 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
       }
     }
 
-    // Inject custom app.js wrapper to prevent standard window blocking APIs and wire error catching
+    // Inject console logs interceptor & runtime error handling script
     const errorHandlingScript = `
       <script>
+        // Catch runtime errors
         window.addEventListener('error', function(e) {
           console.error("Runtime Error: " + e.message);
           window.parent.postMessage({ type: "PREVIEW_ERROR", message: e.message }, "*");
@@ -391,6 +431,47 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
           document.body.appendChild(errDiv);
           setTimeout(() => errDiv.remove(), 6000);
         });
+
+        // Intercept standard console logging and send to parent
+        (function() {
+          const originalLog = console.log;
+          const originalError = console.error;
+          const originalWarn = console.warn;
+          const originalInfo = console.info;
+
+          console.log = function(...args) {
+            originalLog.apply(console, args);
+            window.parent.postMessage({ 
+              type: "PREVIEW_CONSOLE", 
+              logType: "log", 
+              message: args.map(arg => typeof arg === 'object' ? JSON.stringify(arg) : String(arg)).join(" ") 
+            }, "*");
+          };
+          console.error = function(...args) {
+            originalError.apply(console, args);
+            window.parent.postMessage({ 
+              type: "PREVIEW_CONSOLE", 
+              logType: "error", 
+              message: args.map(arg => typeof arg === 'object' ? JSON.stringify(arg) : String(arg)).join(" ") 
+            }, "*");
+          };
+          console.warn = function(...args) {
+            originalWarn.apply(console, args);
+            window.parent.postMessage({ 
+              type: "PREVIEW_CONSOLE", 
+              logType: "warn", 
+              message: args.map(arg => typeof arg === 'object' ? JSON.stringify(arg) : String(arg)).join(" ") 
+            }, "*");
+          };
+          console.info = function(...args) {
+            originalInfo.apply(console, args);
+            window.parent.postMessage({ 
+              type: "PREVIEW_CONSOLE", 
+              logType: "info", 
+              message: args.map(arg => typeof arg === 'object' ? JSON.stringify(arg) : String(arg)).join(" ") 
+            }, "*");
+          };
+        })();
       </script>
     `;
 
@@ -403,7 +484,6 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
     if (jsFile) {
       const scriptTag = `<script>\n${jsFile.content}\n</script>`;
       if (finalHtml.includes("</body>")) {
-        // Replace current reference or append to end
         if (finalHtml.includes('<script src="app.js"></script>')) {
           finalHtml = finalHtml.replace('<script src="app.js"></script>', scriptTag);
         } else {
@@ -415,7 +495,13 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
     }
 
     const blob = new Blob([finalHtml], { type: "text/html" });
-    return URL.createObjectURL(blob);
+    const url = URL.createObjectURL(blob);
+    setPreviewUrl(url);
+    return url;
+  };
+
+  const getCombinedPreviewBlob = () => {
+    return previewUrl || "about:blank";
   };
 
   // Add a new file
@@ -536,6 +622,7 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
 
     setRuntimeError(null);
     setAiPrompt("");
+    setAiStreamingText("");
 
     // Append user message
     const userMsg: ChatMessage = {
@@ -614,6 +701,7 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
                 const parsed = JSON.parse(dataStr);
                 if (parsed.text) {
                   fullText += parsed.text;
+                  setAiStreamingText(fullText);
                   
                   // Live-update the streaming text (filtering out ugly raw JSON blocks on the fly)
                   const displayable = cleanDisplayContent(fullText);
@@ -633,6 +721,7 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
 
       // Final complete content parsing
       const displayableText = cleanDisplayContent(fullText);
+      setAiStreamingText(fullText);
       
       // Try to extract JSON from response markdown block
       let jsonStr = "";
@@ -652,6 +741,9 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
         
         setFiles(editedFiles);
         setPreviewKey(prev => prev + 1);
+        
+        // Refresh live preview once AI finishes writing the edits
+        refreshPreview(editedFiles);
         
         // Finalize the chat history with backup snapshots
         setChatHistory(prev => prev.map(msg => 
@@ -739,6 +831,7 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
         setFiles(data.files);
         setActiveFilePath("index.html");
         setPreviewKey(prev => prev + 1);
+        refreshPreview(data.files);
         triggerStatus(`Berhasil membuka proyek '${projectName}' dari cloud!`, "success");
       } else {
         triggerStatus(`Proyek '${projectName}' kosong atau belum tersimpan.`, "info");
@@ -867,6 +960,8 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
       return part;
     });
   };
+
+  const aiName = selectedModel.toLowerCase().includes("gemini") ? "Gemini" : "ExeAI";
 
   return (
     <div className={`fixed inset-0 z-50 flex flex-col backdrop-blur-xl ${isDark ? "bg-zinc-950 text-zinc-100 font-sans" : "bg-zinc-50 text-zinc-900 font-sans"}`}>
@@ -997,7 +1092,7 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
           <div className="p-4 border-b border-zinc-850 flex items-center justify-between bg-zinc-950/40">
             <div className="flex items-center gap-2">
               <Sparkles className="h-4 w-4 text-amber-500" />
-              <span className="text-xs font-semibold tracking-tight text-zinc-200">Gemini</span>
+              <span className="text-xs font-semibold tracking-tight text-zinc-200">{aiName}</span>
             </div>
             
             {/* Start New Chat/Reset */}
@@ -1084,7 +1179,7 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
                 >
                   {/* Speaker identity label */}
                   <span className="text-[10px] text-zinc-500 font-medium px-1">
-                    {isUsr ? "Anda" : "Gemini"}
+                    {isUsr ? "Anda" : aiName}
                   </span>
 
                   {/* Message Bubble */}
@@ -1216,13 +1311,85 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
         </div>
 
         {/* PANEL KANAN: WORKSPACE INTERACTIVE / CODE EDITOR PANE */}
-        <div className="flex-1 flex flex-col min-w-0 bg-zinc-950">
+        <div className="flex-1 flex flex-col min-w-0 bg-zinc-950 relative">
+          
+          {/* GORGEOUS GLASSMORPHIC AI THINKING OVERLAY */}
+          {isAIEditing && (
+            <div className="absolute inset-0 bg-zinc-950/95 backdrop-blur-md z-50 flex flex-col p-8 overflow-y-auto animate-fade-in font-sans">
+              <div className="max-w-2xl mx-auto w-full flex flex-col items-center space-y-6 my-auto">
+                {/* Dynamic Animated Pulse Ring */}
+                <div className="relative flex items-center justify-center">
+                  <div className="w-20 h-20 rounded-full border-2 border-dashed border-amber-500/30 animate-spin duration-[8s]" />
+                  <div className="absolute w-14 h-14 rounded-full border-2 border-amber-500/10 bg-amber-500/5 animate-ping duration-[2s]" />
+                  <Sparkles className="absolute h-8 w-8 text-amber-500 animate-pulse" />
+                </div>
+
+                <div className="text-center space-y-2">
+                  <h3 className="text-sm font-bold tracking-tight text-zinc-100 uppercase">ExeAI Code Engine Active</h3>
+                  <p className="text-xs text-zinc-400 font-mono">Status: Menghasilkan kode & menyusun file patch baru...</p>
+                </div>
+
+                {/* Progress list steps */}
+                <div className="w-full bg-zinc-900/50 border border-zinc-850 rounded-xl p-4 space-y-3 font-mono text-[11px]">
+                  <div className="flex items-center justify-between text-zinc-500 pb-1 border-b border-zinc-800/50">
+                    <span>PIPELINE ENGINE</span>
+                    <span className="text-amber-500 animate-pulse">RUNNING</span>
+                  </div>
+                  
+                  <div className="flex items-center gap-2 text-emerald-400">
+                    <span>✔</span>
+                    <span>Analisis instruksi berhasil diselesaikan</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-emerald-400">
+                    <span>✔</span>
+                    <span>Pemindaian folder & struktur workspace selesai</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-amber-400">
+                    <span className="animate-pulse">●</span>
+                    <span>Menulis ulang baris kode & menyusun file patch baru...</span>
+                  </div>
+                </div>
+
+                {/* Real-time Streaming Explanation & Details */}
+                <div className="w-full flex flex-col gap-2 text-left">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 font-sans">Penjelasan Perubahan (Live Stream):</span>
+                  <div className="w-full max-h-40 overflow-y-auto p-4 rounded-xl bg-zinc-900/60 border border-zinc-800 text-zinc-300 text-xs leading-relaxed whitespace-pre-wrap font-sans">
+                    {cleanDisplayContent(aiStreamingText) || "Menyusun penjelasan perubahan..."}
+                  </div>
+                </div>
+
+                {/* Raw Output Preview Code Diff block */}
+                {aiStreamingText.includes("```json") && (
+                  <div className="w-full flex flex-col gap-2 text-left">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 font-sans">Berkas yang Sedang Diubah:</span>
+                    <div className="w-full max-h-48 overflow-y-auto p-3 rounded-xl bg-zinc-950 border border-zinc-850 font-mono text-[10px] text-zinc-400 whitespace-pre-wrap">
+                      {(() => {
+                        const match = aiStreamingText.match(/```json\s*([\s\S]*?)\s*(```|$)/);
+                        if (match) {
+                          return (
+                            <span className="text-amber-500/80">
+                              {match[1].slice(0, 1000)}
+                              {match[1].length > 1000 ? "\n... (Sisa baris kode terpotong untuk pratinjau)" : ""}
+                            </span>
+                          );
+                        }
+                        return "Menunggu format JSON patch...";
+                      })()}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
           
           {/* Segmented controls Preview vs Code */}
           <div className="p-3 border-b border-zinc-850 bg-zinc-950 flex items-center justify-between shrink-0">
             <div className="flex items-center bg-zinc-900 p-1 rounded-xl border border-zinc-850">
               <button
-                onClick={() => setActiveRightTab("preview")}
+                onClick={() => {
+                  setActiveRightTab("preview");
+                  refreshPreview();
+                }}
                 className={`px-3.5 py-1.5 rounded-lg text-xs font-normal flex items-center gap-1.5 transition-all ${
                   activeRightTab === "preview" 
                     ? "bg-amber-500 text-white font-medium" 
@@ -1272,8 +1439,9 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
               )}
               <button
                 onClick={() => {
+                  refreshPreview();
                   setPreviewKey(prev => prev + 1);
-                  triggerStatus("Pratinjau berhasil dimuat ulang!", "success");
+                  triggerStatus("Pratinjau berhasil diperbarui dengan perubahan kode terbaru!", "success");
                 }}
                 className="p-1.5 text-zinc-400 hover:text-zinc-200 transition-colors"
                 title="Muat Ulang Preview"
@@ -1303,14 +1471,14 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
               <div className="flex-1 flex items-center justify-center p-6 bg-zinc-900/20 overflow-hidden relative">
                 {deviceMode === "mobile" ? (
                   /* SMARTPHONE CONTAINER FRAME */
-                  <div className="w-[280px] h-[540px] rounded-[36px] bg-zinc-950 border-[10px] border-zinc-900 shadow-2xl relative flex flex-col overflow-hidden animate-fade-in ring-1 ring-zinc-800/50">
-                    <div className="absolute top-0 left-1/2 transform -translate-x-1/2 w-28 h-6 bg-zinc-900 rounded-b-2xl z-20 flex items-center justify-center">
-                      <div className="w-12 h-1 bg-zinc-800 rounded-full" />
+                  <div className="w-[360px] h-[640px] max-w-full max-h-[90%] rounded-[40px] bg-zinc-950 border-[12px] border-zinc-900 shadow-2xl relative flex flex-col overflow-hidden animate-fade-in ring-1 ring-zinc-800/50">
+                    <div className="absolute top-0 left-1/2 transform -translate-x-1/2 w-32 h-5 bg-zinc-900 rounded-b-xl z-20 flex items-center justify-center">
+                      <div className="w-10 h-1 bg-zinc-800 rounded-full" />
                     </div>
                     <iframe
                       key={previewKey}
                       src={getCombinedPreviewBlob()}
-                      className="w-full h-full border-none rounded-[24px] bg-slate-950"
+                      className="w-full h-full border-none rounded-[28px] bg-slate-950"
                       sandbox="allow-scripts"
                       title="Mobile App Preview"
                     />
@@ -1328,6 +1496,85 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
                     />
                   </div>
                 )}
+
+                {/* CONSOLE LOG DRAWER (Bottom Right, Google AI Studio style) */}
+                <div className="absolute bottom-4 right-4 z-30 font-mono">
+                  {!isConsoleOpen ? (
+                    <button
+                      onClick={() => setIsConsoleOpen(true)}
+                      className="px-3.5 py-1.5 rounded-xl bg-zinc-900/90 border border-zinc-800/80 hover:bg-zinc-800 text-[11px] font-medium text-zinc-300 flex items-center gap-2 shadow-2xl backdrop-blur-md transition-all hover:scale-105 active:scale-95 cursor-pointer"
+                    >
+                      <Terminal className="h-3.5 w-3.5 text-amber-500" />
+                      <span>Console</span>
+                      {consoleLogs.length > 0 && (
+                        <span className="px-1.5 py-0.5 text-[9px] font-bold rounded-full bg-amber-500 text-zinc-950">
+                          {consoleLogs.length}
+                        </span>
+                      )}
+                    </button>
+                  ) : (
+                    <div className="w-[380px] h-64 rounded-xl bg-zinc-950/95 border border-zinc-800/80 shadow-2xl flex flex-col overflow-hidden backdrop-blur-md animate-fade-in">
+                      {/* Terminal Header */}
+                      <div className="px-3 py-2 border-b border-zinc-850 flex items-center justify-between bg-zinc-900/40 select-none shrink-0">
+                        <div className="flex items-center gap-1.5">
+                          <Terminal className="h-3.5 w-3.5 text-amber-500" />
+                          <span className="text-[10px] font-bold tracking-tight text-zinc-200">Console Output</span>
+                          {consoleLogs.length > 0 && (
+                            <span className="px-1.5 py-0.2 text-[9px] font-bold rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                              {consoleLogs.length} logs
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-1">
+                          {/* Clear Logs Button */}
+                          <button
+                            onClick={() => setConsoleLogs([])}
+                            className="p-1 rounded hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 transition-colors"
+                            title="Bersihkan log"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                          {/* Minimize Button */}
+                          <button
+                            onClick={() => setIsConsoleOpen(false)}
+                            className="p-1 rounded hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 transition-colors"
+                            title="Tutup console"
+                          >
+                            <ChevronDown className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </div>
+                      {/* Terminal Body */}
+                      <div className="flex-1 overflow-y-auto p-3 space-y-1.5">
+                        {consoleLogs.length === 0 ? (
+                          <div className="h-full flex items-center justify-center text-[10px] text-zinc-600 italic">
+                            Tidak ada log tertangkap. Panggil console.log() di proyek Anda.
+                          </div>
+                        ) : (
+                          consoleLogs.map((log, idx) => {
+                            let logColor = "text-zinc-300";
+                            let bgClass = "";
+                            if (log.type === "error") {
+                              logColor = "text-rose-400";
+                              bgClass = "bg-rose-500/5";
+                            } else if (log.type === "warn") {
+                              logColor = "text-amber-400";
+                              bgClass = "bg-amber-500/5";
+                            } else if (log.type === "info") {
+                              logColor = "text-blue-400";
+                            }
+                            return (
+                              <div key={idx} className={`p-1.5 rounded text-[11px] leading-relaxed font-mono flex items-start gap-2 ${bgClass}`}>
+                                <span className="text-zinc-600 shrink-0 select-none text-[9px] pt-0.5">{log.timestamp}</span>
+                                <span className={`flex-1 break-all ${logColor}`}>{log.text}</span>
+                              </div>
+                            );
+                          })
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           )}
@@ -1421,63 +1668,7 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
                   })}
                 </div>
 
-                {/* CLOUD EXECHAT SETTINGS (Supabase integration fully abstracted) */}
-                <div className="p-3 border-t border-zinc-850 bg-zinc-950/40 shrink-0 space-y-3 font-sans">
-                  <div className="flex items-center gap-1.5">
-                    <Cloud className="h-3.5 w-3.5 text-amber-500" />
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Cloud ExeChat</span>
-                  </div>
-
-                  {/* Editable Project Slug Name input */}
-                  <div className="space-y-1">
-                    <label className="block text-[9px] font-medium text-zinc-500">NAMA & SLUG PROJECT</label>
-                    <input
-                      type="text"
-                      value={projectName}
-                      onChange={(e) => handleProjectNameChange(e.target.value)}
-                      placeholder="my-project-id"
-                      className="w-full px-2 py-1 text-xs font-mono rounded border border-zinc-800 bg-zinc-900 text-zinc-200 focus:outline-none focus:border-amber-500"
-                      title="Ubah nama project sekaligus memperbarui URL sandbox"
-                    />
-                  </div>
-
-                  <div className="space-y-1.5 pt-1">
-                    <div className="flex gap-1.5">
-                      <button
-                        onClick={handleUploadToSupabase}
-                        className="flex-1 py-1.5 px-2 rounded-lg text-[10px] font-semibold bg-amber-600 hover:bg-amber-500 text-white flex items-center justify-center gap-1 transition-colors"
-                        title="Simpan file ke Cloud Sandbox"
-                      >
-                        <Upload className="h-3 w-3" />
-                        <span>Simpan</span>
-                      </button>
-                      <button
-                        onClick={handleLoadFromSupabase}
-                        className="flex-1 py-1.5 px-2 rounded-lg text-[10px] font-semibold bg-zinc-800 hover:bg-zinc-750 text-zinc-200 border border-zinc-700/50 flex items-center justify-center gap-1 transition-colors"
-                        title="Buka file dari Cloud Sandbox"
-                      >
-                        <Download className="h-3 w-3" />
-                        <span>Buka</span>
-                      </button>
-                    </div>
-
-                    <button
-                      onClick={handleShareProject}
-                      className="w-full py-1.5 px-2.5 rounded-lg text-[10px] font-medium border border-amber-500/20 text-amber-500 hover:bg-amber-500/10 flex items-center justify-center gap-1 transition-colors"
-                    >
-                      <Share2 className="h-3 w-3" />
-                      <span>Salin Link Proyek</span>
-                    </button>
-
-                    <button
-                      onClick={handleDeleteProjectSupabase}
-                      className="w-full py-1 px-2 rounded-lg text-[9px] font-normal border border-rose-500/10 text-rose-400 hover:bg-rose-500/10 flex items-center justify-center gap-1 transition-colors"
-                    >
-                      <Trash2 className="h-3 w-3" />
-                      <span>Bersihkan Cloud</span>
-                    </button>
-                  </div>
-                </div>
+                {/* Cloud ExeChat Settings removed as requested */}
 
               </div>
 
