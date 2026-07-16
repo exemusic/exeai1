@@ -128,19 +128,16 @@ async function runGeminiModel(
 
 async function streamGemini(messages: any[], systemInstruction: string, temperature: number, webSearchEnabled: boolean, res: any) {
   const geminiKey = process.env.GEMINI_API_KEY;
-  if (!geminiKey) {
-    res.write(`data: ${JSON.stringify({ error: "Kunci API Gemini tidak dikonfigurasi di server. Silakan atur variabel lingkungan GEMINI_API_KEY di dashboard platform Anda." })}\n\n`);
-    res.write("data: [DONE]\n\n");
-    return res.end();
+  const geminiKey2 = process.env.GEMINI2_API_KEY;
+
+  const keysToTry: { key: string; name: string }[] = [];
+  if (geminiKey) {
+    keysToTry.push({ key: geminiKey, name: "Utama" });
   }
-  const ai = new GoogleGenAI({
-    apiKey: geminiKey,
-    httpOptions: {
-      headers: {
-        'User-Agent': 'aistudio-build'
-      }
-    }
-  });
+  if (geminiKey2) {
+    keysToTry.push({ key: geminiKey2, name: "Cadangan" });
+  }
+
   const contents = messages.map((m: any) => ({
     role: m.role === "model" || m.role === "assistant" ? "model" : "user",
     parts: [{ text: m.content }]
@@ -151,30 +148,69 @@ async function streamGemini(messages: any[], systemInstruction: string, temperat
     temperature: temperature !== undefined ? Number(temperature) : 0.7
   };
 
-  // 1. Try gemini-3.5-flash
-  try {
-    await runGeminiModel(ai, "gemini-3.5-flash", contents, config, webSearchEnabled, res);
-    return;
-  } catch (err1: any) {
-    const errStr = String(err1.message || JSON.stringify(err1));
-    console.warn("gemini-3.5-flash failed, attempting fallback to gemini-3.1-flash-lite...", errStr);
-    
-    // 2. Try gemini-3.1-flash-lite
+  // If no Gemini API keys are configured, fallback directly to Cerebras
+  if (keysToTry.length === 0) {
+    console.warn("No Gemini API keys defined. Falling back directly to ExeAI (Cerebras)...");
     try {
-      res.write(`data: ${JSON.stringify({ text: "*(Mengaktifkan mode hemat daya dan beralih ke engine Gemini Flash Lite...)*\n\n" })}\n\n`);
-      await runGeminiModel(ai, "gemini-3.1-flash-lite", contents, config, webSearchEnabled, res);
+      res.write(`data: ${JSON.stringify({ text: "*(Sistem tidak mendeteksi Kunci API Google, mengalihkan secara dinamis ke ExeAI Engine...)*\n\n" })}\n\n`);
+      await runCerebrasModel("gemma-4-31b", messages, systemInstruction, temperature, res);
       return;
-    } catch (err2: any) {
-      const errStr2 = String(err2.message || JSON.stringify(err2));
-      console.warn("gemini-3.1-flash-lite failed, attempting fallback to ExeAI (Cerebras)...", errStr2);
+    } catch (err3: any) {
+      handleGeminiError(err3, res);
+      return;
+    }
+  }
+
+  // Iterate over available keys
+  for (let i = 0; i < keysToTry.length; i++) {
+    const { key, name } = keysToTry[i];
+    const isBackup = i > 0;
+    
+    const ai = new GoogleGenAI({
+      apiKey: key,
+      httpOptions: {
+        headers: {
+          'User-Agent': 'aistudio-build'
+        }
+      }
+    });
+
+    if (isBackup) {
+      res.write(`data: ${JSON.stringify({ text: "*(Batas kuota Kunci API Utama tercapai, menghubungkan ke Kunci API Cadangan...)*\n\n" })}\n\n`);
+    }
+
+    // 1. Try gemini-3.5-flash with this key
+    try {
+      await runGeminiModel(ai, "gemini-3.5-flash", contents, config, webSearchEnabled, res);
+      return; // Success!
+    } catch (err1: any) {
+      const errStr1 = String(err1.message || JSON.stringify(err1));
+      console.warn(`gemini-3.5-flash failed with Key ${name}:`, errStr1);
       
-      // 3. Try ExeAI (Cerebras) - gemma-4-31b using llama3.1-8b under the hood
+      // 2. Try gemini-3.1-flash-lite with this key
       try {
-        res.write(`data: ${JSON.stringify({ text: "*(Sistem mendeteksi kapasitas puncak pada Google AI, mengalihkan secara dinamis ke ExeAI Engine...)*\n\n" })}\n\n`);
-        await runCerebrasModel("gemma-4-31b", messages, systemInstruction, temperature, res);
-      } catch (err3: any) {
-        // If all fallbacks fail, print the original/secondary error message
-        handleGeminiError(err2, res);
+        res.write(`data: ${JSON.stringify({ text: "*(Mengaktifkan mode hemat daya dan beralih ke engine Gemini Flash Lite...)*\n\n" })}\n\n`);
+        await runGeminiModel(ai, "gemini-3.1-flash-lite", contents, config, webSearchEnabled, res);
+        return; // Success!
+      } catch (err2: any) {
+        const errStr2 = String(err2.message || JSON.stringify(err2));
+        console.warn(`gemini-3.1-flash-lite failed with Key ${name}:`, errStr2);
+        
+        // If there's another Gemini key, continue to the next loop iteration
+        if (i < keysToTry.length - 1) {
+          continue;
+        }
+        
+        // No more Gemini keys left. Fallback to ExeAI (Cerebras)
+        console.warn("All Gemini API keys failed or exhausted. Falling back to ExeAI (Cerebras)...");
+        try {
+          res.write(`data: ${JSON.stringify({ text: "*(Sistem mendeteksi kapasitas puncak pada seluruh Google AI, mengalihkan secara dinamis ke ExeAI Engine...)*\n\n" })}\n\n`);
+          await runCerebrasModel("gemma-4-31b", messages, systemInstruction, temperature, res);
+          return;
+        } catch (err3: any) {
+          // If everything fails, show error
+          handleGeminiError(err2, res);
+        }
       }
     }
   }
