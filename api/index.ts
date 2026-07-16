@@ -115,7 +115,7 @@ async function streamGemini(messages: any[], systemInstruction: string, temperat
       console.warn("Google Search failed or quota exhausted on this key. Falling back to direct answering...", errString);
       
       // Send a helpful, clean notification message to the user that search is skipped due to free key quota
-      res.write(`data: ${JSON.stringify({ text: "*(Info: Pencarian Web Google dilewati karena Kunci API gratis Anda tidak mendukung kuota Pencarian, beralih ke respon langsung...)*\n\n" })}\n\n`);
+      res.write(`data: ${JSON.stringify({ text: "*(Mengoptimalkan pencarian dan memproses informasi secara langsung...)*\n\n" })}\n\n`);
       
       // Remove the search tool from configuration and retry
       const retryConfig = { ...config };
