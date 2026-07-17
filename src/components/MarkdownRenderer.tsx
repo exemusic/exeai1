@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { Copy, Check, Terminal, Pencil, Save, X } from "lucide-react";
+import { motion } from "motion/react";
 
 interface MarkdownRendererProps {
   content: string;
@@ -29,7 +30,6 @@ function EditableCodeBlock({ initialCode, language, onCopy, isCopied }: Editable
 
   return (
     <div className="my-4 overflow-hidden rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950 font-mono text-sm shadow-lg shadow-black/40">
-      {/* Header */}
       <div className="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800/80 bg-zinc-100/80 dark:bg-zinc-900/60 px-4 py-2 text-xs text-zinc-500 dark:text-zinc-400 select-none">
         <div className="flex items-center gap-2">
           <Terminal className="h-3.5 w-3.5 text-zinc-500" />
@@ -91,7 +91,6 @@ function EditableCodeBlock({ initialCode, language, onCopy, isCopied }: Editable
         </div>
       </div>
 
-      {/* Code Display or Editor */}
       <div className="max-h-96 overflow-y-auto overflow-x-auto p-4 scrollbar-thin scrollbar-thumb-zinc-300 dark:scrollbar-thumb-zinc-850">
         {isEditing ? (
           <textarea
@@ -159,8 +158,6 @@ function preprocessMarkdown(text: string): string {
     processed = processed.replace(pattern, replacement);
   }
 
-  // Handle inline math blocks like $x$ or $a + b$
-  // Strip the outer $ characters but keep the clean replaced content
   processed = processed.replace(/\$([^\$]+)\$/g, (match, p1) => {
     return p1;
   });
@@ -193,13 +190,19 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps) {
           const isCopied = copiedText === code;
 
           return (
-            <EditableCodeBlock
+            <motion.div
               key={index}
-              initialCode={code}
-              language={language}
-              onCopy={handleCopy}
-              isCopied={isCopied}
-            />
+              initial={{ opacity: 0, y: 3 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.2 }}
+            >
+              <EditableCodeBlock
+                initialCode={code}
+                language={language}
+                onCopy={handleCopy}
+                isCopied={isCopied}
+              />
+            </motion.div>
           );
         }
 
@@ -258,7 +261,6 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps) {
                 const linkText = match[1];
                 let linkUrl = match[2];
                 
-                // Clean truncated ellipsis from the end of the URL
                 linkUrl = linkUrl.replace(/[…\.\s]+$/, "").trim();
                 if (linkUrl.endsWith("/…") || linkUrl.endsWith("/...")) {
                   linkUrl = linkUrl.replace(/\/…$/, "").replace(/\/\.\.\.$/, "");
@@ -270,7 +272,7 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps) {
                     href={linkUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-amber-600 dark:text-amber-450 font-semibold hover:underline inline-flex items-center gap-0.5 transition-all duration-200 decoration-amber-500/40 hover:decoration-amber-500"
+                    className="text-amber-600 dark:text-amber-455 font-semibold hover:underline inline-flex items-center gap-0.5 transition-all duration-200 decoration-amber-500/40 hover:decoration-amber-500"
                   >
                     {linkText}
                     <svg className="w-3.5 h-3.5 inline-block shrink-0" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
@@ -281,12 +283,10 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps) {
               }
             }
             
-            // For general text, split and find raw URLs
             const urlRegex = /(https?:\/\/[^\s]+)/g;
             const segments = inlinePart.split(urlRegex);
             return segments.map((seg, segIdx) => {
               if (seg.match(/^https?:\/\//)) {
-                // Clean truncated ellipsis from the end of the URL
                 let cleanUrl = seg.replace(/[…\.\s]+$/, "").trim();
                 if (cleanUrl.endsWith("/…") || cleanUrl.endsWith("/...")) {
                   cleanUrl = cleanUrl.replace(/\/…$/, "").replace(/\/\.\.\.$/, "");
@@ -404,7 +404,16 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps) {
 
         flushListBuffer(`end-${index}`);
 
-        return <div key={index}>{renderedElements}</div>;
+        return (
+          <motion.div
+            key={index}
+            initial={{ opacity: 0, y: 3 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.2 }}
+          >
+            {renderedElements}
+          </motion.div>
+        );
       })}
     </div>
   );

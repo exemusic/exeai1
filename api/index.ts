@@ -7,10 +7,8 @@ dotenv.config();
 
 const app = express();
 
-// JSON body parser
 app.use(express.json());
 
-// Helper to calculate credit cost based on message length (kept for compatibility)
 function getCreditCost(text: string): number {
   const len = (text || "").trim().length;
   if (len < 20) return 1;
@@ -19,12 +17,10 @@ function getCreditCost(text: string): number {
   return 4;
 }
 
-// Helper to get Cerebras API key
 function getCerebrasApiKey() {
   return process.env.CEREBRAS_API_KEY;
 }
 
-// Health check endpoint
 app.get("/api/health", (req, res) => {
   res.json({
     status: "ok",
@@ -32,12 +28,10 @@ app.get("/api/health", (req, res) => {
   });
 });
 
-// Secure endpoint to get or create guest credits (returns 99999 for unlimited use)
 app.post("/api/user/get-or-create-credits", (req, res) => {
   return res.json({ credits: 99999 });
 });
 
-// GET /api/supabase/config
 app.get("/api/supabase/config", (req, res) => {
   const url = process.env.SUPABASE_URL || "https://knmjalxisidyduzwfwnp.supabase.co";
   const hasServiceRole = !!process.env.SUPABASE_SERVICE_ROLE;
@@ -51,26 +45,23 @@ app.get("/api/supabase/config", (req, res) => {
   });
 });
 
-// POST /api/supabase/upload
 app.post("/api/supabase/upload", async (req, res) => {
   try {
     const { projectName, files, bucket = "execode" } = req.body;
     
-    // Header overrides or environment variables
     const url = (req.headers["x-supabase-url"] as string) || process.env.SUPABASE_URL || "https://knmjalxisidyduzwfwnp.supabase.co";
     const key = (req.headers["x-supabase-key"] as string) || process.env.SUPABASE_SERVICE_ROLE || process.env.SUPABASE_ANON_KEY;
 
     if (!key) {
-      return res.status(400).json({ error: "Supabase API Key (Service Role atau Anon Key) belum dikonfigurasi di server." });
+      return res.status(400).json({ error: "Supabase API Key (Service Role or Anon Key) has not been configured on the server." });
     }
 
     if (!projectName || !files || !Array.isArray(files)) {
-      return res.status(400).json({ error: "Data project atau file tidak lengkap." });
+      return res.status(400).json({ error: "Project data or files are incomplete." });
     }
 
     const supabase = createClient(url, key);
 
-    // 1. Clean up existing files under this project first to avoid duplication/leaks
     try {
       const folderPath = `projects/${projectName}`;
       const { data: existingFiles } = await supabase.storage.from(bucket).list(folderPath);
@@ -82,7 +73,6 @@ app.post("/api/supabase/upload", async (req, res) => {
       console.warn("Supabase clean up step warning:", cleanErr);
     }
 
-    // 2. Upload new files
     for (const file of files) {
       const filePath = `projects/${projectName}/${file.path}`;
       const buffer = Buffer.from(file.content, "utf-8");
@@ -97,14 +87,13 @@ app.post("/api/supabase/upload", async (req, res) => {
       if (error) throw error;
     }
 
-    res.json({ success: true, message: `Berhasil mengunggah ${files.length} file ke Supabase Storage.` });
+    res.json({ success: true, message: `Successfully uploaded ${files.length} files to Supabase Storage.` });
   } catch (error: any) {
     console.error("Supabase Upload Error:", error);
-    res.status(500).json({ error: error.message || "Gagal mengunggah ke Supabase Storage." });
+    res.status(500).json({ error: error.message || "Failed to upload to Supabase Storage." });
   }
 });
 
-// POST /api/supabase/load
 app.post("/api/supabase/load", async (req, res) => {
   try {
     const { projectName, bucket = "execode" } = req.body;
@@ -113,11 +102,11 @@ app.post("/api/supabase/load", async (req, res) => {
     const key = (req.headers["x-supabase-key"] as string) || process.env.SUPABASE_SERVICE_ROLE || process.env.SUPABASE_ANON_KEY;
 
     if (!key) {
-      return res.status(400).json({ error: "Supabase API Key belum dikonfigurasi." });
+      return res.status(400).json({ error: "Supabase API Key has not been configured." });
     }
 
     if (!projectName) {
-      return res.status(400).json({ error: "Nama project tidak boleh kosong." });
+      return res.status(400).json({ error: "Project name cannot be empty." });
     }
 
     const supabase = createClient(url, key);
@@ -129,7 +118,7 @@ app.post("/api/supabase/load", async (req, res) => {
 
     if (listError) throw listError;
     if (!fileList || fileList.length === 0) {
-      return res.status(404).json({ error: `Project '${projectName}' tidak ditemukan di bucket '${bucket}'.` });
+      return res.status(404).json({ error: `Project '${projectName}' was not found in bucket '${bucket}'.` });
     }
 
     const loadedFiles = [];
@@ -151,11 +140,10 @@ app.post("/api/supabase/load", async (req, res) => {
     res.json({ success: true, files: loadedFiles });
   } catch (error: any) {
     console.error("Supabase Load Error:", error);
-    res.status(500).json({ error: error.message || "Gagal memuat file dari Supabase Storage." });
+    res.status(500).json({ error: error.message || "Failed to load files from Supabase Storage." });
   }
 });
 
-// POST /api/supabase/delete
 app.post("/api/supabase/delete", async (req, res) => {
   try {
     const { projectName, fileName, bucket = "execode" } = req.body;
@@ -164,23 +152,21 @@ app.post("/api/supabase/delete", async (req, res) => {
     const key = (req.headers["x-supabase-key"] as string) || process.env.SUPABASE_SERVICE_ROLE || process.env.SUPABASE_ANON_KEY;
 
     if (!key) {
-      return res.status(400).json({ error: "Supabase API Key belum dikonfigurasi." });
+      return res.status(400).json({ error: "Supabase API Key has not been configured." });
     }
 
     if (!projectName) {
-      return res.status(400).json({ error: "Nama project tidak boleh kosong." });
+      return res.status(400).json({ error: "Project name cannot be empty." });
     }
 
     const supabase = createClient(url, key);
 
     if (fileName) {
-      // Delete single file
       const filePath = `projects/${projectName}/${fileName}`;
       const { error } = await supabase.storage.from(bucket).remove([filePath]);
       if (error) throw error;
-      res.json({ success: true, message: `File '${fileName}' berhasil dihapus dari Supabase Storage.` });
+      res.json({ success: true, message: `File '${fileName}' was successfully deleted from Supabase Storage.` });
     } else {
-      // Delete entire folder content
       const folderPath = `projects/${projectName}`;
       const { data: fileList, error: listError } = await supabase.storage.from(bucket).list(folderPath);
       if (listError) throw listError;
@@ -190,11 +176,11 @@ app.post("/api/supabase/delete", async (req, res) => {
         const { error: removeError } = await supabase.storage.from(bucket).remove(filesToDelete);
         if (removeError) throw removeError;
       }
-      res.json({ success: true, message: `Seluruh file project '${projectName}' berhasil dihapus dari Supabase Storage.` });
+      res.json({ success: true, message: `All project files for '${projectName}' were successfully deleted from Supabase Storage.` });
     }
   } catch (error: any) {
     console.error("Supabase Delete Error:", error);
-    res.status(500).json({ error: error.message || "Gagal menghapus file di Supabase Storage." });
+    res.status(500).json({ error: error.message || "Failed to delete files in Supabase Storage." });
   }
 });
 
@@ -207,7 +193,6 @@ async function runGeminiModel(
   res: any
 ): Promise<boolean> {
   const finalConfig = { ...config };
-  // Web search is disabled entirely per user request
   delete finalConfig.tools;
 
   try {
@@ -236,10 +221,10 @@ async function streamGemini(messages: any[], systemInstruction: string, temperat
 
   const keysToTry: { key: string; name: string }[] = [];
   if (geminiKey) {
-    keysToTry.push({ key: geminiKey, name: "Utama" });
+    keysToTry.push({ key: geminiKey, name: "Primary" });
   }
   if (geminiKey2) {
-    keysToTry.push({ key: geminiKey2, name: "Cadangan" });
+    keysToTry.push({ key: geminiKey2, name: "Backup" });
   }
 
   const contents = messages.map((m: any) => ({
@@ -248,15 +233,14 @@ async function streamGemini(messages: any[], systemInstruction: string, temperat
   }));
   
   const config: any = {
-    systemInstruction: systemInstruction || "Anda adalah ExeAi, asisten AI modern yang sangat pintar, ramah, dan solutif.",
+    systemInstruction: systemInstruction || "You are ExeAi, an advanced AI assistant that is highly intelligent, friendly, and helpful.",
     temperature: temperature !== undefined ? Number(temperature) : 0.7
   };
 
-  // If no Gemini API keys are configured, fallback directly to Cerebras
   if (keysToTry.length === 0) {
     console.warn("No Gemini API keys defined. Falling back directly to ExeAI (Cerebras)...");
     try {
-      res.write(`data: ${JSON.stringify({ text: "*(Sistem tidak mendeteksi Kunci API Google, mengalihkan secara dinamis ke ExeAI Engine...)*\n\n" })}\n\n`);
+      res.write(`data: ${JSON.stringify({ text: "*(System did not detect Google API Key, dynamically redirecting to ExeAI Engine...)*\n\n" })}\n\n`);
       await runCerebrasModel("gemma-4-31b", messages, systemInstruction, temperature, res);
       return;
     } catch (err3: any) {
@@ -265,7 +249,6 @@ async function streamGemini(messages: any[], systemInstruction: string, temperat
     }
   }
 
-  // Iterate over available keys
   for (let i = 0; i < keysToTry.length; i++) {
     const { key, name } = keysToTry[i];
     const isBackup = i > 0;
@@ -280,39 +263,34 @@ async function streamGemini(messages: any[], systemInstruction: string, temperat
     });
 
     if (isBackup) {
-      res.write(`data: ${JSON.stringify({ text: "*(Batas kuota Kunci API Utama tercapai, menghubungkan ke Kunci API Cadangan...)*\n\n" })}\n\n`);
+      res.write(`data: ${JSON.stringify({ text: "*(Primary API Key quota reached, connecting to Backup API Key...)*\n\n" })}\n\n`);
     }
 
-    // 1. Try gemini-3.5-flash with this key
     try {
       await runGeminiModel(ai, "gemini-3.5-flash", contents, config, webSearchEnabled, res);
-      return; // Success!
+      return;
     } catch (err1: any) {
       const errStr1 = String(err1.message || JSON.stringify(err1));
       console.warn(`gemini-3.5-flash failed with Key ${name}:`, errStr1);
       
-      // 2. Try gemini-3.1-flash-lite with this key
       try {
-        res.write(`data: ${JSON.stringify({ text: "*(Mengaktifkan mode hemat daya dan beralih ke engine Gemini Flash Lite...)*\n\n" })}\n\n`);
+        res.write(`data: ${JSON.stringify({ text: "*(Activating power saving mode and switching to Gemini Flash Lite engine...)*\n\n" })}\n\n`);
         await runGeminiModel(ai, "gemini-3.1-flash-lite", contents, config, webSearchEnabled, res);
-        return; // Success!
+        return;
       } catch (err2: any) {
         const errStr2 = String(err2.message || JSON.stringify(err2));
         console.warn(`gemini-3.1-flash-lite failed with Key ${name}:`, errStr2);
         
-        // If there's another Gemini key, continue to the next loop iteration
         if (i < keysToTry.length - 1) {
           continue;
         }
         
-        // No more Gemini keys left. Fallback to ExeAI (Cerebras)
         console.warn("All Gemini API keys failed or exhausted. Falling back to ExeAI (Cerebras)...");
         try {
-          res.write(`data: ${JSON.stringify({ text: "*(Sistem mendeteksi kapasitas puncak pada seluruh Google AI, mengalihkan secara dinamis ke ExeAI Engine...)*\n\n" })}\n\n`);
+          res.write(`data: ${JSON.stringify({ text: "*(System detects peak capacity across Google AI, dynamically redirecting to ExeAI Engine...)*\n\n" })}\n\n`);
           await runCerebrasModel("gemma-4-31b", messages, systemInstruction, temperature, res);
           return;
         } catch (err3: any) {
-          // If everything fails, show error
           handleGeminiError(err2, res);
         }
       }
@@ -334,7 +312,7 @@ async function runCerebrasModel(
 
   const systemMessage = {
     role: "system",
-    content: systemInstruction || "Anda adalah ExeAi, asisten AI modern yang sangat pintar, ramah, dan solutif."
+    content: systemInstruction || "You are ExeAi, an advanced AI assistant that is highly intelligent, friendly, and helpful."
   };
 
   const mappedMessages = messages.map((m: any) => ({
@@ -402,7 +380,6 @@ async function runCerebrasModel(
               res.write(`data: ${JSON.stringify({ text })}\n\n`);
             }
           } catch (err) {
-            // Ignore parser errors
           }
         }
       }
@@ -434,7 +411,6 @@ async function runCerebrasModel(
               res.write(`data: ${JSON.stringify({ text })}\n\n`);
             }
           } catch (err) {
-            // Ignore parser errors
           }
         }
       }
@@ -444,16 +420,16 @@ async function runCerebrasModel(
 
 function handleGeminiError(err: any, res: any) {
   console.error("Gemini stream error:", err);
-  let errMsg = "Terjadi kesalahan saat memanggil Gemini API.";
+  let errMsg = "An error occurred while calling the Gemini API.";
   const errString = String(err.message || JSON.stringify(err));
   if (errString.includes("API key not valid") || errString.includes("API_KEY_INVALID") || errString.includes("INVALID_ARGUMENT")) {
-    errMsg = "Kunci API Gemini (GEMINI_API_KEY) Anda tidak valid atau telah kedaluwarsa. Silakan periksa atau perbarui Kunci API Anda di menu Settings > Secrets di pojok kanan atas.";
+    errMsg = "Your Gemini API Key (GEMINI_API_KEY) is invalid or has expired. Please check or update your API Key in the Settings > Secrets menu at the top right.";
   } else if (errString.includes("PERMISSION_DENIED")) {
-    errMsg = "Akses ditolak (Permission Denied) oleh Gemini API. Pastikan model gemini-3.5-flash diaktifkan untuk Kunci API Anda di menu Settings > Secrets.";
+    errMsg = "Access denied (Permission Denied) by Gemini API. Make sure the gemini-3.5-flash model is enabled for your API Key in the Settings > Secrets menu.";
   } else if (errString.includes("RESOURCE_EXHAUSTED") || errString.includes("quota")) {
-    errMsg = "Batas kuota Gemini API tercapai (Rate Limit). Silakan coba beberapa saat lagi atau gunakan Kunci API yang mendukung penagihan aktif di menu Settings > Secrets.";
+    errMsg = "Gemini API rate limit reached (Rate Limit). Please try again in a moment or use an API Key with active billing enabled in the Settings > Secrets menu.";
   } else {
-    errMsg = `Gagal menghubungi Gemini API: ${errString}`;
+    errMsg = `Failed to contact Gemini API: ${errString}`;
   }
   res.write(`data: ${JSON.stringify({ error: errMsg })}\n\n`);
 }
@@ -461,13 +437,13 @@ function handleGeminiError(err: any, res: any) {
 async function streamGroq(messages: any[], systemInstruction: string, temperature: number, res: any) {
   const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) {
-    res.write(`data: ${JSON.stringify({ error: "Groq API Key (GROQ_API_KEY) belum dikonfigurasi di server. Silakan hubungi admin atau tambahkan ke .env." })}\n\n`);
+    res.write(`data: ${JSON.stringify({ error: "Groq API Key (GROQ_API_KEY) has not been configured on the server. Please contact admin or add it to .env." })}\n\n`);
     return;
   }
 
   const systemMessage = {
     role: "system",
-    content: systemInstruction || "Anda adalah Exe, asisten AI yang sangat pintar, ramah, dan solutif."
+    content: systemInstruction || "You are Exe, a highly intelligent, friendly, and helpful AI assistant."
   };
 
   const mappedMessages = messages.map((m: any) => ({
@@ -535,7 +511,6 @@ async function streamGroq(messages: any[], systemInstruction: string, temperatur
               res.write(`data: ${JSON.stringify({ text })}\n\n`);
             }
           } catch (err) {
-            // Ignore parser errors
           }
         }
       }
@@ -567,7 +542,6 @@ async function streamGroq(messages: any[], systemInstruction: string, temperatur
               res.write(`data: ${JSON.stringify({ text })}\n\n`);
             }
           } catch (err) {
-            // Ignore parser errors
           }
         }
       }
@@ -627,10 +601,9 @@ app.post("/api/chat/stream", async (req, res) => {
       return res.end();
     }
 
-    // Format messages into Cerebras (OpenAI-compatible) format
     const systemMessage = {
       role: "system",
-      content: systemInstruction || "Anda adalah ExeAi, asisten AI modern yang sangat pintar, ramah, dan solutif."
+      content: systemInstruction || "You are ExeAi, an advanced AI assistant that is highly intelligent, friendly, and helpful."
     };
 
     const mappedMessages = messages.map((m: any) => ({
@@ -640,7 +613,6 @@ app.post("/api/chat/stream", async (req, res) => {
 
     const allMessages = [systemMessage, ...mappedMessages];
 
-    // Request stream from Cerebras endpoint
     const response = await fetch("https://api.cerebras.ai/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -659,7 +631,7 @@ app.post("/api/chat/stream", async (req, res) => {
       const errorText = await response.text();
       if (response.status === 429) {
         console.warn("Cerebras API rate-limited (429).");
-        res.write(`data: ${JSON.stringify({ error: "Server sedang sibuk. Silakan coba lagi nanti." })}\n\n`);
+        res.write(`data: ${JSON.stringify({ error: "Server is currently busy. Please try again later." })}\n\n`);
         return res.end();
       }
 
@@ -677,7 +649,6 @@ app.post("/api/chat/stream", async (req, res) => {
     const decoder = new TextDecoder("utf-8");
     let buffer = "";
 
-    // Support both Node.js stream types and Web ReadableStreams in Vercel / serverless environment
     if (typeof (reader as any).getReader === "function") {
       const webReader = (reader as any).getReader();
       while (true) {
@@ -709,13 +680,11 @@ app.post("/api/chat/stream", async (req, res) => {
                 res.write(`data: ${JSON.stringify({ text })}\n\n`);
               }
             } catch (err) {
-              // Ignore parser errors
             }
           }
         }
       }
     } else {
-      // Async iterable fallback for node-fetch or other stream formats
       for await (const chunk of reader as any) {
         let decodedChunk = "";
         if (typeof chunk === "string") {
@@ -742,18 +711,16 @@ app.post("/api/chat/stream", async (req, res) => {
                 res.write(`data: ${JSON.stringify({ text })}\n\n`);
               }
             } catch (err) {
-              // Ignore parser errors
             }
           }
         }
       }
     }
 
-    // Signal completion
     res.write("data: [DONE]\n\n");
   } catch (error: any) {
     console.warn("Cerebras Proxy Error:", error && error.message ? error.message : error);
-    res.write(`data: ${JSON.stringify({ error: "Server mengalami masalah internal. Silakan coba lagi nanti." })}\n\n`);
+    res.write(`data: ${JSON.stringify({ error: "Server encountered an internal issue. Please try again later." })}\n\n`);
   } finally {
     res.end();
   }

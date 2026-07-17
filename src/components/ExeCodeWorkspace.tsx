@@ -37,10 +37,14 @@ import {
   ArrowLeft,
   Volume2,
   Lock,
-  Menu
+  Menu,
+  Info,
+  FileUp
 } from "lucide-react";
 import JSZip from "jszip";
 import { MODEL_OPTIONS } from "../presets";
+import { motion, AnimatePresence } from "motion/react";
+import { MarkdownRenderer } from "./MarkdownRenderer";
 
 interface VirtualFile {
   path: string;
@@ -53,6 +57,14 @@ interface ChatMessage {
   content: string;
   timestamp: string;
   filesSnapshot?: VirtualFile[];
+  modelId?: string;
+  thinkingDuration?: number;
+}
+
+interface ToastMessage {
+  id: string;
+  text: string;
+  type: "success" | "error" | "info";
 }
 
 interface ExeCodeWorkspaceProps {
@@ -146,20 +158,16 @@ const DEFAULT_FILES: VirtualFile[] = [
   },
   {
     path: "app.js",
-    content: `// Write your interactive JavaScript code here!
-console.log("ExeCode App initialized!");
+    content: `console.log("ExeCode App initialized!");
 
 const button = document.getElementById("actionBtn");
 if (button) {
   button.addEventListener("click", () => {
-    // Generate random color for visual effect
     const colors = ["#f59e0b", "#10b981", "#3b82f6", "#8b5cf6", "#ec4899", "#ef4444"];
     const randomColor = colors[Math.floor(Math.random() * colors.length)];
     
-    // Apply visual changes effect
     button.style.backgroundColor = randomColor;
     
-    // Display a simple toast notification
     const notification = document.createElement("div");
     notification.className = "fixed bottom-20 left-1/2 transform -translate-x-1/2 bg-slate-900 border border-slate-800 px-4 py-2 rounded-lg text-xs font-bold text-white shadow-xl flex items-center gap-2 animate-fade-in";
     notification.innerHTML = \`<span>Button color changed to <span style="color: \${randomColor}">\${randomColor}</span>!</span>\`;
@@ -182,7 +190,7 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
   
   const [activeFilePath, setActiveFilePath] = useState<string>("index.html");
   const [projectName, setProjectName] = useState<string>(() => {
-    return localStorage.getItem("execode_project_name") || "Proyek ExeCode";
+    return localStorage.getItem("execode_project_name") || "ExeCode Project";
   });
 
   const [selectedModel, setSelectedModel] = useState<string>(() => {
@@ -190,7 +198,6 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
   });
   const [showModelDropdown, setShowModelDropdown] = useState<boolean>(false);
 
-  // Settings for cloud saving
   const [supabaseUrl, setSupabaseUrl] = useState<string>("https://knmjalxisidyduzwfwnp.supabase.co");
   const [supabaseAnonKey, setSupabaseAnonKey] = useState<string>("");
   const [supabaseBucket, setSupabaseBucket] = useState<string>("execode");
@@ -206,21 +213,19 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
   const [showNewFileInput, setShowNewFileInput] = useState<boolean>(false);
   const [statusMessage, setStatusMessage] = useState<{ text: string; type: "success" | "error" | "info" } | null>(null);
   
-  // ExeAI Chat Session
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>(() => {
     const saved = localStorage.getItem("execode_chat_history");
     if (saved) {
       try {
         return JSON.parse(saved);
       } catch (e) {
-        // fail silent
       }
     }
     return [
       {
         id: "initial",
         role: "assistant",
-        content: "Halo! Saya adalah Asisten AI ExeCode Anda. Beritahu saya apa yang ingin Anda buat atau ubah pada aplikasi web ini, dan saya akan memperbarui kodenya secara real-time!",
+        content: "Hello! I am your ExeCode AI Assistant. Let me know what you want to create or change in this web application, and I will update the code in real-time!",
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       }
     ];
@@ -228,21 +233,24 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
 
   const [runtimeError, setRuntimeError] = useState<string | null>(null);
 
-  // Optimasi preview & console logging
   const [previewUrl, setPreviewUrl] = useState<string>("");
   const [consoleLogs, setConsoleLogs] = useState<{ type: "log" | "error" | "warn" | "info"; text: string; timestamp: string }[]>([]);
   const [isConsoleOpen, setIsConsoleOpen] = useState<boolean>(false);
   const [aiStreamingText, setAiStreamingText] = useState<string>("");
 
-  // Mobile detection and redirection countdown
   const [isMobileScreen, setIsMobileScreen] = useState<boolean>(false);
   const [countdown, setCountdown] = useState<number>(5);
 
+  const [likedMessages, setLikedMessages] = useState<Record<string, boolean>>({});
+  const [dislikedMessages, setDislikedMessages] = useState<Record<string, boolean>>({});
+  const [showClearChatConfirm, setShowClearChatConfirm] = useState<boolean>(false);
+  const [showDeleteProjectConfirm, setShowDeleteProjectConfirm] = useState<boolean>(false);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const fileUploadRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const activeFile = files.find(f => f.path === activeFilePath) || files[0];
 
-  // Mobile device and screen width detection
   useEffect(() => {
     const checkMobile = () => {
       const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth < 768;
@@ -253,7 +261,6 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
     return () => window.removeEventListener("resize", checkMobile);
   }, []);
 
-  // Countdown and return redirection when mobile detected
   useEffect(() => {
     if (!isMobileScreen) return;
     const timer = setInterval(() => {
@@ -285,20 +292,89 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [chatHistory]);
 
-  // Activate code tab when entering fullscreen
-  useEffect(() => {
-    if (isFullscreen) {
-      setActiveRightTab("code");
-    }
-  }, [isFullscreen]);
+  const [expandedThoughts, setExpandedThoughts] = useState<Record<string, boolean>>({});
+  const [expandedActions, setExpandedActions] = useState<Record<string, boolean>>({});
+  const [toasts, setToasts] = useState<ToastMessage[]>([]);
+  const thinkingStartTimesRef = useRef<Record<string, number>>({});
 
-  // Handle setting status message
-  const triggerStatus = (text: string, type: "success" | "error" | "info" = "info") => {
-    setStatusMessage({ text, type });
-    setTimeout(() => setStatusMessage(null), 5000);
+  const handleClearChat = () => {
+    setShowClearChatConfirm(true);
   };
 
-  // Listen to Preview Errors & Console logs posted from iframe
+  const executeClearChat = () => {
+    setChatHistory([
+      {
+        id: "initial",
+        role: "assistant",
+        content: "Hello! I am your ExeCode AI Assistant. Let me know what you want to create or change in this web application, and I will update the code in real-time!",
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      }
+    ]);
+    setShowClearChatConfirm(false);
+    triggerStatus("Chat history cleared.", "info");
+  };
+
+  const handleDeviceFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 10 * 1024 * 1024) {
+      triggerStatus("File size exceeds the 10MB limit.", "error");
+      return;
+    }
+
+    const reader = new FileReader();
+    const isImage = file.type.startsWith("image/");
+
+    reader.onload = (event) => {
+      const content = event.target?.result as string;
+      if (!content) {
+        triggerStatus("Failed to read the file content.", "error");
+        return;
+      }
+
+      if (files.some(f => f.path.toLowerCase() === file.name.toLowerCase())) {
+        triggerStatus(`A file named '${file.name}' already exists!`, "error");
+        return;
+      }
+
+      const newFile: VirtualFile = {
+        path: file.name,
+        content: content,
+      };
+
+      setFiles(prev => [...prev, newFile]);
+      setActiveFilePath(file.name);
+      triggerStatus(`Successfully uploaded '${file.name}' from your device!`, "success");
+
+      if (fileUploadRef.current) {
+        fileUploadRef.current.value = "";
+      }
+    };
+
+    reader.onerror = () => {
+      triggerStatus("An error occurred while reading the file.", "error");
+    };
+
+    if (isImage) {
+      reader.readAsDataURL(file);
+    } else {
+      reader.readAsText(file);
+    }
+  };
+
+  const showToast = (text: string, type: "success" | "error" | "info" = "info") => {
+    const id = Math.random().toString(36).substring(2, 9);
+    setToasts(prev => [...prev, { id, text, type }]);
+    setTimeout(() => {
+      setToasts(prev => prev.filter(t => t.id !== id));
+    }, 4000);
+  };
+
+  const triggerStatus = (text: string, type: "success" | "error" | "info" = "info") => {
+    showToast(text, type);
+  };
+
   useEffect(() => {
     const handleMessage = (e: MessageEvent) => {
       if (!e.data) return;
@@ -327,9 +403,7 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
     return () => window.removeEventListener("message", handleMessage);
   }, []);
 
-  // Fetch Supabase configurations & handle project auto-routing
   useEffect(() => {
-    // Load initial files preview
     const initialFilesStr = localStorage.getItem("execode_files");
     const initialFiles = initialFilesStr ? JSON.parse(initialFilesStr) : DEFAULT_FILES;
     
@@ -350,7 +424,7 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
       const projectId = decodeURIComponent(match[1]);
       setProjectName(projectId);
       
-      triggerStatus(`Menghubungkan ke Cloud Sandbox...`, "info");
+      triggerStatus(`Connecting to Cloud Sandbox...`, "info");
       
       fetch("/api/supabase/load", {
         method: "POST",
@@ -363,7 +437,7 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
         })
       })
       .then(res => {
-        if (!res.ok) throw new Error("Project tidak ditemukan di cloud.");
+        if (!res.ok) throw new Error("Project not found in the cloud.");
         return res.json();
       })
       .then(data => {
@@ -371,28 +445,26 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
           setFiles(data.files);
           setActiveFilePath("index.html");
           refreshPreview(data.files);
-          triggerStatus(`Berhasil memuat '${projectId}' dari cloud!`, "success");
+          triggerStatus(`Successfully loaded '${projectId}' from cloud!`, "success");
         } else {
           refreshPreview(initialFiles);
-          triggerStatus(`Project '${projectId}' kosong atau belum ada file.`, "info");
+          triggerStatus(`Project '${projectId}' is empty or has no files yet.`, "info");
         }
       })
       .catch(err => {
         console.warn(err);
         refreshPreview(initialFiles);
-        triggerStatus(`Project '${projectId}' belum tersimpan di cloud atau nama salah.`, "info");
+        triggerStatus(`Project '${projectId}' is not saved in the cloud yet or the name is incorrect.`, "info");
       });
     } else {
-      // Auto-generate unique project ID and rewrite URL
       const randomId = "proj-" + Math.random().toString(36).substring(2, 10);
       setProjectName(randomId);
       window.history.pushState(null, "", `/project/${randomId}`);
       refreshPreview(initialFiles);
-      triggerStatus(`Membuat Sandbox Baru: ${randomId}`, "success");
+      triggerStatus(`Creating New Sandbox: ${randomId}`, "success");
     }
   }, []);
 
-  // Sync / project slug update helper
   const handleProjectNameChange = (newName: string) => {
     const sanitized = newName.replace(/[^a-zA-Z0-9-_]/g, "");
     setProjectName(sanitized);
@@ -416,15 +488,12 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
       });
   };
 
-  // Update File Content in editor
   const handleEditorChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const updatedContent = e.target.value;
     setFiles(prev => prev.map(f => f.path === activeFilePath ? { ...f, content: updatedContent } : f));
   };
 
-  // Generate Interactive HTML Bundle with CSS and JS injected for Live Preview
   const refreshPreview = (customFiles: VirtualFile[] = files) => {
-    // Release existing blob URL to free memory
     if (previewUrl && previewUrl.startsWith("blob:")) {
       URL.revokeObjectURL(previewUrl);
     }
@@ -432,7 +501,6 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
     const htmlFile = customFiles.find(f => f.path.toLowerCase() === "index.html");
     let finalHtml = htmlFile ? htmlFile.content : "<h1>No index.html file found!</h1>";
 
-    // 1. Dynamic replacement of <link rel="stylesheet"> with virtual files content
     const linkRegex = /<link\s+[^>]*rel=["']stylesheet["'][^>]*href=["']([^"']+)["'][^>]*\/?>|<link\s+[^>]*href=["']([^"']+)["'][^>]*rel=["']stylesheet["'][^>]*\/?>/gi;
     const injectedStyles = new Set<string>();
 
@@ -447,7 +515,6 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
       return match;
     });
 
-    // 2. Dynamic replacement of <script src="..."></script> with virtual files content
     const scriptRegex = /<script\s+[^>]*src=["']([^"']+)["'][^>]*>\s*<\/script>/gi;
     const injectedScripts = new Set<string>();
 
@@ -456,12 +523,11 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
       const matchedFile = customFiles.find(f => f.path.toLowerCase() === src.toLowerCase());
       if (matchedFile) {
         injectedScripts.add(matchedFile.path.toLowerCase());
-        return `<script>\n// Injected from ${matchedFile.path}\n${matchedFile.content}\n</script>`;
+        return `<script>\n${matchedFile.content}\n</script>`;
       }
       return match;
     });
 
-    // 3. Fallback injection for unlinked CSS files (e.g., style.css or styles.css)
     const fallbackCssNames = ["style.css", "styles.css"];
     fallbackCssNames.forEach(cssName => {
       if (!injectedStyles.has(cssName)) {
@@ -478,7 +544,6 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
       }
     });
 
-    // Ensure viewport meta tag exists for mobile responsive scaling in preview
     if (!finalHtml.toLowerCase().includes('name="viewport"') && !finalHtml.toLowerCase().includes("name='viewport'")) {
       const viewportTag = `\n  <meta name="viewport" content="width=device-width, initial-scale=1.0">`;
       if (finalHtml.includes("<head>")) {
@@ -488,10 +553,8 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
       }
     }
 
-    // Inject console logs interceptor & runtime error handling script
     const errorHandlingScript = `
       <script>
-        // Catch runtime errors
         window.addEventListener('error', function(e) {
           console.error("Runtime Error: " + e.message);
           window.parent.postMessage({ type: "PREVIEW_ERROR", message: e.message }, "*");
@@ -513,7 +576,6 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
           setTimeout(() => errDiv.remove(), 6000);
         });
 
-        // Intercept standard console logging and send to parent
         (function() {
           const originalLog = console.log;
           const originalError = console.error;
@@ -568,11 +630,10 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
       finalHtml = errorHandlingScript + finalHtml;
     }
 
-    // 4. Fallback injection for unlinked app.js
     if (!injectedScripts.has("app.js")) {
       const jsFile = customFiles.find(f => f.path.toLowerCase() === "app.js");
       if (jsFile) {
-        const scriptTag = `<script>\n// Fallback Injection for app.js\n${jsFile.content}\n</script>`;
+        const scriptTag = `<script>\n${jsFile.content}\n</script>`;
         if (finalHtml.includes("</body>")) {
           finalHtml = finalHtml.replace("</body>", `${scriptTag}\n</body>`);
         } else {
@@ -592,7 +653,6 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
     return previewUrl || "about:blank";
   };
 
-  // Add a new file
   const handleAddFile = () => {
     if (!newFileName.trim()) return;
     const name = newFileName.trim();
@@ -603,7 +663,7 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
 
     const newFile: VirtualFile = {
       path: name,
-      content: name.endsWith(".json") ? "{\n  \n}" : name.endsWith(".js") ? "// Write your Javascript code here\n" : "<!-- Write your HTML/CSS markup here -->\n"
+      content: name.endsWith(".json") ? "{\n  \n}" : name.endsWith(".js") ? "" : "<!-- Write your HTML/CSS markup here -->\n"
     };
 
     setFiles(prev => [...prev, newFile]);
@@ -613,7 +673,6 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
     triggerStatus(`File '${name}' was successfully added.`, "success");
   };
 
-  // Delete file
   const handleDeleteFile = (pathToDelete: string) => {
     if (pathToDelete === "index.html") {
       triggerStatus("The file 'index.html' is the main file and cannot be deleted!", "error");
@@ -626,13 +685,11 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
     }
     triggerStatus(`File '${pathToDelete}' was successfully deleted.`, "success");
     
-    // Also trigger clean-up on Supabase
     if (supabaseUrl && supabaseAnonKey) {
       deleteSingleFileFromSupabase(pathToDelete);
     }
   };
 
-  // Export as ZIP file
   const handleDownloadZip = async () => {
     try {
       const zip = new JSZip();
@@ -652,7 +709,6 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
     }
   };
 
-  // Import Zip file
   const handleZipUploadChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -696,13 +752,11 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
     }
   };
 
-  // Clean-up markdown blocks to show only pure descriptions in chat bubbles
   const cleanDisplayContent = (text: string) => {
     let cleaned = text.replace(/```(?:json|javascript|js|html|typescript|ts)?[\s\S]*?(?:```|$)/gi, "");
     return cleaned.trim();
   };
 
-  // Extract files from standard markdown code blocks when JSON parsing is impossible or failed
   const extractFilesFromMarkdownBlocks = (text: string, currentFiles: VirtualFile[]): VirtualFile[] | null => {
     const codeBlockRegex = /```([a-zA-Z0-9_-]*)\n([\s\S]*?)\n```/g;
     const blocks: { lang: string; content: string; index: number }[] = [];
@@ -722,7 +776,6 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
     for (let i = 0; i < blocks.length; i++) {
       const block = blocks[i];
       
-      // Ignore blocks that are actually formatted JSON arrays to prevent them from overwriting individual files
       if (block.lang.toLowerCase() === "json" && (block.content.trim().startsWith("[") || block.content.includes('"path"'))) {
         continue;
       }
@@ -776,11 +829,9 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
     return extracted.length > 0 ? extracted : null;
   };
 
-  // Attempt to parse or extract a valid JSON array from the response text
   const tryExtractJsonArray = (text: string): VirtualFile[] | null => {
     if (!text) return null;
 
-    // Helper to validate and return virtual files
     const parseAsVirtualFiles = (candidate: string): VirtualFile[] | null => {
       try {
         let cleaned = candidate.trim();
@@ -788,7 +839,6 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
         if (Array.isArray(parsed) && parsed.length > 0 && parsed.every(item => item && typeof item === "object" && typeof item.path === "string" && typeof item.content === "string")) {
           return parsed;
         }
-        // Try with trailing commas removed
         cleaned = cleaned.replace(/,(\s*[\]}])/g, "$1");
         parsed = JSON.parse(cleaned);
         if (Array.isArray(parsed) && parsed.length > 0 && parsed.every(item => item && typeof item === "object" && typeof item.path === "string" && typeof item.content === "string")) {
@@ -798,11 +848,9 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
       return null;
     };
 
-    // Helper for manual robust regex extraction of file structures
     const runManualExtractor = (rawText: string): VirtualFile[] | null => {
       const extractedFiles: VirtualFile[] = [];
       
-      // Regex matches keys like "path", 'path', path and supports value wrappers like ", ', or `
       const pathRegex = /(?:"path"|'path'|\bpath\b)\s*:\s*(?:"([^"]+)"|'([^']+)'|`([^`]+)`)/gi;
       const pathMatches: { path: string; index: number; lastIndex: number }[] = [];
       let match;
@@ -825,7 +873,6 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
           
           const searchSub = rawText.substring(startOfSearch, endOfSearch);
           
-          // Locate content key with quote identifier: "content", 'content', or content
           const contentKeyRegex = /(?:"content"|'content'|\bcontent\b)\s*:\s*(["'`])/i;
           const contentMatch = searchSub.match(contentKeyRegex);
           if (!contentMatch) continue;
@@ -836,7 +883,6 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
           
           let endQuoteIndex = -1;
           
-          // Search backward for the matching unescaped closing quote character followed by structure endings
           for (let j = contentSearchSub.length - 1; j >= 0; j--) {
             if (contentSearchSub[j] === quoteChar) {
               let backslashCount = 0;
@@ -845,7 +891,7 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
                 backslashCount++;
                 k--;
               }
-              if (backslashCount % 2 !== 0) continue; // Escaped quote
+              if (backslashCount % 2 !== 0) continue;
               
               const after = contentSearchSub.substring(j + 1).trim();
               if (after.startsWith("}") || after.startsWith(",") || after === "" || after.startsWith("]")) {
@@ -856,7 +902,6 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
           }
           
           if (endQuoteIndex === -1) {
-            // Backward scan fallback for any unescaped quote character
             for (let j = contentSearchSub.length - 1; j >= 0; j--) {
               if (contentSearchSub[j] === quoteChar) {
                 let backslashCount = 0;
@@ -876,7 +921,6 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
           if (endQuoteIndex !== -1) {
             let contentValue = contentSearchSub.substring(0, endQuoteIndex);
             
-            // Decode typical escaped structures depending on wrapper quote
             if (quoteChar === '"') {
               contentValue = contentValue
                 .replace(/\\n/g, "\n")
@@ -908,7 +952,6 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
       return extractedFiles.length > 0 ? extractedFiles : null;
     };
 
-    // --- STEP 1: Scan all markdown code blocks in the response ---
     const codeBlockRegex = /```(?:json|javascript|js)?\s*([\s\S]*?)\s*```/gi;
     let codeBlockMatch;
     while ((codeBlockMatch = codeBlockRegex.exec(text)) !== null) {
@@ -920,15 +963,12 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
       if (manualFromBlock) return manualFromBlock;
     }
 
-    // --- STEP 2: Try to parse the entire text as JSON ---
     const parsedAll = parseAsVirtualFiles(text);
     if (parsedAll) return parsedAll;
 
-    // --- STEP 3: Try running manual extractor on the entire raw text ---
     const manualFromAll = runManualExtractor(text);
     if (manualFromAll) return manualFromAll;
 
-    // --- STEP 4: Smart bracket-to-bracket look-up on the entire text ---
     let startIdx = -1;
     let searchPos = 0;
     while (true) {
@@ -975,7 +1015,6 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
     return null;
   };
 
-  // Call API server-side to let AI automatically edit our source code based on a prompt!
   const handleSendPromptToAI = async (overridePrompt?: string) => {
     const promptToSend = overridePrompt || aiPrompt;
     if (!promptToSend.trim()) return;
@@ -984,7 +1023,6 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
     setAiPrompt("");
     setAiStreamingText("");
 
-    // Append user message
     const userMsg: ChatMessage = {
       id: "usr-" + Date.now(),
       role: "user",
@@ -992,13 +1030,16 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     };
 
-    // Append empty assistant message for streaming
     const assistantMsgId = "ai-" + Date.now();
+    thinkingStartTimesRef.current[assistantMsgId] = Date.now();
+
     const tempAssistantMsg: ChatMessage = {
       id: assistantMsgId,
       role: "assistant",
-      content: "AI sedang membaca berkas dan menganalisis pengeditan...",
+      content: "AI is reading files and analyzing edits...",
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      modelId: selectedModel,
+      thinkingDuration: 1,
     };
 
     setChatHistory(prev => [...prev, userMsg, tempAssistantMsg]);
@@ -1013,24 +1054,24 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
           messages: [
             {
               role: "user",
-              content: `Instruksi Pengguna: "${promptToSend}"\n\n` +
-                `Berikut adalah seluruh daftar file di workspace saya beserta isi kodenya saat ini:\n\n` +
+              content: `User Instructions: "${promptToSend}"\n\n` +
+                `Here is the entire list of files in my workspace with their current code:\n\n` +
                 JSON.stringify(files, null, 2) + "\n\n" +
-                `PENTING (INSTRUKSI PERILAKU & STRUKTUR AI):\n` +
-                `1. Berikan penjelasan yang jelas mengenai: file apa yang Anda edit, untuk apa file tersebut, mengapa perubahan ini bagus/berguna, dan jelaskan implementasinya secara ringkas dan rapi.\n` +
-                `2. Fokus utama Anda adalah: MEMILIH/MENYESUAIKAN/MERAPIKAN file, MEMPERBAIKI BUG (fix bug), MENGEDIT berkas, dan MEMVERIFIKASI agar tidak ada kode yang salah.\n` +
-                `3. SANGAT PENTING: Anda hanya boleh mengikuti perintah pengguna secara tepat. JANGAN MENAMBAHKAN fitur, komponen, tombol, atau logic lain yang tidak disuruh atau tidak diminta oleh pengguna!\n` +
-                `4. Berikan penjelasan ringkas dan rapi di luar blok kode JSON dalam Bahasa Indonesia.\n` +
-                `5. Kemudian, berikan blok kode \`\`\`json berisi array dari file-file yang Anda PERBARUI saja. JANGAN sertakan file yang tidak diedit sama sekali.\n` +
-                `6. Tulis isi file baru secara LENGKAP di bagian "content". JANGAN PERNAH menyingkat isi file dengan ellipsis, komentar "// sisa kode", atau "/* ... */" karena itu akan merusak program pengguna.\n` +
-                `7. Agar aman dari batasan parsing JSON, usahakan meng-escape tanda kutip ganda (\`\"\`) di dalam kode Anda, atau gunakan tanda kutip tunggal (\`'\`) atau backticks (\`\` \` \`\`) dalam string kodenya.\n` +
-                `8. Jangan merusak atau menghapus file penting. Edit file index.html atau app.js sesuai kebutuhan, atau buat file baru jika diperlukan.\n\n` +
-                `Contoh format respons yang Anda HARUS ikuti:\n` +
-                `### Penjelasan Perubahan\n` +
-                `- **[File yang Diubah]**: [Penjelasan untuk apa file ini dan mengapa struktur/perubahan ini bagus...]\n\n` +
+                `IMPORTANT (AI BEHAVIOR & STRUCTURE INSTRUCTIONS):\n` +
+                `1. Provide a clear explanation of: which files you edited, what those files are for, why these changes are good/useful, and explain the implementation concisely and neatly.\n` +
+                `2. Your primary focus is: SELECTING/ADJUSTING/TIDYING files, FIXING BUGS, EDITING files, and VERIFYING to ensure there is no wrong code.\n` +
+                `3. VERY IMPORTANT: You must follow user commands precisely. DO NOT add other features, components, buttons, or logic that were not requested or asked by the user!\n` +
+                `4. Provide a concise and neat explanation outside the JSON code block in English.\n` +
+                `5. Then, provide a \`\`\`json code block containing the array of ONLY updated files. DO NOT include files that were not edited at all.\n` +
+                `6. Write the NEW file content completely in the "content" field. NEVER shorten file content with ellipsis, comments like "// remaining code", or "/* ... */" because that will break the user's program.\n` +
+                `7. To be safe from JSON parsing limits, try to escape double quotes (\`\"\`) in your code, or use single quotes (\`'\`) or backticks (\`\` \` \`\`) inside the code string.\n` +
+                `8. Do not corrupt or delete important files. Edit index.html or app.js as needed, or create new files if required.\n\n` +
+                `Example format of the response you MUST follow:\n` +
+                `### Explanation of Changes\n` +
+                `- **[Edited File]**: [Explanation of what this file is for and why this structure/change is good...]\n\n` +
                 `\`\`\`json\n` +
                 `[\n` +
-                `  { "path": "index.html", "content": "...kode baru lengkap..." }\n` +
+                `  { "path": "index.html", "content": "...complete new code..." }\n` +
                 `]\n` +
                 `\`\`\``
             }
@@ -1069,23 +1110,31 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
                   fullText += parsed.text;
                   setAiStreamingText(fullText);
                   
-                  // Live-update the streaming text (filtering out ugly raw JSON blocks on the fly)
+                  const startTime = thinkingStartTimesRef.current[assistantMsgId];
+                  let dur: number | undefined = undefined;
+                  if (startTime) {
+                    dur = Math.max(1, Math.round((Date.now() - startTime) / 1000));
+                  }
+
                   const displayable = cleanDisplayContent(fullText);
                   setChatHistory(prev => prev.map(msg => 
                     msg.id === assistantMsgId 
-                      ? { ...msg, content: displayable || "Menyusun perubahan kode..." } 
+                      ? { 
+                          ...msg, 
+                          content: displayable || "Assembling code changes...",
+                          thinkingDuration: dur,
+                          modelId: selectedModel
+                        } 
                       : msg
                   ));
                 }
               } catch (e) {
-                // Ignore
               }
             }
           }
         }
       }
 
-      // Final complete content parsing
       const displayableText = cleanDisplayContent(fullText);
       setAiStreamingText(fullText);
       
@@ -1096,10 +1145,8 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
       }
 
       if (editedFiles && Array.isArray(editedFiles) && editedFiles.length > 0) {
-        // Backup current state for Restore button before updating
         const oldFiles = [...files];
         
-        // Merge the edited files into existing files securely to avoid wiping out unmodified files
         const mergedFiles = [...files];
         editedFiles.forEach((editedFile) => {
           const index = mergedFiles.findIndex(f => f.path.toLowerCase() === editedFile.path.toLowerCase());
@@ -1116,10 +1163,11 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
         setFiles(mergedFiles);
         setPreviewKey(prev => prev + 1);
         
-        // Refresh live preview once AI finishes writing the edits
         refreshPreview(mergedFiles);
         
-        // Finalize the chat history with backup snapshots and list of modified files
+        const startTime = thinkingStartTimesRef.current[assistantMsgId];
+        const finalDur = startTime ? Math.max(1, Math.round((Date.now() - startTime) / 1000)) : 3;
+
         setChatHistory(prev => prev.map(msg => 
           msg.id === assistantMsgId 
             ? { 
@@ -1127,14 +1175,30 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
                 content: (displayableText ? displayableText.trim() : "I have updated your code files as requested.") + "\n\n" + 
                          `**Updated files:**\n` + 
                          editedFiles.map(f => `• \`${f.path}\``).join("\n"), 
-                filesSnapshot: oldFiles 
+                filesSnapshot: oldFiles,
+                thinkingDuration: finalDur,
+                modelId: selectedModel
               } 
             : msg
         ));
         
         triggerStatus("Your workspace was successfully updated!", "success");
       } else {
-        throw new Error("JSON response format is not as expected or could not be parsed.");
+        const startTime = thinkingStartTimesRef.current[assistantMsgId];
+        const finalDur = startTime ? Math.max(1, Math.round((Date.now() - startTime) / 1000)) : 3;
+
+        setChatHistory(prev => prev.map(msg => 
+          msg.id === assistantMsgId 
+            ? { 
+                ...msg, 
+                content: fullText.trim() || "I have processed your request.",
+                thinkingDuration: finalDur,
+                modelId: selectedModel
+              } 
+            : msg
+        ));
+        
+        triggerStatus("AI response received.", "success");
       }
     } catch (err: any) {
       console.error("AI Code Edit Error: ", err);
@@ -1149,10 +1213,9 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
     }
   };
 
-  // Sync Project Files to Cloud ExeChat (via Supabase backend routes)
   const handleUploadToSupabase = async () => {
     try {
-      triggerStatus("Menyimpan berkas Anda ke Cloud ExeChat...", "info");
+      triggerStatus("Saving your files to Cloud ExeChat...", "info");
 
       const headers: Record<string, string> = {
         "Content-Type": "application/json"
@@ -1180,7 +1243,6 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
     }
   };
 
-  // Load project from Cloud Sandbox
   const handleLoadFromSupabase = async () => {
     try {
       triggerStatus(`Opening project '${projectName}' from Cloud...`, "info");
@@ -1218,11 +1280,12 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
     }
   };
 
-  // Delete project from Supabase Cloud
-  const handleDeleteProjectSupabase = async () => {
-    const confirmClear = window.confirm(`Are you sure you want to delete all Cloud storage for project '${projectName}'? This action cannot be undone.`);
-    if (!confirmClear) return;
+  const handleDeleteProjectSupabase = () => {
+    setShowDeleteProjectConfirm(true);
+  };
 
+  const executeDeleteProjectSupabase = async () => {
+    setShowDeleteProjectConfirm(false);
     try {
       await deleteProjectFromSupabase();
       triggerStatus("All project cloud storage successfully cleared!", "success");
@@ -1274,70 +1337,186 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
     }
   };
 
-  // Simple Markdown elements parser
-  const renderMessageContent = (content: string) => {
-    const lines = content.split("\n");
+  const parseMessageThinking = (content: string) => {
+    const trimmed = content.trim();
+    if (trimmed.startsWith("<think>")) {
+      const closeIndex = trimmed.indexOf("</think>");
+      if (closeIndex !== -1) {
+        const thinking = trimmed.substring(7, closeIndex).trim();
+        const actual = trimmed.substring(closeIndex + 8).trim();
+        return { thinking, actual, isThinking: false };
+      } else {
+        const thinking = trimmed.substring(7).trim();
+        return { thinking, actual: "", isThinking: true };
+      }
+    }
+    return { thinking: null, actual: content, isThinking: false };
+  };
+
+  const extractUpdatedFilesFromContent = (text: string): string[] => {
+    const lines = text.split("\n");
+    const foundFiles: string[] = [];
+    let startCollecting = false;
+    for (const line of lines) {
+      if (line.includes("**Updated files:**") || line.includes("Updated files:")) {
+        startCollecting = true;
+        continue;
+      }
+      if (startCollecting) {
+        const match = line.match(/•\s*`([^`]+)`/) || line.match(/-\s*`([^`]+)`/);
+        if (match) {
+          foundFiles.push(match[1]);
+        }
+      }
+    }
+    return foundFiles;
+  };
+
+  const renderMessageContent = (content: string, msgId: string) => {
+    const { thinking, actual, isThinking } = parseMessageThinking(content);
+    
+    const msg = chatHistory.find(m => m.id === msgId);
+    const msgDuration = msg?.thinkingDuration || 2;
+    const msgModelId = msg?.modelId || selectedModel;
+    const msgModelName = MODEL_OPTIONS.find(m => m.id === msgModelId)?.name || "ExeAi";
+    
+    const updatedFiles = msg ? extractUpdatedFilesFromContent(msg.content) : [];
+
     return (
-      <div className="space-y-2 text-zinc-300 text-xs leading-relaxed font-sans font-normal">
-        {lines.map((line, idx) => {
-          if (line.trim().startsWith("```json") || line.trim().startsWith("```") || line.trim().startsWith("]")) {
-            return null;
-          }
-          
-          // Bullet list items
-          if (line.trim().startsWith("* ") || line.trim().startsWith("- ")) {
-            const text = line.replace(/^[\s*-]+/, "").trim();
-            return (
-              <ul key={idx} className="list-disc pl-4 space-y-1 my-1">
-                <li className="text-zinc-300">{parseInlineFormatting(text)}</li>
-              </ul>
-            );
-          }
-          
-          // Headers
-          if (line.trim().startsWith("### ")) {
-            return (
-              <h4 key={idx} className="text-xs font-bold text-zinc-100 mt-3 mb-1 uppercase tracking-wider text-amber-500">
-                {parseInlineFormatting(line.replace("### ", ""))}
-              </h4>
-            );
-          }
-          if (line.trim().startsWith("## ")) {
-            return (
-              <h3 key={idx} className="text-sm font-bold text-zinc-100 mt-4 mb-2 border-b border-zinc-800 pb-1">
-                {parseInlineFormatting(line.replace("## ", ""))}
-              </h3>
-            );
-          }
-          
-          if (!line.trim()) return <div key={idx} className="h-1" />;
-          
-          return (
-            <p key={idx} className="leading-relaxed">
-              {parseInlineFormatting(line)}
-            </p>
-          );
-        })}
+      <div className="flex flex-col gap-2.5 w-full max-w-full overflow-hidden text-xs">
+        {thinking !== null && (
+          <div className="mb-1 font-sans select-none flex flex-col items-start w-full">
+            <button
+              onClick={() => setExpandedThoughts(prev => ({ ...prev, [msgId]: !prev[msgId] }))}
+              className="w-full flex items-center justify-between gap-3 text-[10.5px] text-zinc-400 hover:text-zinc-200 transition-all font-semibold bg-zinc-900/80 border border-zinc-800/80 hover:border-zinc-700/60 px-3 py-2 rounded-xl cursor-pointer shadow-sm active:scale-[0.99]"
+            >
+              <div className="flex items-center gap-2">
+                <span className="shrink-0 text-amber-500 animate-pulse">💡</span>
+                <span>{isThinking ? "Thinking Process..." : "Thought process"}</span>
+              </div>
+              <div className="flex items-center gap-1.5 text-zinc-500">
+                {!isThinking && <span className="text-[9.5px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400 font-mono">Thought for {msgDuration}s</span>}
+                <ChevronDown className={`h-3 w-3 shrink-0 transition-transform duration-250 ${expandedThoughts[msgId] ? "rotate-180 text-zinc-300" : ""}`} />
+              </div>
+            </button>
+
+            <AnimatePresence>
+              {expandedThoughts[msgId] && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: "auto", opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className="overflow-hidden w-full"
+                >
+                  <div className="mt-2 w-full bg-zinc-950/70 border border-zinc-900/60 p-3 rounded-xl font-mono text-[10px] text-zinc-500 leading-relaxed whitespace-pre-wrap max-h-[160px] overflow-y-auto scrollbar-thin border-l-2 border-l-amber-500/60 pl-3">
+                    {thinking || "Processing..."}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        )}
+
+        {/* Dynamic Action History Timeline logs */}
+        {msg && (
+          <div className="mb-1 font-sans select-none flex flex-col items-start w-full">
+            <button
+              onClick={() => setExpandedActions(prev => ({ ...prev, [msgId]: !prev[msgId] }))}
+              className="w-full flex items-center justify-between gap-3 text-[10.5px] text-zinc-400 hover:text-zinc-200 transition-all font-semibold bg-zinc-900/50 border border-zinc-900/80 px-3 py-1.5 rounded-xl cursor-pointer"
+            >
+              <div className="flex items-center gap-2">
+                <span className="shrink-0 text-zinc-400 text-[11px]">⚙️</span>
+                <span>Execution Logs</span>
+              </div>
+              <div className="flex items-center gap-1.5 text-zinc-500">
+                <span className="text-[8.5px] uppercase tracking-wider px-1 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded">Success</span>
+                <ChevronDown className={`h-3 w-3 shrink-0 transition-transform duration-250 ${expandedActions[msgId] ? "rotate-180 text-zinc-300" : ""}`} />
+              </div>
+            </button>
+
+            <AnimatePresence>
+              {expandedActions[msgId] && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: "auto", opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className="overflow-hidden w-full"
+                >
+                  <div className="mt-1.5 w-full bg-zinc-950/40 border border-zinc-900/60 p-3 rounded-xl font-sans text-[10px] text-zinc-400 leading-relaxed flex flex-col gap-2.5">
+                    
+                    {/* Read File step */}
+                    <div className="flex items-start gap-2">
+                      <span className="text-emerald-500 font-semibold shrink-0">✓</span>
+                      <div className="flex flex-col gap-1">
+                        <span className="font-semibold text-zinc-300">Read workspace files</span>
+                        <div className="flex flex-wrap gap-1 mt-0.5">
+                          {files.map(f => (
+                            <span key={f.path} className="px-1.5 py-0.5 rounded bg-zinc-900 border border-zinc-800 text-[9px] font-mono text-zinc-400">
+                              📄 {f.path}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Analyze step */}
+                    <div className="flex items-center gap-2">
+                      <span className="text-emerald-500 font-semibold shrink-0">✓</span>
+                      <span className="font-semibold text-zinc-300">Analyzed project structure & dependencies</span>
+                    </div>
+
+                    {/* Inference step */}
+                    <div className="flex items-center gap-2">
+                      <span className="text-emerald-500 font-semibold shrink-0">✓</span>
+                      <span className="font-semibold text-zinc-300">
+                        Inference via <span className="text-amber-400 font-mono">{msgModelName}</span> ({msgDuration}s)
+                      </span>
+                    </div>
+
+                    {/* Edit step */}
+                    {updatedFiles.length > 0 && (
+                      <div className="flex items-start gap-2">
+                        <span className="text-emerald-500 font-semibold shrink-0">✓</span>
+                        <div className="flex flex-col gap-1">
+                          <span className="font-semibold text-zinc-300">Modified file contents</span>
+                          <div className="flex flex-wrap gap-1 mt-0.5">
+                            {updatedFiles.map(filePath => (
+                              <span key={filePath} className="px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/20 text-[9px] font-mono text-amber-400">
+                                ✏️ {filePath}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        )}
+
+        {actual ? (
+          <div className="text-zinc-300 w-full overflow-x-auto text-[13px] leading-relaxed select-text mt-1">
+            <MarkdownRenderer content={actual} />
+          </div>
+        ) : (
+          isThinking && (
+            <div className="flex items-center gap-1.5 py-1 select-none">
+              <span className="h-1 w-1 rounded-full bg-zinc-500 animate-[bounce_1s_infinite_100ms]" />
+              <span className="h-1 w-1 rounded-full bg-zinc-500 animate-[bounce_1s_infinite_200ms]" />
+              <span className="h-1 w-1 rounded-full bg-zinc-500 animate-[bounce_1s_infinite_300ms]" />
+            </div>
+          )
+        )}
       </div>
     );
   };
 
-  const parseInlineFormatting = (text: string) => {
-    const regex = /(\*\*.*?\*\*|`.*?`)/g;
-    const splitParts = text.split(regex);
-    
-    return splitParts.map((part, i) => {
-      if (part.startsWith("**") && part.endsWith("**")) {
-        return <strong key={i} className="font-semibold text-zinc-100">{part.slice(2, -2)}</strong>;
-      }
-      if (part.startsWith("`") && part.endsWith("`")) {
-        return <code key={i} className="bg-zinc-900 border border-zinc-800 text-amber-400 font-mono text-[11px] px-1 py-0.5 rounded">{part.slice(1, -1)}</code>;
-      }
-      return part;
-    });
-  };
-
-  const aiName = "AI";
+  const aiName = "ExeAi";
 
   if (isMobileScreen) {
     return (
@@ -1353,27 +1532,27 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
           </div>
           
           <div className="space-y-2">
-            <h3 className="text-lg font-bold tracking-tight">Fitur Tidak Tersedia di HP</h3>
+            <h3 className="text-lg font-bold tracking-tight">Feature Not Available on Mobile</h3>
             <p className="text-xs text-zinc-400 leading-relaxed">
-              Maaf, fitur <span className="text-amber-500 font-semibold">ExeCode</span> hanya didukung pada perangkat PC / Desktop demi pengalaman pengeditan kode yang optimal.
+              Sorry, <span className="text-amber-500 font-semibold">ExeCode</span> features are only supported on PC / Desktop devices for the optimal code editing experience.
             </p>
           </div>
 
           <div className="w-full h-px bg-zinc-800/50" />
 
           <div className="flex flex-col items-center space-y-2">
-            <span className="text-xs text-zinc-500 font-medium">Mengalihkan kembali ke ExeChat dalam</span>
+            <span className="text-xs text-zinc-500 font-medium">Redirecting back to ExeChat in</span>
             <div className="flex items-center justify-center w-12 h-12 rounded-full bg-amber-500 text-white font-bold text-lg shadow-lg shadow-amber-500/20 animate-bounce">
               {countdown}
             </div>
-            <span className="text-[10px] text-zinc-600 font-mono">detik...</span>
+            <span className="text-[10px] text-zinc-600 font-mono">seconds...</span>
           </div>
 
           <button
             onClick={onClose}
             className="w-full py-2.5 rounded-xl text-xs font-semibold bg-zinc-800 hover:bg-zinc-750 text-zinc-200 transition-all border border-zinc-700/50"
           >
-            Kembali Sekarang
+            Go Back Now
           </button>
         </div>
       </div>
@@ -1383,10 +1562,8 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
   return (
     <div className={`fixed inset-0 z-50 flex flex-col backdrop-blur-xl ${isDark ? "bg-zinc-950 text-zinc-100 font-sans" : "bg-zinc-50 text-zinc-900 font-sans"}`}>
       
-      {/* HEADER BAR (Visual Match: ExeChat brand with start/share/remix actions) */}
       {!isFullscreen && (
         <div className={`px-5 py-3 flex items-center justify-between border-b ${isDark ? "border-zinc-850 bg-zinc-950" : "border-zinc-200 bg-white"} shrink-0`}>
-          {/* Left: Back to start */}
           <div className="flex items-center gap-3">
             <button
               onClick={() => {
@@ -1406,34 +1583,17 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
             </button>
           </div>
 
-          {/* Center: Brand name "ExeChat" */}
           <div className="flex items-center gap-2">
-            <span className="font-sans font-bold text-base tracking-tight text-zinc-100">ExeChat</span>
-            <span className="text-[10px] font-normal uppercase tracking-wider px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-500 border border-amber-500/20">
-              ExeCode
+            <span className="font-sans font-extrabold text-base tracking-widest text-amber-400 uppercase">
+              EXECODE
             </span>
           </div>
 
-          {/* Right: Remix, Share, Publish, Fullscreen */}
           <div className="flex items-center gap-2">
-            {statusMessage && (
-              <div className={`mr-2 px-3 py-1.5 rounded-lg text-[11px] font-normal flex items-center gap-1.5 shadow-sm animate-fade-in ${
-                statusMessage.type === "success" 
-                  ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20" 
-                  : statusMessage.type === "error"
-                    ? "bg-rose-500/10 text-rose-500 border border-rose-500/20"
-                    : "bg-amber-500/10 text-amber-500 border border-amber-500/20"
-              }`}>
-                {statusMessage.type === "success" ? <CheckCircle2 className="h-3 w-3" /> : <AlertCircle className="h-3 w-3" />}
-                <span>{statusMessage.text}</span>
-              </div>
-            )}
-
-            {/* Save / Sync button */}
             <button
               onClick={handleUploadToSupabase}
               className="px-3 py-1.5 rounded-xl text-xs font-normal bg-amber-500 hover:bg-amber-450 text-white flex items-center gap-1.5 transition-all shadow-md active:scale-95 cursor-pointer"
-              title="Simpan Proyek ke Cloud"
+              title="Save Project to Cloud"
             >
               <Upload className="h-3.5 w-3.5" />
               <span>Save</span>
@@ -1454,47 +1614,37 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
         </div>
       )}
 
-      {/* CORE WORKSPACE GRID */}
-      <div className="flex-1 flex flex-col md:flex-row overflow-hidden min-h-0 relative bg-zinc-950">
+      <div className={`flex-1 flex flex-col md:flex-row overflow-hidden min-h-0 relative ${isDark ? "bg-zinc-950" : "bg-zinc-50"}`}>
         
-        {/* PANEL KIRI: AI CHAT CONVERSATION (Styled like Google AI Studio) */}
         <div className={`${
           isFullscreen 
             ? "hidden" 
-            : "w-full md:w-[380px] h-1/2 md:h-full border-b md:border-b-0 md:border-r flex flex-col shrink-0 border-zinc-850 bg-[#121214]"
+            : `w-full md:w-[380px] h-1/2 md:h-full border-b md:border-b-0 md:border-r flex flex-col shrink-0 transition-colors duration-200 ${
+                isDark ? "border-zinc-850 bg-[#121214]" : "border-zinc-200 bg-[#fafafa]"
+              }`
         }`}>
-          {/* Chat Header */}
-          <div className="p-4 border-b border-zinc-850 flex items-center justify-between bg-zinc-950/40">
+          <div className={`p-4 border-b flex items-center justify-between transition-colors duration-200 ${
+            isDark ? "border-zinc-850 bg-zinc-950/40" : "border-zinc-200 bg-white"
+          }`}>
             <div className="flex items-center gap-2">
               <Sparkles className="h-4 w-4 text-amber-500" />
-              <span className="text-xs font-semibold tracking-tight text-zinc-200">{aiName}</span>
+              <span className={`text-xs font-semibold tracking-tight ${isDark ? "text-zinc-200" : "text-zinc-800"}`}>{aiName}</span>
             </div>
             
-            {/* Start New Chat/Reset */}
             <button
-              onClick={() => {
-                const conf = window.confirm("Start a new AI conversation? The chat history in this workspace will be cleared.");
-                if (conf) {
-                  setChatHistory([
-                    {
-                      id: "initial",
-                      role: "assistant",
-                      content: "Hello! I am your ExeCode AI Assistant. Let me know what you want to create or change in this web application, and I will update the code in real-time!",
-                      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-                    }
-                  ]);
-                  triggerStatus("Chat history cleared.", "info");
-                }
-              }}
-              className="p-1 rounded-lg hover:bg-zinc-900 text-zinc-400 hover:text-zinc-200 transition-all"
-              title="Start New Chat"
+              onClick={handleClearChat}
+              className={`p-1 rounded-lg text-zinc-400 hover:text-rose-500 transition-all cursor-pointer ${
+                isDark ? "hover:bg-zinc-900" : "hover:bg-zinc-150"
+              }`}
+              title="Clear Chat History"
             >
-              <Plus className="h-4 w-4" />
+              <Trash2 className="h-4 w-4" />
             </button>
           </div>
 
-          {/* Chat Metadata & Model Dropdown Selection */}
-          <div className="px-4 py-2 border-b border-zinc-850/50 bg-zinc-950/20 text-[10px] text-zinc-500 flex items-center justify-between font-mono shrink-0">
+          <div className={`px-4 py-2 border-b text-[10px] text-zinc-500 flex items-center justify-between font-mono shrink-0 transition-colors duration-200 ${
+            isDark ? "border-zinc-850/50 bg-zinc-950/20" : "border-zinc-200 bg-zinc-100/50"
+          }`}>
             <span>{MODEL_OPTIONS.find(m => m.id === selectedModel)?.name || "AI Assistant"} • Ran successfully</span>
             
             <div className="relative">
@@ -1502,14 +1652,16 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
                 onClick={() => setShowModelDropdown(!showModelDropdown)}
                 className="text-[10px] text-amber-500 hover:text-amber-400 font-medium flex items-center gap-1 transition-all"
               >
-                <span>Ubah Model</span>
+                <span>Change Model</span>
                 <ChevronDown className="h-3 w-3" />
               </button>
 
               {showModelDropdown && (
-                <div className="absolute top-full right-0 mt-1 z-50 w-64 rounded-xl border p-1 shadow-2xl bg-zinc-900 border-zinc-800 text-zinc-100 max-h-64 overflow-y-auto">
-                  <div className="px-2.5 py-1 mb-1 border-b border-zinc-800/20">
-                    <span className="text-[9px] font-bold uppercase tracking-wider text-zinc-500">Pilih Model AI</span>
+                <div className={`absolute top-full right-0 mt-1 z-50 w-64 rounded-xl border p-1 shadow-2xl max-h-64 overflow-y-auto ${
+                  isDark ? "bg-zinc-900 border-zinc-800 text-zinc-100" : "bg-white border-zinc-200 text-zinc-800"
+                }`}>
+                  <div className={`px-2.5 py-1 mb-1 border-b ${isDark ? "border-zinc-800/20" : "border-zinc-100"}`}>
+                    <span className="text-[9px] font-bold uppercase tracking-wider text-zinc-500">Select AI Model</span>
                   </div>
                   <div className="space-y-0.5">
                     {MODEL_OPTIONS.map((m) => {
@@ -1521,17 +1673,21 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
                           onClick={() => {
                             setSelectedModel(m.id);
                             setShowModelDropdown(false);
-                            triggerStatus(`Model AI diubah ke '${m.name}'`, "success");
+                            triggerStatus(`AI Model changed to '${m.name}'`, "success");
                           }}
                           className={`w-full text-left px-2.5 py-1.5 rounded-lg text-[11px] flex flex-col gap-0.5 transition-all ${
                             isSel
                               ? "bg-amber-500/10 text-amber-400 border border-amber-500/15"
-                              : "text-zinc-400 hover:bg-zinc-800/40 hover:text-zinc-200"
+                              : isDark
+                                ? "text-zinc-400 hover:bg-zinc-800/40 hover:text-zinc-200"
+                                : "text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900"
                           }`}
                         >
                           <div className="flex items-center justify-between w-full">
-                            <span className={`font-semibold ${isSel ? "text-amber-400" : "text-zinc-300"}`}>{m.name}</span>
-                            <span className="text-[8px] px-1 bg-zinc-950 text-zinc-500 rounded border border-zinc-800">{m.badge}</span>
+                            <span className={`font-semibold ${isSel ? "text-amber-400" : isDark ? "text-zinc-300" : "text-zinc-700"}`}>{m.name}</span>
+                            <span className={`text-[8px] px-1 rounded border ${
+                              isDark ? "bg-zinc-950 text-zinc-500 border-zinc-800" : "bg-zinc-50 text-zinc-500 border-zinc-200"
+                            }`}>{m.badge}</span>
                           </div>
                           <span className="text-[9px] text-zinc-500 line-clamp-1">{m.description}</span>
                         </button>
@@ -1543,7 +1699,6 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
             </div>
           </div>
 
-          {/* Messages Area */}
           <div className="flex-1 overflow-y-auto p-4 space-y-4 flex flex-col">
             {chatHistory.map((message) => {
               const isUsr = message.role === "user";
@@ -1552,34 +1707,60 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
                   key={message.id}
                   className={`flex flex-col ${isUsr ? "items-end" : "items-start"} space-y-1`}
                 >
-                  {/* Speaker identity label */}
                   <span className="text-[10px] text-zinc-500 font-medium px-1">
-                    {isUsr ? "Anda" : aiName}
+                    {isUsr 
+                      ? "You" 
+                      : (MODEL_OPTIONS.find(m => m.id === (message.modelId || selectedModel))?.name || aiName)
+                    }
                   </span>
 
-                  {/* Message Bubble */}
                   <div
-                    className={`px-3.5 py-2.5 rounded-2xl text-xs max-w-[85%] leading-relaxed ${
+                    className={`px-3.5 py-2.5 rounded-2xl text-xs max-w-[85%] leading-relaxed border transition-colors duration-200 ${
                       isUsr
-                        ? "bg-zinc-900 border border-zinc-800 text-zinc-200 rounded-tr-sm"
-                        : "bg-zinc-900/30 border border-zinc-900 text-zinc-300 rounded-tl-sm"
+                        ? isDark
+                          ? "bg-zinc-900 border-zinc-800 text-zinc-200 rounded-tr-sm"
+                          : "bg-zinc-100 border-zinc-200 text-zinc-800 rounded-tr-sm"
+                        : isDark
+                          ? "bg-zinc-900/30 border-zinc-900 text-zinc-300 rounded-tl-sm"
+                          : "bg-amber-500/5 border-amber-500/10 text-zinc-800 rounded-tl-sm"
                     }`}
                   >
                     {isUsr ? (
                       <p className="font-sans font-normal whitespace-pre-wrap">{message.content}</p>
                     ) : (
-                      renderMessageContent(message.content)
+                      renderMessageContent(message.content, message.id)
                     )}
 
-                    {/* Snapshot Restore Action */}
                     {!isUsr && message.filesSnapshot && (
                       <div className="mt-3 pt-2 border-t border-zinc-800/50 flex items-center justify-between gap-4 flex-wrap">
                         <div className="flex gap-1">
-                          <button className="p-1 rounded hover:bg-zinc-800 text-zinc-500 hover:text-zinc-300 transition-colors">
-                            <ThumbsUp className="h-3 w-3" />
+                          <button
+                            onClick={() => {
+                              const isLiked = !likedMessages[message.id];
+                              setLikedMessages(prev => ({ ...prev, [message.id]: isLiked }));
+                              setDislikedMessages(prev => ({ ...prev, [message.id]: false }));
+                              triggerStatus(isLiked ? "You liked this assistant response." : "Feedback removed.", "success");
+                            }}
+                            className={`p-1 rounded hover:bg-zinc-850 transition-all ${
+                              likedMessages[message.id] ? "text-blue-500 bg-blue-500/10" : "text-zinc-500 hover:text-zinc-300"
+                            }`}
+                            title="Like"
+                          >
+                            <ThumbsUp className={`h-3 w-3 ${likedMessages[message.id] ? "fill-current" : ""}`} />
                           </button>
-                          <button className="p-1 rounded hover:bg-zinc-800 text-zinc-500 hover:text-zinc-300 transition-colors">
-                            <ThumbsDown className="h-3 w-3" />
+                          <button
+                            onClick={() => {
+                              const isDisliked = !dislikedMessages[message.id];
+                              setDislikedMessages(prev => ({ ...prev, [message.id]: isDisliked }));
+                              setLikedMessages(prev => ({ ...prev, [message.id]: false }));
+                              triggerStatus(isDisliked ? "You disliked this assistant response." : "Feedback removed.", "info");
+                            }}
+                            className={`p-1 rounded hover:bg-zinc-850 transition-all ${
+                              dislikedMessages[message.id] ? "text-red-500 bg-red-500/10" : "text-zinc-500 hover:text-zinc-300"
+                            }`}
+                            title="Dislike"
+                          >
+                            <ThumbsDown className={`h-3 w-3 ${dislikedMessages[message.id] ? "fill-current" : ""}`} />
                           </button>
                         </div>
                         
@@ -1604,27 +1785,15 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
               );
             })}
             {isAIEditing && (
-              <div className="flex flex-col items-start space-y-1 animate-pulse">
-                <span className="text-[10px] text-zinc-500 font-medium px-1 flex items-center gap-1.5">
-                  <Sparkles className="h-3.5 w-3.5 text-amber-500 animate-spin duration-3000" />
-                  {aiName} is thinking...
-                </span>
-                <div className="px-3.5 py-3 rounded-2xl text-xs max-w-[85%] leading-relaxed bg-amber-500/5 border border-amber-500/15 text-zinc-300 rounded-tl-sm w-full space-y-2">
-                  <div className="flex items-center gap-2">
-                    <span className="h-2 w-2 rounded-full bg-amber-500 animate-ping" />
-                    <span className="font-semibold text-zinc-200">AI Code Engine Active</span>
-                  </div>
-                  <div className="font-mono text-[10px] text-zinc-400 space-y-1 bg-zinc-950/40 p-2 rounded-lg border border-zinc-900">
-                    <div className="flex items-center gap-1.5 text-emerald-400/90">
-                      <span>✔</span>
-                      <span>Analyzing your instructions</span>
-                    </div>
-                    <div className="flex items-center gap-1.5 text-amber-400">
-                      <span className="animate-pulse">●</span>
-                      <span>Structuring & editing code files...</span>
-                    </div>
-                  </div>
+              <div className="flex items-center gap-2 py-3 px-1.5 select-none animate-pulse">
+                <div className="flex gap-1 items-center">
+                  <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-[bounce_1s_infinite_100ms]" />
+                  <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-[bounce_1s_infinite_200ms]" />
+                  <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-[bounce_1s_infinite_300ms]" />
                 </div>
+                <span className="text-xs text-zinc-500 font-medium font-sans">
+                  AI is editing code...
+                </span>
               </div>
             )}
             <div ref={messagesEndRef} />
@@ -1632,7 +1801,7 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
 
           {/* CODE STATUS INTERACTIVE BOX (Only visible when runtimeError exists to keep the chat roomy) */}
           {runtimeError && (
-            <div className="px-4 py-2 border-t border-zinc-850 bg-zinc-950/40 shrink-0">
+            <div className={`px-4 py-2 border-t shrink-0 ${isDark ? "border-zinc-850 bg-zinc-950/40" : "border-zinc-200 bg-zinc-50"}`}>
               <div className="p-2.5 rounded-xl border border-rose-500/10 bg-rose-500/5 flex items-center justify-between gap-2 text-xs">
                 <div className="flex items-center gap-2 min-w-0">
                   <AlertCircle className="h-4 w-4 text-rose-500 shrink-0 animate-pulse" />
@@ -1653,8 +1822,12 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
           )}
 
           {/* PROMPT CHAT INPUT BAR */}
-          <div className="p-4 border-t border-zinc-850 bg-zinc-950/80">
-            <div className="relative flex flex-col bg-zinc-900 border border-zinc-800 focus-within:border-amber-500/50 rounded-2xl p-1.5 transition-all">
+          <div className={`p-4 border-t transition-colors duration-200 ${isDark ? "border-zinc-850 bg-zinc-950/80" : "border-zinc-200 bg-white"}`}>
+            <div className={`relative flex flex-col rounded-2xl p-1.5 transition-all border ${
+              isDark 
+                ? "bg-zinc-900 border-zinc-800 focus-within:border-amber-500/50" 
+                : "bg-zinc-50 border-zinc-200 focus-within:border-amber-500"
+            }`}>
               <textarea
                 value={aiPrompt}
                 onChange={(e) => setAiPrompt(e.target.value)}
@@ -1666,15 +1839,26 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
                     if (!isAIEditing) handleSendPromptToAI();
                   }
                 }}
-                className="w-full bg-transparent border-none focus:outline-none text-xs text-zinc-200 placeholder-zinc-500 resize-none px-2.5 pt-1.5 min-h-[44px] max-h-[140px] leading-relaxed"
+                className={`w-full bg-transparent border-none focus:outline-none text-xs resize-none px-2.5 pt-1.5 min-h-[44px] max-h-[140px] leading-relaxed ${
+                  isDark ? "text-zinc-200 placeholder-zinc-500" : "text-zinc-800 placeholder-zinc-400"
+                }`}
               />
               
               <div className="flex items-center justify-between px-2 pb-1.5 pt-1">
                 <div className="flex items-center gap-1.5 text-zinc-500">
-                  <button className="p-1.5 rounded-lg hover:bg-zinc-800 hover:text-zinc-300 transition-colors" title="Tambah aset">
-                    <Plus className="h-4 w-4" />
+                  <button 
+                    type="button"
+                    onClick={handleClearChat}
+                    className={`p-1.5 rounded-lg text-zinc-500 hover:text-rose-500 transition-colors cursor-pointer ${
+                      isDark ? "hover:bg-zinc-800" : "hover:bg-zinc-100"
+                    }`} 
+                    title="Clear Chat History"
+                  >
+                    <Trash2 className="h-4 w-4" />
                   </button>
-                  <button className="p-1.5 rounded-lg hover:bg-zinc-800 hover:text-zinc-300 transition-colors" title="Input suara">
+                  <button className={`p-1.5 rounded-lg transition-colors ${
+                    isDark ? "hover:bg-zinc-800 hover:text-zinc-300" : "hover:bg-zinc-100 hover:text-zinc-750"
+                  }`} title="Input suara">
                     <Volume2 className="h-4 w-4" />
                   </button>
                 </div>
@@ -1684,9 +1868,9 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
                   disabled={isAIEditing || !aiPrompt.trim()}
                   className={`p-2 rounded-xl transition-all ${
                     isAIEditing 
-                      ? "bg-zinc-800 text-zinc-500 cursor-not-allowed" 
+                      ? isDark ? "bg-zinc-800 text-zinc-500 cursor-not-allowed" : "bg-zinc-100 text-zinc-400 cursor-not-allowed"
                       : !aiPrompt.trim()
-                        ? "bg-zinc-800 text-zinc-500"
+                        ? isDark ? "bg-zinc-800 text-zinc-500" : "bg-zinc-100 text-zinc-400"
                         : "bg-amber-500 hover:bg-amber-450 text-white shadow-md active:scale-95 cursor-pointer"
                   }`}
                 >
@@ -1702,12 +1886,12 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
         </div>
 
         {/* PANEL KANAN: WORKSPACE INTERACTIVE / CODE EDITOR PANE */}
-        <div className="flex-1 flex flex-col min-w-0 bg-zinc-950 relative">
+        <div className={`flex-1 flex flex-col min-w-0 relative ${isDark ? "bg-zinc-950 text-zinc-100" : "bg-white text-zinc-800"}`}>
           
           {/* Segmented controls Preview vs Code */}
           {!isFullscreen && (
-            <div className="p-3 border-b border-zinc-850 bg-zinc-950 flex items-center justify-between shrink-0">
-              <div className="flex items-center bg-zinc-900 p-1 rounded-xl border border-zinc-850">
+            <div className={`p-3 border-b flex items-center justify-between shrink-0 ${isDark ? "border-zinc-850 bg-zinc-950" : "border-zinc-200 bg-zinc-50"}`}>
+              <div className={`flex items-center p-1 rounded-xl border ${isDark ? "bg-zinc-900 border-zinc-850" : "bg-zinc-100 border-zinc-200"}`}>
                 <button
                   onClick={() => {
                     setActiveRightTab("preview");
@@ -1716,7 +1900,7 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
                   className={`px-3.5 py-1.5 rounded-lg text-xs font-normal flex items-center gap-1.5 transition-all ${
                     activeRightTab === "preview" 
                       ? "bg-amber-500 text-white font-medium" 
-                      : "text-zinc-400 hover:text-zinc-200"
+                      : isDark ? "text-zinc-400 hover:text-zinc-200" : "text-zinc-500 hover:text-zinc-900"
                   }`}
                 >
                   <span className="h-1.5 w-1.5 bg-current rounded-full" />
@@ -1727,7 +1911,7 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
                   className={`px-3.5 py-1.5 rounded-lg text-xs font-normal transition-all ${
                     activeRightTab === "code" 
                       ? "bg-amber-500 text-white font-medium" 
-                      : "text-zinc-400 hover:text-zinc-200"
+                      : isDark ? "text-zinc-400 hover:text-zinc-200" : "text-zinc-500 hover:text-zinc-900"
                   }`}
                 >
                   Code
@@ -1740,24 +1924,24 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
                 <span className="truncate text-zinc-400">{projectName.toLowerCase().replace(/\s+/g, "-")}</span>
               </div>
 
-              <div className="flex items-center gap-1 bg-zinc-900/60 p-1 rounded-lg border border-zinc-850">
+              <div className={`flex items-center gap-1 p-1 rounded-lg border ${isDark ? "bg-zinc-900/60 border-zinc-850" : "bg-zinc-100 border-zinc-200"}`}>
                 {activeRightTab === "preview" && (
                   <>
                     <button
                       onClick={() => setDeviceMode("desktop")}
-                      className={`p-1.5 rounded-md transition-all ${deviceMode === "desktop" ? "bg-amber-500/10 text-amber-500" : "text-zinc-400 hover:text-zinc-200"}`}
+                      className={`p-1.5 rounded-md transition-all ${deviceMode === "desktop" ? "bg-amber-500/10 text-amber-500" : isDark ? "text-zinc-400 hover:text-zinc-200" : "text-zinc-500 hover:text-zinc-800"}`}
                       title="Pratinjau Desktop"
                     >
                       <Monitor className="h-3.5 w-3.5" />
                     </button>
                     <button
                       onClick={() => setDeviceMode("mobile")}
-                      className={`p-1.5 rounded-md transition-all ${deviceMode === "mobile" ? "bg-amber-500/10 text-amber-500" : "text-zinc-400 hover:text-zinc-200"}`}
+                      className={`p-1.5 rounded-md transition-all ${deviceMode === "mobile" ? "bg-amber-500/10 text-amber-500" : isDark ? "text-zinc-400 hover:text-zinc-200" : "text-zinc-500 hover:text-zinc-800"}`}
                       title="Pratinjau Smartphone"
                     >
                       <Smartphone className="h-3.5 w-3.5" />
                     </button>
-                    <div className="h-4 w-px bg-zinc-800 mx-1" />
+                    <div className={`h-4 w-px mx-1 ${isDark ? "bg-zinc-800" : "bg-zinc-300"}`} />
                   </>
                 )}
                 <button
@@ -1776,12 +1960,58 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
           )}
 
           {/* Tab Content 1: Preview mode active */}
-          {!isFullscreen && activeRightTab === "preview" && (
+          {activeRightTab === "preview" && (
             <div className="flex-1 flex flex-col min-h-0">
-              {/* Sandbox interactive preview frame container */}
+              {isFullscreen && (
+                <div className={`px-4 py-2 border-b flex items-center justify-between shrink-0 ${isDark ? "border-zinc-900 bg-zinc-950" : "border-zinc-200 bg-zinc-50"}`}>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px] font-bold font-mono px-2 py-0.5 rounded bg-amber-500/10 text-amber-500 border border-amber-500/20 animate-pulse">
+                      Live Preview
+                    </span>
+                    <span className={`text-[10px] font-sans ${isDark ? "text-zinc-400" : "text-zinc-500"}`}>Full Screen Mode • Testing application</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className={`flex items-center gap-1 p-1 rounded-lg border ${isDark ? "bg-zinc-900 border-zinc-850" : "bg-zinc-100 border-zinc-200"}`}>
+                      <button
+                        onClick={() => setDeviceMode("desktop")}
+                        className={`p-1.5 rounded-md transition-all ${deviceMode === "desktop" ? "bg-amber-500/10 text-amber-500" : "text-zinc-400 hover:text-zinc-200"}`}
+                        title="Desktop Preview"
+                      >
+                        <Monitor className="h-3.5 w-3.5" />
+                      </button>
+                      <button
+                        onClick={() => setDeviceMode("mobile")}
+                        className={`p-1.5 rounded-md transition-all ${deviceMode === "mobile" ? "bg-amber-500/10 text-amber-500" : "text-zinc-400 hover:text-zinc-200"}`}
+                        title="Smartphone Preview"
+                      >
+                        <Smartphone className="h-3.5 w-3.5" />
+                      </button>
+                      <div className="h-4 w-px bg-zinc-800 mx-1" />
+                      <button
+                        onClick={() => {
+                          refreshPreview();
+                          setPreviewKey(prev => prev + 1);
+                          triggerStatus("Preview updated!", "success");
+                        }}
+                        className="p-1.5 text-zinc-400 hover:text-zinc-200 transition-colors"
+                        title="Reload Preview"
+                      >
+                        <RefreshCw className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                    <button
+                      onClick={() => setIsFullscreen(false)}
+                      className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-rose-500 hover:bg-rose-600 text-white flex items-center gap-1.5 transition-all shadow-md active:scale-95 cursor-pointer"
+                    >
+                      <Minimize2 className="h-3.5 w-3.5" />
+                      <span>Return</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+
               <div className="flex-1 flex items-center justify-center p-6 bg-zinc-900/20 overflow-hidden relative">
                 {deviceMode === "mobile" ? (
-                  /* SMARTPHONE CONTAINER FRAME */
                   <div className="w-[360px] h-[640px] max-w-full max-h-[90%] rounded-[40px] bg-zinc-950 border-[12px] border-zinc-900 shadow-2xl relative flex flex-col overflow-hidden animate-fade-in ring-1 ring-zinc-800/50">
                     <div className="absolute top-0 left-1/2 transform -translate-x-1/2 w-32 h-5 bg-zinc-900 rounded-b-xl z-20 flex items-center justify-center">
                       <div className="w-10 h-1 bg-zinc-800 rounded-full" />
@@ -1796,7 +2026,6 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
                     <div className="absolute bottom-1.5 left-1/2 transform -translate-x-1/2 w-20 h-1 bg-zinc-800 rounded-full" />
                   </div>
                 ) : (
-                  /* DESKTOP CONTAINER FRAME */
                   <div className="w-full h-full rounded-xl bg-slate-950 border border-zinc-850 shadow-2xl overflow-hidden flex flex-col">
                     <iframe
                       key={previewKey}
@@ -1808,7 +2037,6 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
                   </div>
                 )}
 
-                {/* CONSOLE LOG DRAWER (Bottom Right, Google AI Studio style) */}
                 <div className="absolute bottom-4 right-4 z-30 font-mono">
                   {!isConsoleOpen ? (
                     <button
@@ -1825,7 +2053,6 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
                     </button>
                   ) : (
                     <div className="w-[380px] h-64 rounded-xl bg-zinc-950/95 border border-zinc-800/80 shadow-2xl flex flex-col overflow-hidden backdrop-blur-md animate-fade-in">
-                      {/* Terminal Header */}
                       <div className="px-3 py-2 border-b border-zinc-850 flex items-center justify-between bg-zinc-900/40 select-none shrink-0">
                         <div className="flex items-center gap-1.5">
                           <Terminal className="h-3.5 w-3.5 text-amber-500" />
@@ -1837,15 +2064,13 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
                           )}
                         </div>
                         <div className="flex items-center gap-1">
-                          {/* Clear Logs Button */}
                           <button
                             onClick={() => setConsoleLogs([])}
                             className="p-1 rounded hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 transition-colors"
-                            title="Bersihkan log"
+                            title="Clear logs"
                           >
                             <Trash2 className="h-3.5 w-3.5" />
                           </button>
-                          {/* Minimize Button */}
                           <button
                             onClick={() => setIsConsoleOpen(false)}
                             className="p-1 rounded hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 transition-colors"
@@ -1855,7 +2080,6 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
                           </button>
                         </div>
                       </div>
-                      {/* Terminal Body */}
                       <div className="flex-1 overflow-y-auto p-3 space-y-1.5">
                         {consoleLogs.length === 0 ? (
                           <div className="h-full flex items-center justify-center text-[10px] text-zinc-600 italic">
@@ -1866,13 +2090,13 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
                             let logColor = "text-zinc-300";
                             let bgClass = "";
                             if (log.type === "error") {
-                              logColor = "text-rose-400";
-                              bgClass = "bg-rose-500/5";
+                                logColor = "text-rose-400";
+                                bgClass = "bg-rose-500/5";
                             } else if (log.type === "warn") {
-                              logColor = "text-amber-400";
-                              bgClass = "bg-amber-500/5";
+                                logColor = "text-amber-400";
+                                bgClass = "bg-amber-500/5";
                             } else if (log.type === "info") {
-                              logColor = "text-blue-400";
+                                logColor = "text-blue-400";
                             }
                             return (
                               <div key={idx} className={`p-1.5 rounded text-[11px] leading-relaxed font-mono flex items-start gap-2 ${bgClass}`}>
@@ -1890,33 +2114,41 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
             </div>
           )}
 
-          {/* Tab Content 2: Code editing and source exploring mode active */}
-          {(isFullscreen || activeRightTab === "code") && (
+          {activeRightTab === "code" && (
             <div className="flex-1 flex overflow-hidden min-h-0">
               
-              {/* Mini File list and storage section */}
               {!isFullscreen && (
-                <div className="w-56 border-r border-zinc-850 bg-zinc-950/60 flex flex-col shrink-0">
-                  <div className="p-3 border-b border-zinc-850 flex items-center justify-between bg-zinc-950/25">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Daftar Berkas</span>
-                    <button
-                      onClick={() => setShowNewFileInput(!showNewFileInput)}
-                      className="p-1 rounded hover:bg-amber-500/10 text-amber-500 transition-colors"
-                      title="Buat File Baru"
-                    >
-                      <Plus className="h-3.5 w-3.5" />
-                    </button>
+                <div className={`w-56 border-r flex flex-col shrink-0 transition-colors duration-200 ${isDark ? "border-zinc-850 bg-zinc-950/60" : "border-zinc-200 bg-zinc-50"}`}>
+                  <div className={`p-3 border-b flex items-center justify-between transition-colors duration-200 ${isDark ? "border-zinc-850 bg-zinc-950/25" : "border-zinc-200 bg-zinc-100/50"}`}>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">File List</span>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        onClick={() => fileUploadRef.current?.click()}
+                        className="p-1 rounded hover:bg-amber-500/10 text-amber-500 transition-colors"
+                        title="Upload File from Device"
+                      >
+                        <FileUp className="h-3.5 w-3.5" />
+                      </button>
+                      <button
+                        onClick={() => setShowNewFileInput(!showNewFileInput)}
+                        className="p-1 rounded hover:bg-amber-500/10 text-amber-500 transition-colors"
+                        title="Create New File"
+                      >
+                        <Plus className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
                   </div>
 
-                  {/* Inline new file name creator */}
                   {showNewFileInput && (
-                    <div className="p-3 border-b border-zinc-850 bg-amber-500/5 flex flex-col gap-2">
+                    <div className={`p-3 border-b flex flex-col gap-2 transition-colors duration-200 ${isDark ? "border-zinc-850 bg-amber-500/5" : "border-zinc-200 bg-amber-500/5"}`}>
                       <input
                         type="text"
                         value={newFileName}
                         onChange={(e) => setNewFileName(e.target.value)}
                         placeholder="style.css, app.js..."
-                        className="w-full px-2 py-1.5 text-xs rounded border border-zinc-800 bg-zinc-900 text-zinc-200 focus:outline-none focus:border-amber-500 font-mono"
+                        className={`w-full px-2 py-1.5 text-xs rounded border focus:outline-none focus:border-amber-500 font-mono transition-colors ${
+                          isDark ? "border-zinc-800 bg-zinc-900 text-zinc-200" : "border-zinc-300 bg-white text-zinc-800"
+                        }`}
                         onKeyDown={(e) => {
                           if (e.key === "Enter") handleAddFile();
                         }}
@@ -1924,7 +2156,7 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
                       <div className="flex justify-end gap-1.5">
                         <button
                           onClick={() => setShowNewFileInput(false)}
-                          className="px-2 py-0.5 text-[10px] font-normal text-zinc-400 hover:bg-zinc-800 rounded"
+                          className={`px-2 py-0.5 text-[10px] font-normal rounded ${isDark ? "text-zinc-400 hover:bg-zinc-800" : "text-zinc-500 hover:bg-zinc-200"}`}
                         >
                           Cancel
                         </button>
@@ -1938,7 +2170,6 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
                     </div>
                   )}
 
-                  {/* File Navigator List items */}
                   <div className="flex-1 overflow-y-auto p-2 space-y-0.5">
                     {files.map(file => {
                       const isActive = file.path === activeFilePath;
@@ -1949,10 +2180,12 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
                       return (
                         <div
                           key={file.path}
-                          className={`group w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-normal font-mono cursor-pointer transition-all ${
+                          className={`group w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-normal font-mono cursor-pointer transition-all border ${
                             isActive 
-                              ? "bg-amber-500/10 text-amber-400 border border-amber-500/15" 
-                              : "text-zinc-400 hover:bg-zinc-900/60 hover:text-zinc-200"
+                              ? "bg-amber-500/10 text-amber-400 border-amber-500/15" 
+                              : isDark 
+                                ? "border-transparent text-zinc-400 hover:bg-zinc-900/60 hover:text-zinc-200" 
+                                : "border-transparent text-zinc-600 hover:bg-zinc-150 hover:text-zinc-900"
                           }`}
                           onClick={() => setActiveFilePath(file.path)}
                         >
@@ -1970,7 +2203,7 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
                                 handleDeleteFile(file.path);
                               }}
                               className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-rose-500/10 text-rose-400 transition-all shrink-0"
-                              title="Hapus File"
+                              title="Delete File"
                             >
                               <Trash className="h-3.5 w-3.5" />
                             </button>
@@ -1980,15 +2213,12 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
                     })}
                   </div>
 
-                  {/* Cloud ExeChat Settings removed as requested */}
-
                 </div>
               )}
 
-              {/* Code text editor pane */}
               <div className="flex-1 flex flex-col min-w-0">
                 {isFullscreen ? (
-                  <div className="px-4 py-2 border-b border-zinc-900 bg-zinc-950 flex items-center justify-between shrink-0">
+                  <div className={`px-4 py-2 border-b flex items-center justify-between shrink-0 transition-colors duration-200 ${isDark ? "border-zinc-900 bg-zinc-950" : "border-zinc-200 bg-white"}`}>
                     <div className="flex items-center gap-2">
                       <span className="text-[11px] font-bold font-mono px-2 py-0.5 rounded bg-amber-500/10 text-amber-500 border border-amber-500/20 animate-pulse">
                         {activeFilePath}
@@ -2004,7 +2234,7 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
                     </button>
                   </div>
                 ) : (
-                  <div className="px-4 py-2 border-b border-zinc-850 bg-zinc-950 flex items-center justify-between shrink-0">
+                  <div className={`px-4 py-2 border-b flex items-center justify-between shrink-0 transition-colors duration-200 ${isDark ? "border-zinc-850 bg-zinc-950" : "border-zinc-200 bg-white"}`}>
                     <div className="flex items-center gap-2">
                       <span className="text-[11px] font-bold font-mono px-2 py-0.5 rounded bg-zinc-500/10 text-amber-500 border border-amber-500/20">
                         {activeFilePath}
@@ -2021,18 +2251,16 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
                 )}
 
                 <div className="flex-1 flex font-mono overflow-hidden relative">
-                  {/* Line Numbers column */}
-                  <div className="w-10 select-none text-right pr-2 pt-4 text-xs font-mono border-r border-zinc-850 bg-zinc-950 text-zinc-600">
+                  <div className={`w-10 select-none text-right pr-2 pt-4 text-xs font-mono border-r transition-colors duration-200 ${isDark ? "border-zinc-850 bg-zinc-950 text-zinc-600" : "border-zinc-200 bg-zinc-100 text-zinc-400"}`}>
                     {Array.from({ length: Math.max(activeFile.content.split("\n").length, 30) }).map((_, i) => (
                       <div key={i} className="h-6 leading-6 select-none">{i + 1}</div>
                     ))}
                   </div>
 
-                  {/* Actual Textarea Editor */}
                   <textarea
                     value={activeFile.content}
                     onChange={handleEditorChange}
-                    className="flex-1 h-full p-4 text-xs font-mono focus:outline-none bg-zinc-950 text-zinc-200 focus:bg-zinc-950 resize-none leading-6 leading-relaxed"
+                    className={`flex-1 h-full p-4 text-xs font-mono focus:outline-none resize-none leading-6 leading-relaxed transition-colors duration-200 ${isDark ? "bg-zinc-950 text-zinc-200 focus:bg-zinc-950" : "bg-white text-zinc-850 focus:bg-white"}`}
                     spellCheck="false"
                   />
                 </div>
@@ -2044,6 +2272,143 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
         </div>
 
       </div>
+
+      {/* Floating Toast Notification system overlay */}
+      <div className="fixed bottom-5 right-5 z-50 flex flex-col gap-2 max-w-sm w-full pointer-events-none">
+        <AnimatePresence>
+          {toasts.map(toast => {
+            let icon = <Info className="h-4 w-4 shrink-0 text-amber-500" />;
+            let bgClass = "bg-zinc-900 border-zinc-850 text-zinc-100 shadow-2xl shadow-black/50";
+            let borderAccent = "border-l-4 border-l-amber-500";
+            
+            if (toast.type === "success") {
+              icon = <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-400" />;
+              borderAccent = "border-l-4 border-l-emerald-500";
+            } else if (toast.type === "error") {
+              icon = <AlertCircle className="h-4 w-4 shrink-0 text-rose-400" />;
+              borderAccent = "border-l-4 border-l-rose-500";
+            }
+
+            return (
+              <motion.div
+                key={toast.id}
+                initial={{ opacity: 0, y: 20, scale: 0.95 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: -20, scale: 0.95 }}
+                transition={{ duration: 0.2 }}
+                className={`pointer-events-auto flex items-start gap-3 p-4 rounded-xl border ${bgClass} ${borderAccent} backdrop-blur-md`}
+              >
+                {icon}
+                <div className="flex-1 text-xs leading-relaxed font-sans font-semibold text-zinc-200">
+                  {toast.text}
+                </div>
+                <button
+                  onClick={() => setToasts(prev => prev.filter(t => t.id !== toast.id))}
+                  className="p-0.5 rounded-lg hover:bg-zinc-800 text-zinc-500 hover:text-zinc-300 transition-colors shrink-0 cursor-pointer"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </motion.div>
+            );
+          })}
+        </AnimatePresence>
+      </div>
+
+      {/* Clear Chat Confirmation Modal */}
+      <AnimatePresence>
+        {showClearChatConfirm && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowClearChatConfirm(false)}
+              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className={`relative w-full max-w-sm rounded-2xl border p-6 shadow-2xl transition-all duration-200 z-10 ${
+                isDark 
+                  ? "bg-zinc-900 border-zinc-800 text-zinc-100" 
+                  : "bg-white border-zinc-200 text-zinc-800"
+              }`}
+            >
+              <h3 className="text-sm font-bold mb-2">Clear Chat History</h3>
+              <p className={`text-xs mb-5 leading-relaxed ${isDark ? "text-zinc-400" : "text-zinc-500"}`}>
+                Are you sure you want to clear your chat conversation with the AI? This action cannot be undone.
+              </p>
+              <div className="flex justify-end gap-2.5">
+                <button
+                  onClick={() => setShowClearChatConfirm(false)}
+                  className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold border transition-all ${
+                    isDark
+                      ? "bg-zinc-800 border-zinc-700 hover:bg-zinc-750 text-zinc-300"
+                      : "bg-zinc-100 border-zinc-200 hover:bg-zinc-200 text-zinc-700"
+                  }`}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={executeClearChat}
+                  className="px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-rose-500 hover:bg-rose-600 text-white shadow-md transition-all active:scale-95"
+                >
+                  Clear Chat
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Delete Project Confirmation Modal */}
+      <AnimatePresence>
+        {showDeleteProjectConfirm && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowDeleteProjectConfirm(false)}
+              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className={`relative w-full max-w-sm rounded-2xl border p-6 shadow-2xl transition-all duration-200 z-10 ${
+                isDark 
+                  ? "bg-zinc-900 border-zinc-800 text-zinc-100" 
+                  : "bg-white border-zinc-200 text-zinc-800"
+              }`}
+            >
+              <h3 className="text-sm font-bold mb-2">Clear Cloud Storage</h3>
+              <p className={`text-xs mb-5 leading-relaxed ${isDark ? "text-zinc-400" : "text-zinc-500"}`}>
+                Are you sure you want to delete this project from the cloud database? All saved files will be permanently deleted from the cloud storage.
+              </p>
+              <div className="flex justify-end gap-2.5">
+                <button
+                  onClick={() => setShowDeleteProjectConfirm(false)}
+                  className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold border transition-all ${
+                    isDark
+                      ? "bg-zinc-800 border-zinc-700 hover:bg-zinc-750 text-zinc-300"
+                      : "bg-zinc-100 border-zinc-200 hover:bg-zinc-200 text-zinc-700"
+                  }`}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={executeDeleteProjectSupabase}
+                  className="px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-rose-500 hover:bg-rose-600 text-white shadow-md transition-all active:scale-95"
+                >
+                  Delete Storage
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
     </div>
   );

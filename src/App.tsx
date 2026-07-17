@@ -107,7 +107,7 @@ export default function App() {
     return null;
   });
 
-  const [welcomeGreeting, setWelcomeGreeting] = useState("Ada ide baru untuk dieksplorasi?");
+  const [welcomeGreeting, setWelcomeGreeting] = useState("Any new ideas to explore?");
   const [memories, setMemories] = useState<string[]>(() => {
     const saved = localStorage.getItem("exechat_memories");
     try {
@@ -124,13 +124,13 @@ export default function App() {
 
   useEffect(() => {
     const greetings = [
-      "ada ide baru?",
-      "mau bahas apa hari ini?",
-      "apa yang ingin kamu ketahui?",
-      "ada yang bisa kubantu?",
-      "mari buat sesuatu yang hebat!",
-      "tanyakan apa saja padaku.",
-      "ada topik seru hari ini?"
+      "any new ideas?",
+      "what should we discuss today?",
+      "what would you like to know?",
+      "is there anything I can help with?",
+      "let's create something great!",
+      "ask me anything.",
+      "any exciting topics today?"
     ];
     const randomIdx = Math.floor(Math.random() * greetings.length);
     setWelcomeGreeting(greetings[randomIdx]);
@@ -262,10 +262,10 @@ export default function App() {
   const thinkingStartTimesRef = useRef<Record<string, number>>({});
 
   const getFormattedCurrentDate = () => {
-    const days = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
+    const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
     const months = [
-      "Januari", "Februari", "Maret", "April", "Mei", "Juni",
-      "Juli", "Agustus", "September", "Oktober", "November", "Desember"
+      "January", "February", "March", "April", "May", "June",
+      "July", "August", "September", "October", "November", "December"
     ];
     const now = new Date();
     const dayName = days[now.getDay()];
@@ -274,7 +274,7 @@ export default function App() {
     const year = now.getFullYear();
     const hours = String(now.getHours()).padStart(2, "0");
     const minutes = String(now.getMinutes()).padStart(2, "0");
-    return `Hari ini adalah ${dayName}, tanggal ${date} ${monthName} ${year}, jam ${hours}:${minutes} WIB.`;
+    return `Today is ${dayName}, ${monthName} ${date}, ${year}, at ${hours}:${minutes}.`;
   };
 
   useEffect(() => {
@@ -321,7 +321,7 @@ export default function App() {
 
     if (file.size > maxBytes) {
       console.log("[File] File too large:", file.size);
-      setErrorText("Ukuran file melebihi batas 20MB.");
+      setErrorText("File size exceeds the 20MB limit.");
       e.currentTarget.value = "";
       return;
     }
@@ -480,11 +480,11 @@ export default function App() {
     const savedLoggedIn = localStorage.getItem("exechat_logged_in") === "true";
     const savedUserId = localStorage.getItem("exechat_user_id");
 
-    if (savedLoggedIn && savedUserId && savedUserId !== "guest") {
+    if (savedLoggedIn && savedUserId) {
       setUserId(savedUserId);
-      setUserEmail(localStorage.getItem("exechat_email"));
-      setUserName(localStorage.getItem("exechat_username") || "");
-      setUserDisplayName(localStorage.getItem("exechat_display_name") || "");
+      setUserEmail(localStorage.getItem("exechat_email") || "guest@exechat.local");
+      setUserName(localStorage.getItem("exechat_username") || "Guest");
+      setUserDisplayName(localStorage.getItem("exechat_display_name") || "Guest");
       setUserPhoto(localStorage.getItem("exechat_user_photo") || null);
       setCredits(99999); 
       setIsLoggedIn(true);
@@ -528,16 +528,13 @@ export default function App() {
     (m) => m.id === (currentSession?.model || selectedModelId)
   ) || MODEL_OPTIONS[0];
 
-  // Check if we are visiting a public project URL
   const publicProjectId = (() => {
     if (typeof window === "undefined") return null;
     const pathname = window.location.pathname;
     
-    // Pattern 1: /project/:projectId/public
     const match1 = pathname.match(/^\/project\/([^/]+)\/public\/?$/);
     if (match1) return decodeURIComponent(match1[1]);
     
-    // Pattern 2: /:projectId/public
     const match2 = pathname.match(/^\/([^/]+)\/public\/?$/);
     if (match2) {
       const pid = decodeURIComponent(match2[1]);
@@ -571,7 +568,7 @@ export default function App() {
     gradient: string;
   }> = {
     dark: {
-      name: "Gelap (Hitam)",
+      name: "Dark (Black)",
       outerBg: "bg-zinc-950",
       mainBg: "bg-zinc-950",
       sidebarBg: "bg-zinc-900",
@@ -587,7 +584,7 @@ export default function App() {
       gradient: "from-zinc-950/25 via-transparent to-transparent",
     },
     light: {
-      name: "Terang (Putih)",
+      name: "Light (White)",
       outerBg: "bg-white",
       mainBg: "bg-white",
       sidebarBg: "bg-zinc-50",
@@ -639,7 +636,7 @@ export default function App() {
       lower.includes("mengerti soal codingan") ||
       lower.includes("bantu saya bikin")
     ) {
-      return "Bantu Coding";
+      return "Coding Help";
     }
 
     if (
@@ -651,9 +648,9 @@ export default function App() {
     ) {
       const match = clean.match(/(?:resep|cara masak)\s+([a-zA-Z\s]{3,15})/i);
       if (match && match[1]) {
-        return `Resep ${match[1].trim().split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}`;
+        return `Recipe ${match[1].trim().split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}`;
       }
-      return "Resep Masakan";
+      return "Cooking Recipe";
     }
 
     if (
@@ -663,7 +660,7 @@ export default function App() {
       lower.includes("buatkan teks") || 
       lower.includes("surat")
     ) {
-      return "Pembuatan Teks";
+      return "Text Generation";
     }
 
     if (
@@ -676,7 +673,7 @@ export default function App() {
       if (match && match[1]) {
         return match[1].trim().split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
       }
-      return "Penjelasan Topik";
+      return "Topic Explanation";
     }
 
     if (
@@ -686,7 +683,7 @@ export default function App() {
       lower.includes("bahasa inggris") || 
       lower.includes("arti dari")
     ) {
-      return "Penerjemahan Bahasa";
+      return "Language Translation";
     }
 
     if (
@@ -699,7 +696,7 @@ export default function App() {
       lower.startsWith("selamat pagi") || 
       lower.startsWith("selamat siang")
     ) {
-      return "Percakapan Santai";
+      return "Casual Conversation";
     }
 
     const words = clean.split(" ").filter(w => w.length > 2);
@@ -709,7 +706,7 @@ export default function App() {
       return rawTitle.length > 25 ? rawTitle.substring(0, 25) + "..." : rawTitle;
     }
 
-    return "Diskusi Baru";
+    return "New Discussion";
   };
 
    const handleGoogleLoginSuccess = (credentialResponse: any) => {
@@ -763,6 +760,25 @@ export default function App() {
     }
   };
 
+  const handleGuestLogin = () => {
+    const guestId = "guest_" + Math.random().toString(36).substring(2, 10);
+    setUserId(guestId);
+    setUserEmail("guest@exechat.local");
+    setUserName("Guest");
+    setUserDisplayName("Guest");
+    setUserPhoto(null);
+    setCredits(99999);
+    setErrorText(null);
+    setIsLoggedIn(true);
+    playNotifySound();
+
+    localStorage.setItem("exechat_logged_in", "true");
+    localStorage.setItem("exechat_email", "guest@exechat.local");
+    localStorage.setItem("exechat_user_id", guestId);
+    localStorage.setItem("exechat_username", "Guest");
+    localStorage.setItem("exechat_display_name", "Guest");
+  };
+
   const handleCompleteRegistrationWithChosenName = (finalChosenName: string) => {
     const finalName = finalChosenName.trim() || googleDefaultName || "User";
     setUserName(finalName);
@@ -801,23 +817,23 @@ export default function App() {
   };
 
   const handleClaimDailyCredits = async () => {
-    setErrorText("Kredit harian tidak diperlukan di versi ExeChat Premium (Kredit Tidak Terbatas).");
+    setErrorText("Daily credits are not required in the ExeChat Premium version (Unlimited Credits).");
   };
 
   const handleSaveUsername = () => {
     if (!userId) {
-      setErrorText("Silakan login terlebih dahulu untuk mengubah username.");
+      setErrorText("Please log in first to change your username.");
       return;
     }
 
     const trimmed = userName.trim();
     if (!trimmed) {
-      setErrorText("Username tidak boleh kosong.");
+      setErrorText("Username cannot be empty.");
       return;
     }
 
     if (!/^[a-zA-Z0-9_-]{3,20}$/.test(trimmed)) {
-      setErrorText("Username harus 3-20 karakter dan hanya boleh berisi huruf, angka, underscore, atau strip.");
+      setErrorText("Username must be 3-20 characters and can only contain letters, numbers, underscores, or hyphens.");
       return;
     }
 
@@ -832,7 +848,7 @@ export default function App() {
     }
 
     setErrorText(null);
-    setRedeemFeedback("Username berhasil disimpan.");
+    setRedeemFeedback("Username successfully saved.");
   };
 
   const createNewSession = (initialMsg?: string) => {
@@ -918,7 +934,7 @@ export default function App() {
       if (userMsgs.length > 0) {
         const lastMsg = userMsgs[userMsgs.length - 1];
         if (lastMsg.content.trim().toLowerCase() === text.toLowerCase()) {
-          setErrorText("Terdeteksi spam! Anda mengirimkan pesan yang persis sama berturut-turut.");
+          setErrorText("Spam detected! You sent the exact same message consecutively.");
           return;
         }
       }
@@ -941,7 +957,7 @@ export default function App() {
     };
 
     if (isKeymash(text)) {
-      setErrorText("Input tidak sah diblokir! Terdeteksi spam acak (gibberish/keymash) yang dapat menguras token.");
+      setErrorText("Invalid input blocked! Detected random spam (gibberish/keymash) that could deplete tokens.");
       return;
     }
 
@@ -1024,9 +1040,9 @@ export default function App() {
       let content = m.content;
       if (m.role === "user" && m.attachment) {
         if (m.attachment.textContent) {
-          content = `[File Terlampir: ${m.attachment.name}]\n====================\n${m.attachment.textContent}\n====================\n\n${m.content}`;
+          content = `[Attached File: ${m.attachment.name}]\n====================\n${m.attachment.textContent}\n====================\n\n${m.content}`;
         } else {
-          content = `[File Terlampir: ${m.attachment.name} (${m.attachment.size} bytes, tipe: ${m.attachment.mime || "unknown"})]\n\n${m.content}`;
+          content = `[Attached File: ${m.attachment.name} (${m.attachment.size} bytes, type: ${m.attachment.mime || "unknown"})]\n\n${m.content}`;
         }
       }
       return {
@@ -1037,9 +1053,9 @@ export default function App() {
 
     let finalInstruction = apiPreset.instruction;
     if (memories.length > 0) {
-      finalInstruction += "\n\n[MEMORI AI (Ingatan pengguna yang tersimpan)]:\n" + memories.map((m, idx) => `${idx + 1}. ${m}`).join("\n");
+      finalInstruction += "\n\n[AI MEMORY (Saved user memories)]:\n" + memories.map((m, idx) => `${idx + 1}. ${m}`).join("\n");
     }
-    finalInstruction += `\n\n[INFO WAKTU REAL-TIME SEKARANG]\n${getFormattedCurrentDate()}`;
+    finalInstruction += `\n\n[CURRENT REAL-TIME TIME INFO]\n${getFormattedCurrentDate()}`;
 
     const controller = new AbortController();
     abortControllerRef.current = controller;
@@ -1139,7 +1155,7 @@ export default function App() {
                       ...s,
                       messages: s.messages.map((m) =>
                         m.id === assistantMsgId
-                          ? { ...m, content: (m.content || "") + "\n\nServer sedang sibuk saat ini. Silakan coba lagi nanti." }
+                          ? { ...m, content: (m.content || "") + "\n\nServer is busy at this time. Please try again later." }
                           : m
                       ),
                     };
@@ -1161,7 +1177,7 @@ export default function App() {
         const msg = (err && err.message) ? err.message.toLowerCase() : "";
         if (msg.includes("cerebras") || msg.includes("too_many_requests") || msg.includes("queue_exceeded") || msg.includes("429")) {
 
-          setErrorText("Server sedang sibuk. Silakan coba lagi nanti.");
+          setErrorText("Server is busy. Please try again later.");
           setSessions((prev) =>
             prev.map((s) => {
               if (s.id === targetSessionId) {
@@ -1169,7 +1185,7 @@ export default function App() {
                   ...s,
                   messages: s.messages.map((m) =>
                     m.id === assistantMsgId && m.content === ""
-                      ? { ...m, content: "Server sedang sibuk saat ini. Silakan coba lagi nanti." }
+                      ? { ...m, content: "Server is busy at this time. Please try again later." }
                       : m
                   ),
                 };
@@ -1180,7 +1196,7 @@ export default function App() {
           console.warn("Cerebras busy/rate-limited — user notified.");
         } else {
           console.error("Stream reader error:", err);
-          setErrorText(err.message || "Terjadi kesalahan saat memproses jawaban.");
+          setErrorText(err.message || "An error occurred while processing the response.");
 
           setSessions((prev) =>
             prev.map((s) => {
@@ -1189,7 +1205,7 @@ export default function App() {
                   ...s,
                   messages: s.messages.map((m) =>
                     m.id === assistantMsgId && m.content === ""
-                      ? { ...m, content: "Terjadi kesalahan koneksi atau konfigurasi API Key. Silakan muat ulang (refresh) halaman jika masalah berlanjut." }
+                      ? { ...m, content: "A connection error or API Key configuration issue occurred. Please refresh the page if the issue persists." }
                       : m
                   ),
                 };
@@ -1219,7 +1235,7 @@ export default function App() {
                 const updatedMessages = [...messages];
                 updatedMessages[messages.length - 1] = {
                   ...lastMsg,
-                  content: lastMsg.content ? lastMsg.content + "\n\n*(Jawaban dihentikan oleh pengguna)*" : "*(Jawaban dihentikan)*"
+                  content: lastMsg.content ? lastMsg.content + "\n\n*(Response stopped by user)*" : "*(Response stopped)*"
                 };
                 return { ...s, messages: updatedMessages };
               }
@@ -1284,9 +1300,9 @@ export default function App() {
       let content = m.content;
       if (m.role === "user" && m.attachment) {
         if (m.attachment.textContent) {
-          content = `[File Terlampir: ${m.attachment.name}]\n====================\n${m.attachment.textContent}\n====================\n\n${m.content}`;
+          content = `[Attached File: ${m.attachment.name}]\n====================\n${m.attachment.textContent}\n====================\n\n${m.content}`;
         } else {
-          content = `[File Terlampir: ${m.attachment.name} (${m.attachment.size} bytes, tipe: ${m.attachment.mime || "unknown"})]\n\n${m.content}`;
+          content = `[Attached File: ${m.attachment.name} (${m.attachment.size} bytes, type: ${m.attachment.mime || "unknown"})]\n\n${m.content}`;
         }
       }
       return {
@@ -1297,9 +1313,9 @@ export default function App() {
 
     let finalInstruction = apiPreset.instruction;
     if (memories.length > 0) {
-      finalInstruction += "\n\n[MEMORI AI (Ingatan pengguna yang tersimpan)]:\n" + memories.map((m, idx) => `${idx + 1}. ${m}`).join("\n");
+      finalInstruction += "\n\n[AI MEMORY (Saved user memories)]:\n" + memories.map((m, idx) => `${idx + 1}. ${m}`).join("\n");
     }
-    finalInstruction += `\n\n[INFO WAKTU REAL-TIME SEKARANG]\n${getFormattedCurrentDate()}`;
+    finalInstruction += `\n\n[CURRENT REAL-TIME TIME INFO]\n${getFormattedCurrentDate()}`;
 
     const controller = new AbortController();
     abortControllerRef.current = controller;
@@ -1374,7 +1390,7 @@ export default function App() {
       }
     } catch (err: any) {
       if (err.name !== "AbortError") {
-        setErrorText("Terjadi kesalahan saat regenerasi jawaban: " + err.message);
+        setErrorText("An error occurred during response regeneration: " + err.message);
       }
     } finally {
       setIsGenerating(false);
@@ -1429,11 +1445,11 @@ export default function App() {
     if (type === "markdown") {
       filename += ".md";
       content = `# ${currentSession.title}\n\n`;
-      content += `*Dibuat menggunakan ExeAi pada: ${new Date(currentSession.createdAt).toLocaleString()}*\n`;
+      content += `*Created using ExeAi on: ${new Date(currentSession.createdAt).toLocaleString()}*\n`;
       content += `*Model: ${currentSession.model} | Temp: ${currentSession.temperature}*\n\n---\n\n`;
 
       currentSession.messages.forEach((msg) => {
-        const roleName = msg.role === "user" ? "👤 PENGGUNA" : "🤖 EXEAI";
+        const roleName = msg.role === "user" ? "👤 USER" : "🤖 EXEAI";
         content += `### ${roleName}\n\n${msg.content}\n\n---\n\n`;
       });
     } else {
@@ -1450,7 +1466,6 @@ export default function App() {
     URL.revokeObjectURL(url);
   };
 
-  // Clear current chat content
   const handleClearCurrentSession = () => {
     if (!currentSessionId) return;
     setSessions((prev) =>
@@ -1459,26 +1474,22 @@ export default function App() {
     setErrorText(null);
   };
 
-  // Filter session history by search query
   const filteredSessions = sessions.filter((s) =>
     s.title.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   const renderSidebarContent = (isMobile = false) => (
     <div className={`flex flex-col h-full w-full ${curTheme.sidebarBg} ${isDark ? "text-zinc-150" : "text-zinc-800"} select-none`}>
-      {/* Brand Identity Header */}
       <div className={`p-5 border-b ${curTheme.border} flex items-center justify-between shrink-0`}>
         <div className="flex items-center gap-3">
           <div>
             <h1 className={`font-display font-bold text-sm tracking-tight flex items-center gap-1.5 ${isDark ? "text-zinc-100" : "text-zinc-900"}`}>
               ExeChat
-              <span className={`text-[10px] px-1.5 py-0.5 rounded-full border font-medium ${isDark ? "bg-zinc-950 text-zinc-400 border-zinc-800" : "bg-zinc-200/60 text-zinc-600 border-zinc-300"}`}>v1</span>
             </h1>
           </div>
         </div>
 
         <div className="flex items-center gap-1.5">
-          {/* Config Button (Quick Settings Panel Toggle) */}
           <button
             onClick={() => {
               setShowSettings(!showSettings);
@@ -1489,19 +1500,18 @@ export default function App() {
                 ? isDark ? "bg-zinc-800 border-zinc-700 text-zinc-150" : "bg-zinc-200 border-zinc-300 text-zinc-900"
                 : isDark ? "border-transparent text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50" : "border-transparent text-zinc-650 hover:text-zinc-900 hover:bg-zinc-200/50"
             }`}
-            title="Pengaturan Mode"
+            title="Mode Settings"
           >
             <Settings className="h-4 w-4" />
           </button>
 
-          {/* Close Sidebar button on Desktop */}
           {!isMobile && (
             <button
               onClick={() => setIsDesktopSidebarOpen(false)}
               className={`p-1.5 rounded-lg border transition-all duration-200 cursor-pointer ${
                 isDark ? "border-transparent text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50" : "border-transparent text-zinc-650 hover:text-zinc-900 hover:bg-zinc-200/50"
               }`}
-              title="Tutup Riwayat Chat"
+              title="Close Chat History"
             >
               <ChevronLeft className="h-4 w-4" />
             </button>
@@ -1509,7 +1519,6 @@ export default function App() {
         </div>
       </div>
 
-      {/* New Chat & ExeCode Workspace buttons */}
       <div className="px-4 pt-4 pb-2 flex flex-col gap-2">
        <button
           onClick={() => {
@@ -1526,7 +1535,7 @@ export default function App() {
           }`}
         >
           <Plus className="h-3.5 w-3.5 stroke-[2.5]" />
-          <span>Chat Baru</span>
+          <span>New Chat</span>
         </button>
 
         <button
@@ -1536,7 +1545,7 @@ export default function App() {
             setShowSettings(false);
             if (isMobile) setIsMobileSidebarOpen(false);
           }}
-          className={`w-full flex items-center justify-center gap-2 rounded-xl font-semibold py-2.5 px-4 transition-all duration-200 text-xs tracking-wide border ${
+          className={`w-full flex items-center justify-center gap-2 rounded-xl font-semibold py-2.5 px-4 transition-all duration-205 text-xs tracking-wide border ${
             showExeCode
               ? "bg-amber-500/20 text-amber-500 border-amber-500/40"
               : isDark 
@@ -1549,7 +1558,6 @@ export default function App() {
         </button>
       </div>
 
-      {/* Search bar */}
       <div className="px-4 py-2">
         <div className="relative">
           <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-zinc-500" />
@@ -1557,7 +1565,7 @@ export default function App() {
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Cari percakapan..."
+            placeholder="Search conversations..."
             className={`w-full pl-9 pr-4 py-2 rounded-xl text-xs transition-all duration-200 focus:outline-none border ${
               isDark 
                 ? "border-zinc-800/80 bg-zinc-950/40 text-zinc-300 placeholder-zinc-600 focus:border-zinc-700 focus:bg-zinc-950/70" 
@@ -1575,12 +1583,11 @@ export default function App() {
         </div>
       </div>
 
-      {/* Chat Sessions History List */}
       <div className="flex-1 overflow-y-auto px-2 py-2 space-y-1 scrollbar-thin">
         <AnimatePresence initial={false}>
           {filteredSessions.length === 0 ? (
             <div className={`text-center py-8 text-xs ${isDark ? "text-zinc-600" : "text-zinc-400"}`}>
-              {searchQuery ? "Tidak ada hasil pencarian." : "Belum ada riwayat chat."}
+              {searchQuery ? "No search results found." : "No chat history yet."}
             </div>
           ) : (
             filteredSessions.map((s) => {
@@ -1628,15 +1635,15 @@ export default function App() {
                       >
                         <input
                           type="text"
-                          value={editTitleInput}
-                          onChange={(e) => setEditTitleInput(e.target.value)}
-                          onBlur={() => saveRenameSession(s.id)}
-                          autoFocus
-                          className={`w-full rounded px-1.5 py-0.5 text-xs focus:outline-none border ${
-                            isDark 
-                              ? "bg-zinc-950 border-zinc-850 text-zinc-100 focus:border-zinc-750" 
-                              : "bg-white border-zinc-250 text-zinc-900 focus:border-zinc-400"
-                          }`}
+                           value={editTitleInput}
+                           onChange={(e) => setEditTitleInput(e.target.value)}
+                           onBlur={() => saveRenameSession(s.id)}
+                           autoFocus
+                           className={`w-full rounded px-1.5 py-0.5 text-xs focus:outline-none border ${
+                             isDark 
+                               ? "bg-zinc-950 border-zinc-850 text-zinc-100 focus:border-zinc-750" 
+                               : "bg-white border-zinc-250 text-zinc-900 focus:border-zinc-400"
+                           }`}
                         />
                       </form>
                     ) : (
@@ -1646,20 +1653,19 @@ export default function App() {
                     )}
                   </div>
 
-                  {/* Item Actions */}
                   {!isEditing && (
                     <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200 shrink-0">
                       <button
                         onClick={(e) => startRenameSession(s.id, s.title, e)}
                         className={`p-1 rounded transition-colors ${isDark ? "hover:bg-zinc-750 text-zinc-500 hover:text-zinc-300" : "hover:bg-zinc-200 text-zinc-400 hover:text-zinc-700"}`}
-                        title="Ubah Nama"
+                        title="Rename"
                       >
                         <Edit2 className="h-3 w-3" />
                       </button>
                       <button
                         onClick={(e) => deleteSession(s.id, e)}
                         className={`p-1 rounded transition-colors ${isDark ? "hover:bg-zinc-750 text-zinc-500 hover:text-red-400" : "hover:bg-zinc-200 text-zinc-400 hover:text-red-600"}`}
-                        title="Hapus Chat"
+                        title="Delete Chat"
                       >
                         <Trash2 className="h-3 w-3" />
                       </button>
@@ -1672,19 +1678,18 @@ export default function App() {
         </AnimatePresence>
       </div>
 
-      {/* Sidebar Status Footer */}
       <div className={`p-4 border-t ${curTheme.border} ${curTheme.sectionBg} text-[11px] space-y-2.5 shrink-0`}>
         {!isLoggedIn && (
           <button
             onClick={handleGoogleLoginClick}
             className="w-full text-center text-[10px] text-zinc-400 hover:text-zinc-200 bg-zinc-900/10 border border-dashed border-zinc-800 hover:border-zinc-700 rounded-xl py-1.5 transition-all font-sans"
           >
-            Masuk dengan Google
+            Sign in with Google
           </button>
         )}
 
         <div className="text-center text-zinc-600 text-[10px] select-none pt-0.5">
-          © 2026 ExeChat version 1
+          © 2026 ExeChat
         </div>
       </div>
     </div>
@@ -1706,8 +1711,8 @@ export default function App() {
               </defs>
             </svg>
           </div>
-          <h2 className="text-lg font-medium tracking-wide animate-pulse">Menghubungkan ke ExeChat...</h2>
-          <p className="mt-2 text-xs text-zinc-500 font-mono">Memverifikasi sesi aman...</p>
+          <h2 className="text-lg font-medium tracking-wide animate-pulse">Connecting to ExeChat...</h2>
+          <p className="mt-2 text-xs text-zinc-500 font-mono">Verifying secure session...</p>
         </div>
       </div>
     );
@@ -1716,7 +1721,6 @@ export default function App() {
   if (!isLoggedIn) {
     return (
       <div className="flex h-screen w-full items-center justify-center bg-zinc-950 font-sans text-zinc-100 antialiased selection:bg-zinc-800 relative overflow-hidden">
-        {/* Soft, natural background radial light - very clean and professional */}
         <div className="absolute inset-0 bg-radial-[circle_at_center,rgba(39,39,42,0.15),transparent_70%] pointer-events-none" />
 
         <motion.div
@@ -1725,7 +1729,6 @@ export default function App() {
           transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
           className="w-full max-w-[400px] rounded-2xl border border-zinc-800 bg-zinc-900/40 p-8 sm:p-10 shadow-xl z-10 mx-4 flex flex-col items-center text-center"
         >
-          {/* Simple, premium chat bubble emblem */}
           <div className="mb-6 select-none">
             <div className="h-12 w-12 rounded-xl bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-200 shadow-md">
               <svg className="h-6 w-6 text-zinc-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -1736,10 +1739,10 @@ export default function App() {
 
           <div className="mb-8 select-none">
             <h2 className="text-xl font-semibold tracking-tight text-white">
-              Selamat Datang
+              Welcome
             </h2>
             <p className="mt-2 text-sm text-zinc-400">
-              Silakan masuk menggunakan akun Google Anda untuk memulai sesi percakapan.
+              Please sign in using your Google account to start your chat session.
             </p>
           </div>
 
@@ -1758,8 +1761,7 @@ export default function App() {
             </motion.div>
           )}
 
-          {/* Google Login Block */}
-          <div className="w-full flex flex-col items-center justify-center p-6 rounded-xl border border-zinc-800 bg-zinc-900/20 backdrop-blur-sm">
+          <div className="w-full flex flex-col items-center justify-center p-6 rounded-xl border border-zinc-800 bg-zinc-900/20 backdrop-blur-sm gap-3">
             <GoogleLogin
               onSuccess={handleGoogleLoginSuccess}
               onError={() => setErrorText("Google sign-in failed. Please try again.")}
@@ -1769,7 +1771,6 @@ export default function App() {
             />
           </div>
 
-          {/* Secure details at bottom - quiet and neat */}
           <p className="mt-8 text-[11px] text-zinc-500 font-medium select-none">
             Chat sessions are saved privately in your browser.
           </p>
@@ -1780,7 +1781,6 @@ export default function App() {
 
   return (
     <div className="flex h-screen w-full overflow-hidden bg-zinc-950 font-sans text-zinc-100 antialiased selection:bg-zinc-700/80">
-      {/* Hidden file input for file uploads */}
       <input
         ref={fileInputRef}
         type="file"
@@ -1791,21 +1791,16 @@ export default function App() {
       <AnimatePresence>
       </AnimatePresence>
 
-      {/* Background Cybernetic Glow Accent */}
       <div className={`absolute top-0 left-0 w-full h-[450px] bg-gradient-to-b ${curTheme.gradient} pointer-events-none select-none z-0`} />
 
-      {/* Main Grid: Left Rail, Expandable Sidebar & Right Chat Workspace */}
       <div className="flex w-full h-full relative z-10">
 
-        {/* DESKTOP NARROW LEFT RAIL (Gemini style) */}
         <div className={`hidden md:flex flex-col items-center justify-between py-6 w-16 h-full shrink-0 border-r ${curTheme.border} ${curTheme.sidebarBg} z-20 select-none`}>
-          {/* Top: Sparkles Logo & Toggle */}
           <div className="flex flex-col items-center gap-6 w-full">
             <div className="p-1 cursor-pointer hover:scale-105 transition-transform" onClick={() => {
               setCurrentSessionId(null);
               setShowSettings(false);
             }}>
-              {/* Custom Rotating Sparkle Logo */}
               <svg className="h-6.5 w-6.5 animate-[spin_10s_linear_infinite]" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <path d="M12 3Q12 12 21 12Q12 12 12 21Q12 12 3 12Q12 12 12 3Z" fill="url(#customGrad)" />
                 <circle cx="12" cy="12" r="2.5" fill="#ffffff" className="mix-blend-overlay" />
@@ -1819,7 +1814,6 @@ export default function App() {
               </svg>
             </div>
 
-            {/* Menu Toggle / Toggle History Drawer */}
             <button
               onClick={() => setIsDesktopSidebarOpen(prev => !prev)}
               className={`p-2 rounded-xl transition-all duration-200 ${
@@ -1827,13 +1821,12 @@ export default function App() {
                   ? (resolvedTheme === "dark" ? "bg-zinc-800 text-white" : "bg-zinc-200 text-zinc-900") 
                   : `hover:bg-zinc-500/10 ${resolvedTheme === "dark" ? "text-zinc-400" : "text-zinc-500"}`
               }`}
-              title="Sembunyikan/Tampilkan Menu Samping"
+              title="Toggle Sidebar"
             >
               <Menu className="h-4.5 w-4.5" />
             </button>
           </div>
 
-          {/* Middle: Quick actions (New Chat, Settings, etc.) */}
           <div className="flex flex-col items-center gap-4 w-full">
             <button
               onClick={() => {
@@ -1841,7 +1834,7 @@ export default function App() {
                 setShowSettings(false);
               }}
               className={`p-2.5 rounded-xl hover:bg-zinc-500/10 transition-all duration-200 ${resolvedTheme === "dark" ? "text-zinc-400 hover:text-white" : "text-zinc-600 hover:text-zinc-900"}`}
-              title="Chat Baru"
+              title="New Chat"
             >
               <Plus className="h-4.5 w-4.5" />
             </button>
@@ -1871,13 +1864,12 @@ export default function App() {
                   ? "bg-[#1a73e8]/10 text-[#1a73e8]" 
                   : `hover:bg-zinc-500/10 ${resolvedTheme === "dark" ? "text-zinc-400 hover:text-white" : "text-zinc-600 hover:text-zinc-900"}`
               }`}
-              title="Pengaturan"
+              title="Settings"
             >
               <Settings className="h-4.5 w-4.5" />
             </button>
           </div>
 
-          {/* Bottom: User Avatar */}
           <div className="flex flex-col items-center gap-4">
             <div className="relative">
               {isLoggedIn ? (
@@ -1885,16 +1877,16 @@ export default function App() {
                   <img
                     onClick={() => setShowSettings(true)}
                     src={userPhoto}
-                    alt="Profil"
+                    alt="Profile"
                     referrerPolicy="no-referrer"
                     className="h-8 w-8 rounded-full object-cover border border-zinc-800 shadow-md cursor-pointer hover:scale-105 transition-all"
-                    title="Lihat Profil"
+                    title="View Profile"
                   />
                 ) : (
                   <div 
                     onClick={() => setShowSettings(true)}
                     className="h-8 w-8 rounded-full bg-gradient-to-tr from-[#59a6ff] to-[#c084fc] flex items-center justify-center text-xs font-bold text-white shadow-md border border-white/20 cursor-pointer hover:scale-105 transition-all"
-                    title="Lihat Profil"
+                    title="View Profile"
                   >
                     {(userDisplayName || userName || "U").charAt(0).toUpperCase()}
                   </div>
@@ -1903,7 +1895,7 @@ export default function App() {
                 <button
                   onClick={handleGoogleLoginClick}
                   className={`h-8 w-8 rounded-full flex items-center justify-center transition-colors border ${resolvedTheme === "dark" ? "bg-zinc-800 border-zinc-700 text-zinc-400 hover:text-white" : "bg-white border-zinc-200 text-zinc-600 hover:text-zinc-900"}`}
-                  title="Masuk / Sign In"
+                  title="Sign In"
                 >
                   <Cpu className="h-4 w-4" />
                 </button>
@@ -1929,11 +1921,9 @@ export default function App() {
           )}
         </AnimatePresence>
 
-        {/* MOBILE SIDEBAR DRAWER */}
         <AnimatePresence>
           {isMobileSidebarOpen && (
             <>
-              {/* Backdrop Overlay */}
               <motion.div
                 key="sidebar-overlay"
                 initial={{ opacity: 0 }}
@@ -1942,7 +1932,6 @@ export default function App() {
                 onClick={() => setIsMobileSidebarOpen(false)}
                 className="fixed inset-0 bg-black z-40 md:hidden"
               />
-              {/* Drawer Content */}
               <motion.aside
                 key="sidebar-drawer"
                 initial={{ x: "-100%" }}
@@ -1957,34 +1946,28 @@ export default function App() {
           )}
         </AnimatePresence>
 
-         {/* WORKSPACE AREA */}
         <main className={`flex-1 h-full flex ${curTheme.mainBg} relative overflow-hidden`}>
 
-          {/* CHAT SECTION */}
           <div className="flex-1 h-full flex flex-col min-w-0">
-                  {/* Chat Workspace Header */}
             <div className={`h-14 md:h-16 px-3.5 md:px-6 border-b ${curTheme.border} ${curTheme.sectionBg} flex items-center justify-between z-10 shrink-0`}>
               <div className="min-w-0 flex items-center gap-2 md:gap-3">
-                {/* Mobile Sidebar Toggle */}
                 <button
                   onClick={() => setIsMobileSidebarOpen(true)}
                   className={`p-1.5 -ml-1 rounded-lg md:hidden transition-colors shrink-0 ${resolvedTheme === "dark" ? "hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200" : "hover:bg-zinc-200 text-zinc-600 hover:text-zinc-900"}`}
-                  title="Buka Menu"
+                  title="Open Menu"
                 >
                   <Menu className="h-4.5 w-4.5" />
                 </button>
               </div>
 
-              {/* Header Right Actions - Profile Picture (Mobile), Logout */}
               <div className="flex items-center gap-3 select-none">
                 {isLoggedIn && (
                   <div className="flex items-center gap-3 border-l border-zinc-800/60 pl-3 md:pl-4">
-                    {/* Foto Profil (Mobile Only) */}
                     <div className="relative group md:hidden">
                       {userPhoto ? (
                         <img
                           src={userPhoto}
-                          alt="Profil"
+                          alt="Profile"
                           referrerPolicy="no-referrer"
                           className="h-8 w-8 rounded-full object-cover border border-zinc-800 shadow-md transition-transform group-hover:scale-105"
                         />
@@ -1994,15 +1977,6 @@ export default function App() {
                         </div>
                       )}
                     </div>
-
-                    {/* Tombol Logout */}
-                    <button
-                      onClick={handleLogout}
-                      className={`p-2 rounded-xl transition-colors ${resolvedTheme === "dark" ? "hover:bg-red-950/25 text-zinc-400 hover:text-red-400" : "hover:bg-red-50 text-zinc-600 hover:text-red-600"}`}
-                      title="Keluar (Logout)"
-                    >
-                      <LogOut className="h-4 w-4" />
-                    </button>
                   </div>
                 )}
 
@@ -2010,7 +1984,7 @@ export default function App() {
                   <button
                     onClick={handleClearCurrentSession}
                     className={`p-2 rounded-xl transition-colors ${resolvedTheme === "dark" ? "hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200" : "hover:bg-zinc-200 text-zinc-600 hover:text-zinc-900"}`}
-                    title="Bersihkan obrolan"
+                    title="Clear chat"
                   >
                     <RefreshCw className="h-3.5 w-3.5" />
                   </button>
@@ -2018,14 +1992,11 @@ export default function App() {
               </div>
             </div>
 
-            {/* Chat Area Scrollable */}
             <div className="flex-1 overflow-y-auto px-3.5 md:px-8 py-4 md:py-6 relative z-0 scrollbar-thin">
               <div className="max-w-3xl mx-auto h-full flex flex-col">
 
-                {/* Empty / Welcome State */}
                 {!currentSession || currentSession.messages.length === 0 ? (
                   <div className="flex-1 flex flex-col justify-center items-center py-8 md:py-14 max-w-2xl mx-auto w-full px-2 text-center">
-                    {/* Welcome Logo / Sparkles */}
                     <div className="text-center select-none mb-3 md:mb-5">
                       <motion.div
                         initial={{ scale: 0.93, opacity: 0 }}
@@ -2035,7 +2006,6 @@ export default function App() {
                           isDark ? "bg-[#1e1f20] border-zinc-800" : "bg-[#f0f4f9] border-zinc-200"
                         }`}
                       >
-                        {/* Colorful Custom Sparkle SVG */}
                         <svg className="h-6 w-6 md:h-8 md:w-8 animate-[spin_10s_linear_infinite]" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                           <path d="M12 3Q12 12 21 12Q12 12 12 21Q12 12 3 12Q12 12 12 3Z" fill="url(#customGradWelcome)" />
                           <circle cx="12" cy="12" r="2.5" fill="#ffffff" className="mix-blend-overlay" />
@@ -2056,16 +2026,15 @@ export default function App() {
                       transition={{ delay: 0.1, duration: 0.4 }}
                       className="font-display font-semibold text-3xl sm:text-4xl md:text-[42px] tracking-tight leading-tight mb-8 bg-gradient-to-r from-[#59a6ff] via-[#c084fc] to-[#ff8da1] bg-clip-text text-transparent select-none"
                     >
-                      {userDisplayName === "Tamu" || userName === "Tamu"
-                        ? `Halo Tamu, ${welcomeGreeting}`
+                      {userDisplayName === "Guest" || userName === "Guest"
+                        ? `Hello Guest, ${welcomeGreeting}`
                         : (userDisplayName || userName 
-                            ? `Halo ${userDisplayName || userName}, ${welcomeGreeting}` 
-                            : `Halo, ${welcomeGreeting.charAt(0).toUpperCase() + welcomeGreeting.slice(1)}`
+                            ? `Hello ${userDisplayName || userName}, ${welcomeGreeting}` 
+                            : `Hello, ${welcomeGreeting.charAt(0).toUpperCase() + welcomeGreeting.slice(1)}`
                           )
                       }
                     </motion.h2>
 
-                    {/* Centered Input Textbox with Shiny Rotating Gradient Border */}
                     <motion.div
                       initial={{ opacity: 0, y: 12 }}
                       animate={{ opacity: 1, y: 0 }}
@@ -2076,7 +2045,6 @@ export default function App() {
                         isDark ? "bg-[#1e1f20]" : "bg-[#f0f4f9]"
                       }`}>
 
-                      {/* Selected File Display */}
                       {selectedFile && (
                         <div className={`mb-3.5 p-2 px-3 rounded-xl border flex items-center gap-2.5 text-xs animate-fadeIn ${
                           isDark ? "bg-zinc-950 border-zinc-850 text-zinc-300" : "bg-white border-zinc-200 text-zinc-700"
@@ -2088,7 +2056,7 @@ export default function App() {
                             <span className={`text-[9px] px-1.5 py-0.5 rounded font-mono border ${
                               isDark ? "bg-zinc-900 text-zinc-400 border-zinc-850" : "bg-zinc-100 text-zinc-500 border-zinc-200"
                             }`}>
-                              Teks Terbaca
+                              Text Read
                             </span>
                           )}
                           <button
@@ -2096,16 +2064,14 @@ export default function App() {
                             className={`ml-auto p-1.5 rounded-lg transition-colors ${
                               isDark ? "text-zinc-500 hover:text-red-400 hover:bg-zinc-900" : "text-zinc-500 hover:text-red-500 hover:bg-zinc-100"
                             }`}
-                            title="Hapus lampiran"
+                            title="Remove attachment"
                           >
                             <X className="h-3.5 w-3.5" />
                           </button>
                         </div>
                       )}
 
-                      {/* Textarea with Upload Button */}
                       <div className="flex items-end gap-2">
-                        {/* Upload button - left side */}
                         <button
                           onClick={() => {
                             console.log("[Button] Upload clicked");
@@ -2114,7 +2080,7 @@ export default function App() {
                           className={`p-2 md:p-2.5 rounded-lg md:rounded-xl transition-colors shrink-0 -ml-1 ${
                             isDark ? "hover:bg-zinc-800/50 hover:text-amber-400 text-zinc-400" : "hover:bg-zinc-200 text-zinc-600 hover:text-[#1a73e8]"
                           }`}
-                          title="Lampirkan File (Teks, Kode, Gambar, Audio, dsb)"
+                          title="Attach File (Text, Code, Image, Audio, etc.)"
                         >
                           <Plus className="h-4.5 w-4.5 stroke-[2]" />
                         </button>
@@ -2129,7 +2095,7 @@ export default function App() {
                               handleSendMessage();
                             }
                           }}
-                          placeholder="Tanyakan apa saja ke ExeChat..."
+                          placeholder="Ask ExeChat anything..."
                           disabled={isGenerating}
                           className={`flex-1 bg-transparent resize-none border-none outline-none focus:ring-0 text-xs md:text-sm min-h-[64px] md:min-h-[90px] max-h-40 font-sans ${
                             isDark ? "text-zinc-200 placeholder-zinc-500" : "text-zinc-800 placeholder-zinc-400"
@@ -2138,11 +2104,9 @@ export default function App() {
                         />
                       </div>
 
-                      {/* Controls at the bottom of the input box */}
                       <div className={`flex items-center justify-between mt-2.5 pt-2.5 border-t ${
                         isDark ? "border-zinc-950" : "border-zinc-200"
                       }`}>
-                        {/* Selector Controls (Model & Preset) */}
                         <div className="flex flex-wrap items-center gap-1.5 md:gap-2">
                           <button
                             type="button"
@@ -2150,7 +2114,7 @@ export default function App() {
                             className={`flex items-center gap-1.5 text-[10px] md:text-[11px] rounded-lg py-1.5 px-1.5 md:px-2.5 max-w-[120px] sm:max-w-none truncate font-sans cursor-pointer focus:outline-none transition-all border ${
                               isDark 
                                 ? "bg-zinc-950 hover:bg-zinc-900 text-zinc-400 border-zinc-900 hover:border-zinc-800" 
-                                : "bg-white hover:bg-zinc-100 text-zinc-600 border-zinc-200 hover:border-zinc-350"
+                               : "bg-white hover:bg-zinc-100 text-zinc-600 border-zinc-200 hover:border-zinc-350"
                             }`}
                             title="Select AI Model"
                           >
@@ -2175,7 +2139,6 @@ export default function App() {
                           </button>
                         </div>
 
-                        {/* Send button */}
                         <button
                           onClick={() => handleSendMessage()}
                           disabled={!inputMessage.trim() || isGenerating}
@@ -2196,7 +2159,6 @@ export default function App() {
                       </div>
                     </motion.div>
 
-                    {/* Preset Info banner */}
                     <div className="mt-4 md:mt-6 text-center select-none">
                       <div className={`inline-flex items-center gap-1 border rounded-full px-3 py-1 text-[9px] md:text-[10px] font-sans tracking-wide ${
                         isDark 
@@ -2209,7 +2171,6 @@ export default function App() {
                     </div>
                   </div>
                 ) : (
-                  // Message list
                   <div className="space-y-3.5 md:space-y-6 flex-1">
                     {currentSession.messages.map((msg, index) => {
                       const isUser = msg.role === "user";
@@ -2234,10 +2195,16 @@ export default function App() {
 
                              {/* Message content */}
                              {isUser ? (
-                               <div className="whitespace-pre-wrap leading-relaxed text-zinc-250 font-sans text-xs sm:text-sm md:text-[15px] select-text flex flex-col gap-2.5">
+                               <div className={`whitespace-pre-wrap leading-relaxed font-sans text-xs sm:text-sm md:text-[15px] select-text flex flex-col gap-2.5 ${isDark ? "text-zinc-250" : "text-zinc-850"}`}>
                                  {msg.attachment && (
-                                   <div className="flex items-center gap-3 p-3 rounded-xl bg-zinc-950/70 border border-zinc-800/80 max-w-sm hover:border-zinc-700/80 transition-all duration-300">
-                                     <div className="p-2.5 rounded-lg bg-zinc-900 border border-zinc-800 text-amber-500 shrink-0 shadow-inner">
+                                   <div className={`flex items-center gap-3 p-3 rounded-xl border max-w-sm transition-all duration-300 ${
+                                     isDark 
+                                       ? "bg-zinc-950/70 border-zinc-800/80 hover:border-zinc-700/80" 
+                                       : "bg-zinc-50 border-zinc-200 hover:border-zinc-350"
+                                   }`}>
+                                     <div className={`p-2.5 rounded-lg border text-amber-500 shrink-0 shadow-inner ${
+                                       isDark ? "bg-zinc-900 border-zinc-800" : "bg-white border-zinc-200"
+                                     }`}>
                                        {msg.attachment.type === "image" ? (
                                          <Sparkles className="h-4 w-4" />
                                        ) : msg.attachment.type === "audio" ? (
@@ -2247,15 +2214,17 @@ export default function App() {
                                        )}
                                      </div>
                                      <div className="flex-1 min-w-0">
-                                       <div className="text-xs font-semibold text-zinc-100 truncate flex items-center gap-1.5">
+                                       <div className={`text-xs font-semibold truncate flex items-center gap-1.5 ${isDark ? "text-zinc-100" : "text-zinc-900"}`}>
                                          <span>{msg.attachment.name}</span>
                                          {msg.attachment.textContent && (
-                                           <span className="text-[9px] bg-zinc-900 text-zinc-400 px-1 py-0.5 rounded border border-zinc-850 font-normal">
+                                           <span className={`text-[9px] px-1 py-0.5 rounded border font-normal ${
+                                             isDark ? "bg-zinc-900 text-zinc-400 border-zinc-850" : "bg-zinc-200 text-zinc-600 border-zinc-300"
+                                           }`}>
                                              Text
                                            </span>
                                          )}
                                        </div>
-                                       <div className="text-[10px] text-zinc-500 font-mono mt-0.5">
+                                       <div className={`text-[10px] font-mono mt-0.5 ${isDark ? "text-zinc-500" : "text-zinc-500"}`}>
                                          {(msg.attachment.size / 1024).toFixed(1)} KB • {msg.attachment.mime || "unknown"}
                                        </div>
                                      </div>
@@ -2337,10 +2306,8 @@ export default function App() {
                               )
                             )}
 
-                            {/* Actions footer (copy, rate, speak) */}
                             {!isUser && msg.content !== "" && (
                               <div className="flex items-center gap-1 sm:gap-2 mt-3 select-none text-zinc-400 dark:text-zinc-500">
-                                {/* Like button */}
                                 <button
                                   onClick={() => {
                                     setLikedMessages((prev) => ({ ...prev, [msg.id]: !prev[msg.id] }));
@@ -2349,12 +2316,11 @@ export default function App() {
                                   className={`p-1.5 rounded-lg hover:bg-zinc-500/10 hover:text-zinc-200 transition-all duration-250 ${
                                     likedMessages[msg.id] ? "text-blue-500 font-semibold bg-blue-500/10" : "text-zinc-400 dark:text-zinc-500"
                                   }`}
-                                  title="Suka"
+                                  title="Like"
                                 >
                                   <ThumbsUp className={`h-4 w-4 ${likedMessages[msg.id] ? "fill-current" : ""}`} />
                                 </button>
 
-                                {/* Dislike button */}
                                 <button
                                   onClick={() => {
                                     setDislikedMessages((prev) => ({ ...prev, [msg.id]: !prev[msg.id] }));
@@ -2363,26 +2329,24 @@ export default function App() {
                                   className={`p-1.5 rounded-lg hover:bg-zinc-500/10 hover:text-zinc-200 transition-all duration-250 ${
                                     dislikedMessages[msg.id] ? "text-red-500 font-semibold bg-red-500/10" : "text-zinc-400 dark:text-zinc-500"
                                   }`}
-                                  title="Tidak Suka"
+                                  title="Dislike"
                                 >
                                   <ThumbsDown className={`h-4 w-4 ${dislikedMessages[msg.id] ? "fill-current" : ""}`} />
                                 </button>
 
-                                {/* Regenerate button */}
                                 <button
                                   onClick={() => handleRegenerateMessage(msg.id)}
                                   className={`p-1.5 rounded-lg hover:bg-zinc-500/10 hover:text-zinc-200 transition-all duration-250 ${isGenerating ? "opacity-40 cursor-not-allowed" : ""}`}
                                   disabled={isGenerating}
-                                  title="Coba Lagi / Regenerasi"
+                                  title="Try Again / Regenerate"
                                 >
                                   <RotateCw className={`h-4 w-4 ${isGenerating ? "animate-spin" : ""}`} />
                                 </button>
 
-                                {/* Copy button */}
                                 <button
                                   onClick={() => copyMessageToClipboard(msg.id, msg.content)}
                                   className="p-1.5 rounded-lg hover:bg-zinc-500/10 hover:text-zinc-200 transition-all duration-250"
-                                  title="Salin jawaban"
+                                  title="Copy response"
                                 >
                                   {copiedMessageId === msg.id ? (
                                     <Check className="h-4 w-4 text-green-500" />
@@ -2391,7 +2355,6 @@ export default function App() {
                                   )}
                                 </button>
 
-                                {/* More / Titik 3 dropdown for Voice */}
                                 <div className="relative">
                                   <button
                                     onClick={(e) => {
@@ -2399,14 +2362,13 @@ export default function App() {
                                       setActiveDropdownMsgId(prev => prev === msg.id ? null : msg.id);
                                     }}
                                     className={`p-1.5 rounded-lg hover:bg-zinc-500/10 hover:text-zinc-200 transition-all duration-250 ${activeDropdownMsgId === msg.id ? "bg-zinc-500/15" : ""}`}
-                                    title="Lainnya"
+                                    title="More"
                                   >
                                     <MoreHorizontal className="h-4 w-4" />
                                   </button>
 
                                   {activeDropdownMsgId === msg.id && (
                                     <>
-                                      {/* Dropdown Backdrop to close on outer click */}
                                       <div 
                                         className="fixed inset-0 z-30" 
                                         onClick={() => setActiveDropdownMsgId(null)}
@@ -2428,12 +2390,12 @@ export default function App() {
                                           {isSpeaking ? (
                                             <>
                                               <VolumeX className="h-4 w-4 text-red-500" />
-                                              <span className="text-red-500 font-semibold">Hentikan Suara</span>
+                                              <span className="text-red-500 font-semibold">Stop Voice</span>
                                             </>
                                           ) : (
                                             <>
                                               <Volume2 className="h-4 w-4 text-[#1a73e8]" />
-                                              <span>Dengarkan Suara</span>
+                                              <span>Listen to Voice</span>
                                             </>
                                           )}
                                         </button>
@@ -2442,7 +2404,6 @@ export default function App() {
                                   )}
                                 </div>
 
-                                {/* Small compact timestamp */}
                                 <span className="text-[10px] text-zinc-500 dark:text-zinc-500 ml-auto font-mono flex items-center gap-1">
                                   <Clock className="h-3 w-3" />
                                   {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
@@ -2454,11 +2415,10 @@ export default function App() {
                       );
                     })}
 
-                    {/* Loader typing indicator */}
                     {isGenerating && currentSession.messages[currentSession.messages.length - 1]?.content !== "" && (
                       <div className="flex items-center gap-2 text-zinc-500 pl-9 md:pl-12 py-1 text-[11px] md:text-xs select-none">
                         <span className="h-1.5 w-1.5 rounded-full bg-zinc-600 animate-pulse" />
-                        <span>AI sedang menulis...</span>
+                        <span>AI is writing...</span>
                       </div>
                     )}
                   </div>
@@ -2484,7 +2444,9 @@ export default function App() {
 
             {/* CHAT INPUT FORM AREA */}
             {currentSession && currentSession.messages.length > 0 && (
-              <div className="p-2.5 md:p-4 border-t border-zinc-900 bg-zinc-950/80 shrink-0 z-10">
+              <div className={`p-2.5 md:p-4 border-t shrink-0 z-10 transition-colors duration-200 ${
+                isDark ? "border-zinc-900 bg-zinc-950/80" : "border-zinc-200 bg-white"
+              }`}>
                 <div className="max-w-3xl mx-auto relative">
 
                   {/* Quick actions box directly above inputs */}
@@ -2494,48 +2456,68 @@ export default function App() {
                       <button
                         type="button"
                         onClick={() => setShowModelModal(true)}
-                        className="bg-zinc-900 hover:bg-zinc-900/80 text-zinc-300 border border-zinc-850 hover:border-zinc-850 text-[10px] md:text-[11px] rounded-lg py-1 px-2.5 font-sans max-w-[125px] sm:max-w-none truncate cursor-pointer focus:outline-none transition-all shadow-sm flex items-center gap-1"
+                        className={`border text-[10px] md:text-[11px] rounded-lg py-1 px-2.5 font-sans max-w-[125px] sm:max-w-none truncate cursor-pointer focus:outline-none transition-all shadow-sm flex items-center gap-1 ${
+                          isDark 
+                            ? "bg-zinc-900 hover:bg-zinc-900/80 text-zinc-300 border-zinc-850 hover:border-zinc-850" 
+                            : "bg-zinc-50 hover:bg-zinc-100 text-zinc-700 border-zinc-200 hover:border-zinc-200"
+                        }`}
                       >
                         <Cpu className="h-2.5 w-2.5 text-purple-500 shrink-0" />
                         <span className="truncate">{activeModel.name}</span>
                         <ChevronDown className="h-2.5 w-2.5 text-zinc-500 shrink-0" />
                       </button>
 
-                      {/* Preset/Instruction Selector */}
+                      {/* Topic/Instruction Selector */}
                       <button
                         type="button"
                         onClick={() => setShowPresetModal(true)}
-                        className="bg-zinc-900 hover:bg-zinc-900/80 text-zinc-300 border border-zinc-850 hover:border-zinc-850 text-[10px] md:text-[11px] rounded-lg py-1 px-2.5 font-sans max-w-[125px] sm:max-w-none truncate cursor-pointer focus:outline-none transition-all shadow-sm flex items-center gap-1"
+                        className={`border text-[10px] md:text-[11px] rounded-lg py-1 px-2.5 font-sans max-w-[125px] sm:max-w-none truncate cursor-pointer focus:outline-none transition-all shadow-sm flex items-center gap-1 ${
+                          isDark 
+                            ? "bg-zinc-900 hover:bg-zinc-900/80 text-zinc-300 border-zinc-850 hover:border-zinc-850" 
+                            : "bg-zinc-50 hover:bg-zinc-100 text-zinc-700 border-zinc-200 hover:border-zinc-200"
+                        }`}
                       >
                         <Sparkles className="h-2.5 w-2.5 text-amber-500 shrink-0" />
-                        <span className="truncate">Preset: {activePreset.name}</span>
+                        <span className="truncate">Topic: {activePreset.name}</span>
                         <ChevronDown className="h-2.5 w-2.5 text-zinc-500 shrink-0" />
                       </button>
                     </div>
 
                     {/* Character Counter Display */}
-                    <div className="flex items-center gap-2 md:gap-3 font-mono text-[9px] md:text-[10px] text-zinc-650 select-none">
-                      <span>{inputMessage.length} karakter</span>
+                    <div className={`flex items-center gap-2 md:gap-3 font-mono text-[9px] md:text-[10px] select-none ${
+                      isDark ? "text-zinc-650" : "text-zinc-400"
+                    }`}>
+                      <span>{inputMessage.length} characters</span>
                     </div>
                   </div>
 
                   {/* Input block */}
-                  <div className="relative rounded-xl md:rounded-2xl border border-zinc-900 bg-zinc-900/20 p-1.5 md:p-2 focus-within:border-zinc-800 focus-within:bg-zinc-900/40 transition-all duration-300 flex flex-col">
+                  <div className={`relative rounded-xl md:rounded-2xl border p-1.5 md:p-2 transition-all duration-300 flex flex-col ${
+                    isDark 
+                      ? "border-zinc-900 bg-zinc-900/20 focus-within:border-zinc-800 focus-within:bg-zinc-900/40" 
+                      : "border-zinc-200 bg-zinc-50/50 focus-within:border-zinc-300 focus-within:bg-zinc-100/50"
+                  }`}>
                     {/* Selected File Preview inside input block */}
                     {selectedFile && (
-                      <div className="mx-1 mb-2.5 p-2 px-3 rounded-xl bg-zinc-950 border border-zinc-850 flex items-center gap-2.5 text-xs text-zinc-300 animate-fadeIn">
+                      <div className={`mx-1 mb-2.5 p-2 px-3 rounded-xl border flex items-center gap-2.5 text-xs animate-fadeIn ${
+                        isDark ? "bg-zinc-950 border-zinc-850 text-zinc-300" : "bg-zinc-100 border-zinc-250/60 text-zinc-700"
+                      }`}>
                         <Paperclip className="h-3.5 w-3.5 text-amber-500 animate-bounce" />
                         <span className="truncate max-w-[180px] sm:max-w-[280px] font-medium">{selectedFile.name}</span>
                         <span className="text-[10px] text-zinc-500 font-mono">({(selectedFile.size / 1024).toFixed(1)} KB)</span>
                         {selectedFile.textContent && (
-                          <span className="text-[9px] px-1.5 py-0.5 rounded bg-zinc-900 text-zinc-400 font-mono border border-zinc-850">
-                            Teks Terbaca
+                          <span className={`text-[9px] px-1.5 py-0.5 rounded font-mono border ${
+                            isDark ? "bg-zinc-900 text-zinc-400 border-zinc-850" : "bg-zinc-50 text-zinc-600 border-zinc-200"
+                          }`}>
+                            Text Read
                           </span>
                         )}
                         <button
                           onClick={() => setSelectedFile(null)}
-                          className="ml-auto p-1.5 text-zinc-500 hover:text-red-400 hover:bg-zinc-900 rounded-lg transition-colors"
-                          title="Hapus lampiran"
+                          className={`ml-auto p-1.5 text-zinc-500 hover:text-red-400 rounded-lg transition-colors ${
+                            isDark ? "hover:bg-zinc-900" : "hover:bg-zinc-200"
+                          }`}
+                          title="Remove attachment"
                         >
                           <X className="h-3.5 w-3.5" />
                         </button>
@@ -2549,8 +2531,10 @@ export default function App() {
                           console.log("[Button] Upload clicked");
                           fileInputRef.current?.click();
                         }}
-                        className="p-2 md:p-2.5 rounded-lg md:rounded-xl hover:bg-zinc-800 hover:text-amber-400 transition-colors text-zinc-500 shrink-0"
-                        title="Unggah file pendukung (Teks, Kode, Gambar, dsb)"
+                        className={`p-2 md:p-2.5 rounded-lg md:rounded-xl hover:text-amber-400 transition-colors text-zinc-500 shrink-0 ${
+                          isDark ? "hover:bg-zinc-800" : "hover:bg-zinc-200"
+                        }`}
+                        title="Upload supporting file (Text, Code, Image, etc.)"
                       >
                         <Plus className="h-4 w-4 md:h-5 md:w-5 stroke-[2]" />
                       </button>
@@ -2568,11 +2552,13 @@ export default function App() {
                        }}
                        placeholder={
                          isGenerating
-                           ? "Harap tunggu jawaban model selesai..."
-                           : "Tanyakan apa saja ke ExeChat..."
+                           ? "Please wait for the AI to finish responding..."
+                           : "Ask ExeChat anything..."
                        }
                        disabled={isGenerating}
-                       className="flex-1 max-h-40 min-h-[38px] md:min-h-[44px] bg-transparent resize-none py-2 px-2.5 border-none outline-none focus:ring-0 text-zinc-200 text-xs md:text-sm placeholder-zinc-550"
+                       className={`flex-1 max-h-40 min-h-[38px] md:min-h-[44px] bg-transparent resize-none py-2 px-2.5 border-none outline-none focus:ring-0 text-xs md:text-sm ${
+                         isDark ? "text-zinc-200 placeholder-zinc-550" : "text-zinc-850 placeholder-zinc-400"
+                       }`}
                        style={{ height: "auto" }}
                      />
 
@@ -2582,7 +2568,7 @@ export default function App() {
                         <button
                           onClick={handleStopGeneration}
                           className="p-2 md:p-2.5 rounded-lg md:rounded-xl bg-red-950/40 border border-red-900/30 hover:border-red-900 hover:bg-red-950/60 text-red-400 transition-all duration-200 flex items-center justify-center cursor-pointer shadow-md"
-                          title="Hentikan jawaban"
+                          title="Stop generating"
                         >
                           <X className="h-3.5 w-3.5 md:h-4.5 md:w-4.5 stroke-[2.5]" />
                         </button>
@@ -2592,10 +2578,14 @@ export default function App() {
                           disabled={!inputMessage.trim()}
                           className={`p-2 md:p-2.5 rounded-lg md:rounded-xl transition-all duration-200 flex items-center justify-center shadow-md ${
                             inputMessage.trim()
-                              ? "bg-zinc-100 hover:bg-zinc-200 text-zinc-950 cursor-pointer hover:scale-105"
-                              : "bg-zinc-900 border border-zinc-850 text-zinc-600 cursor-not-allowed"
+                              ? isDark 
+                                ? "bg-zinc-100 hover:bg-zinc-200 text-zinc-950 cursor-pointer hover:scale-105" 
+                                : "bg-zinc-900 hover:bg-zinc-850 text-white cursor-pointer hover:scale-105"
+                              : isDark 
+                                ? "bg-zinc-900 border border-zinc-850 text-zinc-600 cursor-not-allowed" 
+                                : "bg-zinc-100 border border-zinc-200 text-zinc-400 cursor-not-allowed"
                           }`}
-                          title="Kirim Pesan"
+                          title="Send Message"
                         >
                           <Send className="h-3.5 w-3.5 md:h-4.5 md:w-4.5 stroke-[2.5]" />
                         </button>
@@ -2606,7 +2596,7 @@ export default function App() {
 
                   {/* Footnote instruction advice */}
                   <p className="text-[9px] md:text-[10px] text-zinc-600 text-center select-none mt-1.5 md:mt-2 font-sans">
-                    Ketik pesan dan tekan <kbd className="px-1 py-0.5 bg-zinc-900 border border-zinc-850 rounded text-zinc-500 text-[8px] md:text-[9px]">Enter</kbd> untuk berkirim pesan. ExeChat dapat menampilkan informasi yang salah.
+                    Type your message and press <kbd className="px-1 py-0.5 bg-zinc-900 border border-zinc-850 rounded text-zinc-500 text-[8px] md:text-[9px]">Enter</kbd> to send. ExeChat may display inaccurate information.
                   </p>
                 </div>
               </div>
@@ -2632,7 +2622,7 @@ export default function App() {
                     </div>
                     <div>
                       <h2 className={`text-base font-display font-bold ${curTheme.textTitle}`}>
-                        Pengaturan ExeChat v1
+                        ExeChat Settings
                       </h2>
                     </div>
                   </div>
@@ -2647,10 +2637,10 @@ export default function App() {
                 {/* Tabs bar */}
                 <div className={`px-6 py-2 border-b ${curTheme.border} flex items-center justify-start gap-1 overflow-x-auto scrollbar-none shrink-0 ${isDark ? "bg-zinc-950/40" : "bg-zinc-100/30"}`}>
                   {[
-                    { id: "akun", name: "Akun & Profil", icon: User },
-                    { id: "model", name: "Engine & Karakter AI", icon: Cpu },
-                    { id: "tampilan", name: "Tema & Tampilan", icon: Sun },
-                    { id: "ingatan", name: "Ingatan AI", icon: Brain },
+                    { id: "akun", name: "Account & Profile", icon: User },
+                    { id: "model", name: "Engine & AI Personality", icon: Cpu },
+                    { id: "tampilan", name: "Theme & Display", icon: Sun },
+                    { id: "ingatan", name: "AI Memory", icon: Brain },
                   ].map((tab) => {
                     const TabIcon = tab.icon;
                     const isActive = settingsTab === tab.id;
@@ -2683,13 +2673,13 @@ export default function App() {
                     <div className="space-y-6 animate-fadeIn">
                       <div className={`rounded-2xl p-6 border ${isDark ? "bg-zinc-900/20 border-zinc-850" : "bg-white border-zinc-200 shadow-sm"}`}>
                         <h3 className={`text-xs font-semibold tracking-wider font-mono uppercase mb-4 ${isDark ? "text-zinc-500" : "text-zinc-400"}`}>
-                          Status Keanggotaan
+                          Membership Status
                         </h3>
 
                         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
                           <div className="flex items-center gap-4">
                             {userPhoto ? (
-                              <img src={userPhoto} referrerPolicy="no-referrer" alt="Foto Profil" className="h-14 w-14 rounded-full border border-zinc-500/20 shadow-md shrink-0" />
+                              <img src={userPhoto} referrerPolicy="no-referrer" alt="Profile Photo" className="h-14 w-14 rounded-full border border-zinc-500/20 shadow-md shrink-0" />
                             ) : (
                               <div className={`h-14 w-14 rounded-full border flex items-center justify-center shrink-0 ${isDark ? "bg-zinc-900 border-zinc-800 text-zinc-400" : "bg-zinc-100 border-zinc-200 text-zinc-600"}`}>
                                 <User className="h-7 w-7" />
@@ -2700,7 +2690,7 @@ export default function App() {
                                 <div className="space-y-1">
                                   <div className={`flex items-center gap-2 font-bold text-base ${isDark ? "text-zinc-100" : "text-zinc-900"}`}>
                                     <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-                                    <span>Tersambung via Google</span>
+                                    <span>Connected via Google</span>
                                   </div>
                                   <p className={`text-xs ${isDark ? "text-zinc-400" : "text-zinc-550"}`}>{userEmail}</p>
                                 </div>
@@ -2708,9 +2698,9 @@ export default function App() {
                                 <div className="space-y-1">
                                   <div className={`flex items-center gap-2 font-bold text-base ${isDark ? "text-zinc-100" : "text-zinc-900"}`}>
                                     <span className="h-2 w-2 rounded-full bg-amber-500 animate-pulse" />
-                                    <span>Mode Tamu Percuma</span>
+                                    <span>Free Guest Mode</span>
                                   </div>
-                                  <p className={`text-xs ${isDark ? "text-zinc-400" : "text-zinc-550"}`}>Gunakan Google login untuk personalisasi asisten penuh.</p>
+                                  <p className={`text-xs ${isDark ? "text-zinc-400" : "text-zinc-550"}`}>Use Google sign-in for full assistant personalization.</p>
                                 </div>
                               )}
                             </div>
@@ -2745,21 +2735,21 @@ export default function App() {
                       {isLoggedIn && (
                         <div className={`rounded-2xl p-6 border ${isDark ? "bg-zinc-900/20 border-zinc-850" : "bg-white border-zinc-200 shadow-sm"}`}>
                           <h3 className={`text-xs font-semibold tracking-wider font-mono uppercase mb-2 ${isDark ? "text-zinc-500" : "text-zinc-400"}`}>
-                            Personalisasi Nama Pengguna
+                            Username Personalization
                           </h3>
                           <p className={`text-xs leading-relaxed mb-4 ${isDark ? "text-zinc-500" : "text-zinc-500"}`}>
-                            Atur nama panggilan Anda yang akan digunakan asisten Hexky untuk menyapa Anda dalam obrolan privat ini.
+                            Set your nickname that the Hexky assistant will use to greet you in this private chat.
                           </p>
 
                           <div className="space-y-3">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs mb-2">
                               <div className={`p-3 rounded-xl border flex justify-between ${isDark ? "bg-zinc-950/50 border-zinc-850/60" : "bg-zinc-50 border-zinc-200"}`}>
-                                <span className="text-zinc-500">Nama Google</span>
+                                <span className="text-zinc-500">Google Name</span>
                                 <span className={`font-semibold ${isDark ? "text-zinc-200" : "text-zinc-800"}`}>{googleDefaultName || userEmail?.split("@")[0]}</span>
                               </div>
                               <div className={`p-3 rounded-xl border flex justify-between ${isDark ? "bg-zinc-950/50 border-zinc-850/60" : "bg-zinc-50 border-zinc-200"}`}>
-                                <span className="text-zinc-500">Panggilan Aktif</span>
-                                <span className={`font-semibold ${isDark ? "text-zinc-200" : "text-zinc-800"}`}>{userDisplayName || "Tamu"}</span>
+                                <span className="text-zinc-500">Active Nickname</span>
+                                <span className={`font-semibold ${isDark ? "text-zinc-200" : "text-zinc-800"}`}>{userDisplayName || "Guest"}</span>
                               </div>
                             </div>
 
@@ -2767,7 +2757,7 @@ export default function App() {
                               <input
                                 value={userName}
                                 onChange={(e) => setUserName(e.target.value)}
-                                placeholder="Masukkan nama panggilan baru..."
+                                placeholder="Enter new nickname..."
                                 className={`flex-1 rounded-xl px-4 py-2.5 text-xs focus:outline-none border transition-colors ${
                                   isDark 
                                     ? "bg-zinc-950 border-zinc-850 text-zinc-100 focus:border-zinc-750 placeholder-zinc-700" 
@@ -2782,7 +2772,7 @@ export default function App() {
                                     : "bg-zinc-900 hover:bg-zinc-800 text-white hover:scale-[1.02]"
                                 }`}
                               >
-                                Simpan Nama
+                                Save Name
                               </button>
                             </div>
 
@@ -2803,10 +2793,10 @@ export default function App() {
                       {/* Model Engine AI Selection */}
                       <div className="space-y-3">
                         <h3 className={`text-xs font-semibold tracking-wider font-mono uppercase ${isDark ? "text-zinc-500" : "text-zinc-400"}`}>
-                          Pilihan Engine AI Utama
+                          Primary AI Engine Choice
                         </h3>
                         <p className={`text-xs ${isDark ? "text-zinc-500" : "text-zinc-500"}`}>
-                          Engine menentukan kecerdasan di balik tanggapan asisten Anda.
+                          The engine determines the intelligence behind your assistant's responses.
                         </p>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -2853,7 +2843,7 @@ export default function App() {
                                       <span className={`text-[9px] px-2 py-0.5 rounded-full font-mono border ${
                                         isDark ? "bg-zinc-950 border-zinc-850 text-zinc-500" : "bg-zinc-100 border-zinc-200 text-zinc-500"
                                       }`}>
-                                        {m.id === "gemma-4-31b" ? "Cepat" : "Kuat"}
+                                        {m.id === "gemma-4-31b" ? "Fast" : "Powerful"}
                                       </span>
                                     )}
                                   </div>
@@ -2867,13 +2857,13 @@ export default function App() {
                         </div>
                       </div>
 
-                      {/* Character Preset Instruction Selection */}
+                      {/* Discussion Topic Selection */}
                       <div className="space-y-3 pt-2">
                         <h3 className={`text-xs font-semibold tracking-wider font-mono uppercase ${isDark ? "text-zinc-500" : "text-zinc-400"}`}>
-                          Karakter / Preset Kepribadian
+                          Discussion Topics
                         </h3>
                         <p className={`text-xs ${isDark ? "text-zinc-500" : "text-zinc-500"}`}>
-                          Ubah kepribadian, gaya bicara, dan keahlian kognitif Hexky dalam merespon pesan.
+                          Select a specialized discussion topic to focus the conversation's context and cognitive orientation.
                         </p>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -2938,17 +2928,17 @@ export default function App() {
                     <div className="space-y-6 animate-fadeIn">
                       <div className={`rounded-2xl p-6 border ${isDark ? "bg-zinc-900/20 border-zinc-850" : "bg-white border-zinc-200 shadow-sm"}`}>
                         <h3 className={`text-xs font-semibold tracking-wider font-mono uppercase mb-1.5 ${isDark ? "text-zinc-500" : "text-zinc-400"}`}>
-                          Pilihan Tema Tampilan
+                          Display Theme Options
                         </h3>
                         <p className={`text-xs mb-5 ${isDark ? "text-zinc-500" : "text-zinc-500"}`}>
-                          Ubah estetika visual ExeChat agar nyaman di mata saat membaca obrolan.
+                          Change the visual aesthetics of ExeChat to be comfortable on the eyes when reading chats.
                         </p>
 
                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                           {[
-                            { id: "system", name: "Tema Sistem", desc: "Ikuti pengaturan OS perangkat", icon: Laptop },
-                            { id: "dark", name: "Hitam (Gelap)", desc: "Nuansa gelap hemat daya", icon: Moon },
-                            { id: "light", name: "Putih (Terang)", desc: "Nuansa terang kontras tinggi", icon: Sun },
+                            { id: "system", name: "System Theme", desc: "Follow device OS settings", icon: Laptop },
+                            { id: "dark", name: "Black (Dark)", desc: "Energy-saving dark theme", icon: Moon },
+                            { id: "light", name: "White (Light)", desc: "High-contrast light theme", icon: Sun },
                           ].map((t) => {
                             const isSelected = themeMode === t.id;
                             const IconComp = t.icon;
@@ -2993,10 +2983,10 @@ export default function App() {
 
                       <div className={`rounded-2xl p-6 border ${isDark ? "bg-zinc-900/20 border-zinc-850" : "bg-white border-zinc-200 shadow-sm"}`}>
                         <h3 className={`text-xs font-semibold tracking-wider font-mono uppercase mb-2 ${isDark ? "text-zinc-500" : "text-zinc-400"}`}>
-                          Penyesuaian Audio & Suara
+                          Audio & Sound Customization
                         </h3>
                         <p className={`text-xs leading-relaxed ${isDark ? "text-zinc-500" : "text-zinc-500"}`}>
-                          ExeChat secara otomatis membunyikan notifikasi lembut saat asisten Hexky selesai merespon pesan Anda sebagai umpan balik interaktif.
+                          ExeChat automatically plays a gentle notification sound when the assistant finishes responding as interactive feedback.
                         </p>
                       </div>
                     </div>
@@ -3009,11 +2999,11 @@ export default function App() {
                         <div className="flex items-center gap-2.5 mb-2">
                           <Brain className="h-5 w-5 text-amber-500 animate-pulse" />
                           <h3 className={`text-xs font-semibold tracking-wider font-mono uppercase ${isDark ? "text-zinc-500" : "text-zinc-400"}`}>
-                            Konfigurasi Ingatan AI (Maksimal 5)
+                            AI Memory Configuration (Max 5)
                           </h3>
                         </div>
                         <p className={`text-xs leading-relaxed mb-5 ${isDark ? "text-zinc-500" : "text-zinc-500"}`}>
-                          Asisten Hexky akan mengingat nama, preferensi pekerjaan, bahasa, atau instruksi khusus yang Anda tetapkan di sini di seluruh sesi obrolan Anda yang berbeda secara permanen.
+                          The assistant will remember your name, work preferences, language, or specific instructions set here permanently across your different chat sessions.
                         </p>
 
                         {/* Add Memory Form */}
@@ -3022,7 +3012,7 @@ export default function App() {
                             type="text"
                             value={memoryInput}
                             onChange={(e) => setMemoryInput(e.target.value)}
-                            placeholder={memories.length >= 5 ? "Batas maksimal ingatan tercapai" : "Contoh: Saya adalah programmer React..."}
+                            placeholder={memories.length >= 5 ? "Maximum memory limit reached" : "Example: I am a React programmer..."}
                             disabled={memories.length >= 5}
                             onKeyDown={(e) => {
                               if (e.key === "Enter" && memoryInput.trim()) {
@@ -3055,13 +3045,13 @@ export default function App() {
                                 : "bg-zinc-900 hover:bg-zinc-800 disabled:bg-zinc-100 disabled:text-zinc-350 text-white border-transparent shadow-sm cursor-pointer"
                             }`}
                           >
-                            Simpan
+                            Save
                           </button>
                         </div>
 
                         {memories.length >= 5 && (
                           <p className="text-[10px] text-amber-500 mb-3">
-                            * Anda telah menyimpan 5 ingatan (maksimal). Silakan hapus ingatan lama untuk menambahkan preferensi baru.
+                            * You have saved 5 memories (maximum). Please delete old memories to add a new preference.
                           </p>
                         )}
 
@@ -3069,7 +3059,7 @@ export default function App() {
                         <div className="space-y-2 pt-2 border-t border-zinc-500/10">
                           {memories.length === 0 ? (
                             <div className={`text-center py-6 border border-dashed rounded-xl text-xs ${isDark ? "border-zinc-800/80 text-zinc-600" : "border-zinc-200 text-zinc-400"}`}>
-                              Belum ada ingatan khusus. Tulis preferensi Anda di atas agar Hexky lebih mengenal Anda!
+                              No custom memories saved yet. Write your preferences above to let Hexky know you better!
                             </div>
                           ) : (
                             memories.map((mem, idx) => (
@@ -3095,7 +3085,7 @@ export default function App() {
                                       ? "bg-zinc-900/40 border-zinc-800 hover:bg-red-950/25 text-zinc-500 hover:text-red-400" 
                                       : "bg-zinc-50 border-zinc-200 hover:bg-red-50 text-zinc-500 hover:text-red-650"
                                   }`}
-                                  title="Hapus Ingatan"
+                                  title="Delete Memory"
                                 >
                                   <Trash2 className="h-3.5 w-3.5" />
                                 </button>
@@ -3270,7 +3260,7 @@ export default function App() {
                   <div className="flex items-center justify-between mb-4 pb-1">
                     <div className="flex items-center gap-2">
                       <Cpu className="h-5 w-5 text-purple-500 animate-pulse" />
-                      <h3 className="font-sans font-semibold text-lg">Pilih Model AI</h3>
+                      <h3 className="font-sans font-semibold text-lg">Select AI Model</h3>
                     </div>
                     <button
                       onClick={() => setShowModelModal(false)}
@@ -3283,7 +3273,7 @@ export default function App() {
                   </div>
 
                   <p className={`text-xs mb-5 leading-normal ${isDark ? "text-zinc-400" : "text-zinc-500"}`}>
-                    Pilih model kecerdasan buatan (Hexky) yang paling sesuai dengan kebutuhan analisis dan respon chat Anda.
+                    Choose the artificial intelligence model (Hexky) that best fits your analysis and chat response needs.
                   </p>
 
                   {/* Scrollable list of Models */}
@@ -3398,23 +3388,23 @@ export default function App() {
                       <User className="h-5 w-5" />
                     </div>
                     <div>
-                      <p className={`text-[10px] font-medium ${isDark ? "text-zinc-500" : "text-zinc-400"}`}>Langkah Terakhir</p>
-                      <h3 className={`font-sans font-semibold text-base ${isDark ? "text-zinc-100" : "text-zinc-900"}`}>Siapa Nama Anda?</h3>
+                      <p className={`text-[10px] font-medium ${isDark ? "text-zinc-500" : "text-zinc-400"}`}>Final Step</p>
+                      <h3 className={`font-sans font-semibold text-base ${isDark ? "text-zinc-100" : "text-zinc-900"}`}>What is Your Name?</h3>
                     </div>
                   </div>
 
                   <p className={`text-xs leading-relaxed mb-5 font-sans ${isDark ? "text-zinc-400" : "text-zinc-500"}`}>
-                    Pilih nama panggilan yang akan ditampilkan dalam sesi obrolan Anda. Lewati untuk menggunakan nama dari akun Google Anda.
+                    Choose a nickname to display in your chat sessions. Skip to use the name from your Google account.
                   </p>
 
                   {/* Input field */}
                   <div className="space-y-1.5 mb-5">
-                    <label className={`block text-[10px] font-medium uppercase tracking-wider ${isDark ? "text-zinc-500" : "text-zinc-400"}`}>Nama Panggilan</label>
+                    <label className={`block text-[10px] font-medium uppercase tracking-wider ${isDark ? "text-zinc-500" : "text-zinc-400"}`}>Nickname</label>
                     <input
                       type="text"
                       value={registerModalName}
                       onChange={(e) => setRegisterModalName(e.target.value)}
-                      placeholder="Contoh: Budi Prasetyo"
+                      placeholder="Example: John Doe"
                       maxLength={30}
                       className={`w-full rounded-xl border px-4 py-2.5 text-sm outline-none transition-colors font-sans ${
                         isDark 
@@ -3432,7 +3422,7 @@ export default function App() {
                         isDark ? "bg-white hover:bg-zinc-100 text-zinc-950" : "bg-zinc-900 hover:bg-zinc-800 text-white shadow-sm"
                       }`}
                     >
-                      Simpan & Lanjutkan
+                      Save & Continue
                     </button>
 
                     <button
@@ -3443,7 +3433,7 @@ export default function App() {
                           : "border-zinc-200 hover:border-zinc-300 bg-transparent hover:bg-zinc-50 text-zinc-600 hover:text-zinc-800"
                       }`}
                     >
-                      Lewati (Gunakan Nama Google)
+                      Skip (Use Google Name)
                     </button>
                   </div>
                 </motion.div>
@@ -3476,10 +3466,10 @@ export default function App() {
                   </div>
                   <div className="space-y-1.5 min-w-0">
                     <h4 className={`text-sm font-bold tracking-tight ${isDark ? "text-zinc-100" : "text-zinc-900"}`}>
-                      Pemberitahuan Cookie & Penyimpanan
+                      Cookie & Storage Notification
                     </h4>
                     <p className={`text-xs leading-relaxed ${isDark ? "text-zinc-400" : "text-zinc-500"}`}>
-                      ExeChat menggunakan kuki dan penyimpanan lokal (localStorage) untuk mengingat sesi obrolan, pengaturan tema tampilan, serta verifikasi login Google Anda agar dapat berfungsi secara optimal dan aman.
+                      ExeChat uses cookies and local storage (localStorage) to remember your chat sessions, theme settings, and Google login verification to function optimally and securely.
                     </p>
                   </div>
                 </div>
@@ -3492,16 +3482,16 @@ export default function App() {
                       isDark ? "bg-zinc-900/60 border-zinc-800 text-zinc-400" : "bg-zinc-50 border-zinc-200 text-zinc-650"
                     }`}
                   >
-                    <div className="font-semibold text-xs mb-1">Rincian Penyimpanan Kami:</div>
+                    <div className="font-semibold text-xs mb-1">Our Storage Details:</div>
                     <div className="flex items-start gap-1.5">
                       <span className="text-amber-500">•</span>
-                      <span><strong>Esensial (Wajib)</strong>: Menyimpan ID sesi percakapan Anda, status login Google, dan kunci API yang diperlukan untuk berinteraksi dengan AI.</span>
+                      <span><strong>Essential (Required)</strong>: Stores your chat session IDs, Google login status, and the API keys needed to interact with the AI.</span>
                     </div>
                     <div className="flex items-start gap-1.5">
                       <span className="text-amber-500">•</span>
-                      <span><strong>Preferensi (Opsional)</strong>: Menyimpan pilihan tema (Gelap/Terang), karakter/preset asisten pilihan, serta memori preferensi panggilan Anda.</span>
+                      <span><strong>Preferences (Optional)</strong>: Stores your theme choices (Dark/Light), assistant characters/presets, and nickname memory preferences.</span>
                     </div>
-                    <div>Kami menghargai privasi Anda sepenuhnya. Seluruh data chat Anda disimpan secara lokal di perangkat Anda sendiri.</div>
+                    <div>We fully respect your privacy. All your chat data is stored locally on your own device.</div>
                   </motion.div>
                 )}
 
@@ -3510,7 +3500,7 @@ export default function App() {
                     onClick={() => setShowCookieDetails(!showCookieDetails)}
                     className={`text-xs font-semibold hover:underline ${isDark ? "text-zinc-400 hover:text-zinc-250" : "text-zinc-600 hover:text-zinc-900"}`}
                   >
-                    {showCookieDetails ? "Sembunyikan Detail" : "Pelajari Detail"}
+                    {showCookieDetails ? "Hide Details" : "Learn Details"}
                   </button>
 
                   <div className="flex items-center gap-2">
@@ -3526,7 +3516,7 @@ export default function App() {
                           : "border-zinc-200 hover:bg-zinc-100 text-zinc-600 hover:text-zinc-800"
                       }`}
                     >
-                      Tolak
+                      Reject
                     </button>
                     <button
                       onClick={() => {
@@ -3540,7 +3530,7 @@ export default function App() {
                           : "bg-zinc-900 hover:bg-zinc-800 text-white border-transparent shadow-sm hover:scale-[1.02]"
                       }`}
                     >
-                      Setujui
+                      Accept
                     </button>
                   </div>
                 </div>

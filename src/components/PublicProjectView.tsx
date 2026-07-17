@@ -46,7 +46,6 @@ export function PublicProjectView({ projectId }: PublicProjectViewProps) {
 
           let finalHtml = htmlFile ? htmlFile.content : "<h1>No index.html file found!</h1>";
 
-          // Inject styles if style.css exists
           if (cssFile) {
             const styleTag = `<style>\n${cssFile.content}\n</style>`;
             if (finalHtml.includes("</head>")) {
@@ -56,7 +55,6 @@ export function PublicProjectView({ projectId }: PublicProjectViewProps) {
             }
           }
 
-          // Inject js if app.js exists
           if (jsFile) {
             const scriptTag = `<script>\n${jsFile.content}\n</script>`;
             if (finalHtml.includes("</body>")) {
