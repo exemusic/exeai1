@@ -234,9 +234,40 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
   const [isConsoleOpen, setIsConsoleOpen] = useState<boolean>(false);
   const [aiStreamingText, setAiStreamingText] = useState<string>("");
 
+  // Mobile detection and redirection countdown
+  const [isMobileScreen, setIsMobileScreen] = useState<boolean>(false);
+  const [countdown, setCountdown] = useState<number>(5);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const activeFile = files.find(f => f.path === activeFilePath) || files[0];
+
+  // Mobile device and screen width detection
+  useEffect(() => {
+    const checkMobile = () => {
+      const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth < 768;
+      setIsMobileScreen(isMobile);
+    };
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
+
+  // Countdown and return redirection when mobile detected
+  useEffect(() => {
+    if (!isMobileScreen) return;
+    const timer = setInterval(() => {
+      setCountdown((prev) => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          onClose();
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [isMobileScreen, onClose]);
 
   useEffect(() => {
     localStorage.setItem("execode_files", JSON.stringify(files));
@@ -1307,6 +1338,47 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
   };
 
   const aiName = "AI";
+
+  if (isMobileScreen) {
+    return (
+      <div className={`fixed inset-0 z-50 flex flex-col items-center justify-center p-6 text-center backdrop-blur-xl ${isDark ? "bg-zinc-950 text-zinc-100 font-sans" : "bg-zinc-50 text-zinc-900 font-sans"}`}>
+        <div className={`max-w-sm w-full p-8 rounded-2xl border flex flex-col items-center space-y-6 shadow-2xl animate-fade-in ${isDark ? "bg-zinc-900/80 border-zinc-800" : "bg-white border-zinc-200"}`}>
+          <div className="relative">
+            <div className="w-16 h-16 rounded-full bg-rose-500/10 flex items-center justify-center border border-rose-500/20 text-rose-500 animate-pulse">
+              <Smartphone className="h-8 w-8" />
+            </div>
+            <div className="absolute -top-1 -right-1 bg-rose-500 text-white p-1 rounded-full text-[10px] font-bold">
+              <X className="h-3 w-3" />
+            </div>
+          </div>
+          
+          <div className="space-y-2">
+            <h3 className="text-lg font-bold tracking-tight">Fitur Tidak Tersedia di HP</h3>
+            <p className="text-xs text-zinc-400 leading-relaxed">
+              Maaf, fitur <span className="text-amber-500 font-semibold">ExeCode</span> hanya didukung pada perangkat PC / Desktop demi pengalaman pengeditan kode yang optimal.
+            </p>
+          </div>
+
+          <div className="w-full h-px bg-zinc-800/50" />
+
+          <div className="flex flex-col items-center space-y-2">
+            <span className="text-xs text-zinc-500 font-medium">Mengalihkan kembali ke ExeChat dalam</span>
+            <div className="flex items-center justify-center w-12 h-12 rounded-full bg-amber-500 text-white font-bold text-lg shadow-lg shadow-amber-500/20 animate-bounce">
+              {countdown}
+            </div>
+            <span className="text-[10px] text-zinc-600 font-mono">detik...</span>
+          </div>
+
+          <button
+            onClick={onClose}
+            className="w-full py-2.5 rounded-xl text-xs font-semibold bg-zinc-800 hover:bg-zinc-750 text-zinc-200 transition-all border border-zinc-700/50"
+          >
+            Kembali Sekarang
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={`fixed inset-0 z-50 flex flex-col backdrop-blur-xl ${isDark ? "bg-zinc-950 text-zinc-100 font-sans" : "bg-zinc-50 text-zinc-900 font-sans"}`}>
