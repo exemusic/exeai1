@@ -33,7 +33,7 @@ function getCerebrasModel(uiModel: string): string {
     case "zai-glm-4.7":
       return "llama3.1-70b";
     case "gpt-oss-120b":
-      return "llama-3.3-70b";
+      return "llama3.3-70b";
     default:
       return "llama3.1-8b";
   }
