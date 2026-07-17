@@ -60,6 +60,23 @@ import { PublicProjectView } from "./components/PublicProjectView";
 const notifySoundUrl = new URL("../Sound/notify.mp3", import.meta.url).href;
 
 export default function App() {
+  const [expandedThoughts, setExpandedThoughts] = useState<Record<string, boolean>>({});
+
+  const parseMessageThinking = (content: string) => {
+    const trimmed = content.trim();
+    if (trimmed.startsWith("<think>")) {
+      const closeIndex = trimmed.indexOf("</think>");
+      if (closeIndex !== -1) {
+        const thinking = trimmed.substring(7, closeIndex).trim();
+        const actual = trimmed.substring(closeIndex + 8).trim();
+        return { thinking, actual, isThinking: false };
+      } else {
+        const thinking = trimmed.substring(7).trim();
+        return { thinking, actual: "", isThinking: true };
+      }
+    }
+    return { thinking: null, actual: content, isThinking: false };
+  };
 
   const [sessions, setSessions] = useState<ChatSession[]>(() => {
     const saved = localStorage.getItem("exeai_sessions");
@@ -83,7 +100,7 @@ export default function App() {
             return match[1];
           }
         } catch (e) {
-          console.error("Gagal parse sessions", e);
+          console.error("Failed to parse sessions", e);
         }
       }
     }
@@ -242,6 +259,7 @@ export default function App() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const homeTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const chatTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const thinkingStartTimesRef = useRef<Record<string, number>>({});
 
   const getFormattedCurrentDate = () => {
     const days = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
@@ -694,15 +712,15 @@ export default function App() {
     return "Diskusi Baru";
   };
 
-  const handleGoogleLoginSuccess = (credentialResponse: any) => {
+   const handleGoogleLoginSuccess = (credentialResponse: any) => {
     if (!credentialResponse || !credentialResponse.credential) {
-      setErrorText("Gagal masuk dengan Google: Tidak ada credential.");
+      setErrorText("Google sign-in failed: No credential returned.");
       return;
     }
     try {
       const decoded: any = jwtDecode(credentialResponse.credential);
       if (!decoded || !decoded.sub || !decoded.email) {
-        throw new Error("Informasi pengguna Google tidak valid.");
+        throw new Error("Invalid Google user information.");
       }
 
       const uid = decoded.sub;
@@ -741,7 +759,7 @@ export default function App() {
       localStorage.setItem("exechat_user_photo", picture || "");
     } catch (error: any) {
       console.error("Google login decode error:", error);
-      setErrorText(error?.message || "Gagal masuk dengan Google.");
+      setErrorText(error?.message || "Google sign-in failed.");
     }
   };
 
@@ -827,7 +845,7 @@ export default function App() {
     const id = randomId;
     const newSession: ChatSession = {
       id,
-      title: initialMsg ? generateSmartTitle(initialMsg) : `Obrolan Baru`,
+      title: initialMsg ? generateSmartTitle(initialMsg) : `New Chat`,
       messages: [],
       systemInstructionId: selectedPresetId,
       temperature,
@@ -956,7 +974,7 @@ export default function App() {
       prev.map((s) => {
         if (s.id === targetSessionId) {
 
-          const shouldRename = s.title === "Obrolan Baru" && s.messages.length === 0;
+          const shouldRename = (s.title === "Obrolan Baru" || s.title === "New Chat") && s.messages.length === 0;
           return {
             ...s,
             title: shouldRename ? generateSmartTitle(text) : s.title,
@@ -968,6 +986,7 @@ export default function App() {
     );
 
     const assistantMsgId = "msg_" + Date.now() + "_assistant";
+    thinkingStartTimesRef.current[assistantMsgId] = Date.now();
     const assistantPlaceholder: Message = {
       id: assistantMsgId,
       role: "model",
@@ -1085,11 +1104,22 @@ export default function App() {
                   if (s.id === targetSessionId) {
                     return {
                       ...s,
-                      messages: s.messages.map((m) =>
-                        m.id === assistantMsgId
-                          ? { ...m, content: m.content + parsed.text }
-                          : m
-                      ),
+                      messages: s.messages.map((m) => {
+                        if (m.id === assistantMsgId) {
+                          const newContent = m.content + parsed.text;
+                          let thinkingDuration = m.thinkingDuration;
+                          const startTime = thinkingStartTimesRef.current[assistantMsgId];
+                          if (startTime && m.content.startsWith("<think>") && !m.content.includes("</think>") && newContent.includes("</think>")) {
+                            thinkingDuration = Math.max(1, Math.round((Date.now() - startTime) / 1000));
+                          }
+                          return {
+                            ...m,
+                            content: newContent,
+                            thinkingDuration
+                          };
+                        }
+                        return m;
+                      }),
                     };
                   }
                   return s;
@@ -1239,6 +1269,7 @@ export default function App() {
       })
     );
 
+    thinkingStartTimesRef.current[assistantMsgId] = Date.now();
     setIsGenerating(true);
     setErrorText(null);
 
@@ -1731,7 +1762,7 @@ export default function App() {
           <div className="w-full flex flex-col items-center justify-center p-6 rounded-xl border border-zinc-800 bg-zinc-900/20 backdrop-blur-sm">
             <GoogleLogin
               onSuccess={handleGoogleLoginSuccess}
-              onError={() => setErrorText("Gagal masuk dengan Google. Silakan coba lagi.")}
+              onError={() => setErrorText("Google sign-in failed. Please try again.")}
               useOneTap
               theme="filled_black"
               shape="pill"
@@ -1740,7 +1771,7 @@ export default function App() {
 
           {/* Secure details at bottom - quiet and neat */}
           <p className="mt-8 text-[11px] text-zinc-500 font-medium select-none">
-            Sesi obrolan tersimpan secara privat dalam peramban Anda.
+            Chat sessions are saved privately in your browser.
           </p>
         </motion.div>
       </div>
@@ -2121,7 +2152,7 @@ export default function App() {
                                 ? "bg-zinc-950 hover:bg-zinc-900 text-zinc-400 border-zinc-900 hover:border-zinc-800" 
                                 : "bg-white hover:bg-zinc-100 text-zinc-600 border-zinc-200 hover:border-zinc-350"
                             }`}
-                            title="Pilih Model AI"
+                            title="Select AI Model"
                           >
                             <Cpu className="h-3 w-3 text-purple-500 shrink-0" />
                             <span className="truncate">{activeModel.name}</span>
@@ -2136,10 +2167,10 @@ export default function App() {
                                 ? "bg-zinc-950 hover:bg-zinc-900 text-zinc-400 border-zinc-900 hover:border-zinc-800" 
                                 : "bg-white hover:bg-zinc-100 text-zinc-600 border-zinc-200 hover:border-zinc-350"
                             }`}
-                            title="Pilih Karakter AI"
+                            title="Select Topic"
                           >
                             <Sparkles className="h-3 w-3 text-amber-500 shrink-0" />
-                            <span className="truncate">Preset: {activePreset.name}</span>
+                            <span className="truncate">Topic: {activePreset.name}</span>
                             <ChevronDown className="h-3 w-3 text-zinc-500 shrink-0" />
                           </button>
                         </div>
@@ -2157,7 +2188,7 @@ export default function App() {
                                   ? "bg-zinc-900 text-zinc-600 cursor-not-allowed" 
                                   : "bg-zinc-200 text-zinc-400 cursor-not-allowed")
                           }`}
-                          title="Kirim Pesan"
+                          title="Send Message"
                         >
                           <Send className="h-3.5 w-3.5 md:h-4 md:w-4 stroke-[2.5]" />
                         </button>
@@ -2173,7 +2204,7 @@ export default function App() {
                           : "bg-zinc-100 border-zinc-200 text-zinc-500"
                       }`}>
                         <Info className="h-3 w-3 md:h-3.5 md:w-3.5 text-zinc-450" />
-                        <span>Menggunakan model {activeModel.name} dengan preset {activePreset.name}.</span>
+                        <span>Using model {activeModel.name} on the {activePreset.name} topic.</span>
                       </div>
                     </div>
                   </div>
@@ -2242,17 +2273,64 @@ export default function App() {
                                     <span className="h-1.5 w-1.5 rounded-full bg-zinc-500 animate-[bounce_1s_infinite_300ms]" />
                                   </div>
                                   <span className="text-xs text-zinc-500 font-medium font-sans">
-                                    AI sedang berpikir...
+                                    AI is thinking...
                                   </span>
                                 </div>
                               ) : (
                                 <div className="text-zinc-800 dark:text-zinc-100 font-sans text-sm sm:text-base md:text-[16px] leading-relaxed select-text">
-                                  <MarkdownRenderer content={msg.content} />
+                                  {(() => {
+                                    const { thinking, actual, isThinking } = parseMessageThinking(msg.content);
+                                    const duration = msg.thinkingDuration || 2;
+                                    return (
+                                      <div className="flex flex-col">
+                                        {thinking !== null && (
+                                          <div className="mb-3 font-sans select-none align-baseline flex flex-col items-start">
+                                            <button
+                                              onClick={() => setExpandedThoughts(prev => ({ ...prev, [msg.id]: !prev[msg.id] }))}
+                                              className="flex items-center gap-2 text-xs text-zinc-500 dark:text-zinc-400 hover:text-zinc-750 dark:hover:text-zinc-200 transition-colors font-medium bg-zinc-100 dark:bg-zinc-900/40 px-3 py-1.5 rounded-xl border border-zinc-200 dark:border-zinc-800/80 cursor-pointer"
+                                            >
+                                              <span className="animate-pulse shrink-0">💡</span>
+                                              <span>{isThinking ? "Thinking..." : `Thought for ${duration}s`}</span>
+                                              <ChevronDown className={`h-3 w-3 text-zinc-400 shrink-0 transition-transform duration-200 ${expandedThoughts[msg.id] ? "rotate-180" : ""}`} />
+                                            </button>
+                                            
+                                            <AnimatePresence>
+                                              {expandedThoughts[msg.id] && (
+                                                <motion.div
+                                                  initial={{ height: 0, opacity: 0 }}
+                                                  animate={{ height: "auto", opacity: 1 }}
+                                                  exit={{ height: 0, opacity: 0 }}
+                                                  transition={{ duration: 0.2 }}
+                                                  className="overflow-hidden w-full"
+                                                >
+                                                  <div className="mt-2 ml-3.5 pl-3.5 border-l-2 border-zinc-200 dark:border-zinc-800 text-xs text-zinc-500 dark:text-zinc-500 font-mono leading-relaxed whitespace-pre-wrap py-1">
+                                                    {thinking || "Processing..."}
+                                                  </div>
+                                                </motion.div>
+                                              )}
+                                            </AnimatePresence>
+                                          </div>
+                                        )}
+
+                                        {actual ? (
+                                          <MarkdownRenderer content={actual} />
+                                        ) : (
+                                          isGenerating && index === currentSession.messages.length - 1 && (
+                                            <div className="flex items-center gap-2 py-2">
+                                              <span className="h-1.5 w-1.5 rounded-full bg-zinc-500 animate-[bounce_1s_infinite_100ms]" />
+                                              <span className="h-1.5 w-1.5 rounded-full bg-zinc-500 animate-[bounce_1s_infinite_200ms]" />
+                                              <span className="h-1.5 w-1.5 rounded-full bg-zinc-500 animate-[bounce_1s_infinite_300ms]" />
+                                            </div>
+                                          )
+                                        )}
+                                      </div>
+                                    );
+                                  })()}
 
                                   {isSpeaking && (
                                     <div className="inline-flex items-center gap-1.5 mt-2 px-2.5 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-500 text-[10px] font-mono animate-pulse">
                                       <Volume2 className="h-3.5 w-3.5 animate-bounce" />
-                                      <span>TTS sedang bersuara...</span>
+                                      <span>TTS is speaking...</span>
                                     </div>
                                   )}
                                 </div>
@@ -2648,13 +2726,13 @@ export default function App() {
                                     : "bg-red-50 hover:bg-red-100 text-red-600 border-red-200"
                                 }`}
                               >
-                                Keluar (Logout)
+                                Logout
                               </button>
                             ) : (
                               <div className="w-full">
                                 <GoogleLogin
                                   onSuccess={handleGoogleLoginSuccess}
-                                  onError={() => setErrorText("Gagal masuk dengan Google.")}
+                                  onError={() => setErrorText("Google sign-in failed.")}
                                   theme={isDark ? "filled_black" : "outline"}
                                   shape="pill"
                                 />
@@ -2769,7 +2847,7 @@ export default function App() {
                                       <span className={`text-[9px] px-2 py-0.5 rounded-full font-mono border font-bold ${
                                         isDark ? "bg-amber-500/10 border-amber-500/30 text-amber-400" : "bg-blue-500/10 border-blue-500/20 text-blue-600"
                                       }`}>
-                                        Aktif
+                                        Active
                                       </span>
                                     ) : (
                                       <span className={`text-[9px] px-2 py-0.5 rounded-full font-mono border ${
@@ -3072,7 +3150,7 @@ export default function App() {
                   <div className="flex items-center justify-between mb-4 pb-1">
                     <div className="flex items-center gap-2">
                       <Sparkles className="h-5 w-5 text-amber-500 animate-pulse" />
-                      <h3 className="font-sans font-semibold text-lg">Pilih Karakter AI</h3>
+                      <h3 className="font-sans font-semibold text-lg">Select Topic</h3>
                     </div>
                     <button
                       onClick={() => setShowPresetModal(false)}
@@ -3085,7 +3163,7 @@ export default function App() {
                   </div>
 
                   <p className={`text-xs mb-5 leading-normal ${isDark ? "text-zinc-400" : "text-zinc-500"}`}>
-                    Sesuaikan gaya bicara, kepribadian, dan keahlian asisten AI untuk obrolan Anda saat ini.
+                    Select a trending or specialized topic to focus your AI assistant's expertise.
                   </p>
 
                   {/* Scrollable list of Presets */}
@@ -3136,7 +3214,7 @@ export default function App() {
                               </div>
                               {isSelected && (
                                 <span className="text-[10px] font-mono font-medium text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20 shrink-0">
-                                  Aktif
+                                  Active
                                 </span>
                               )}
                             </div>
@@ -3158,7 +3236,7 @@ export default function App() {
                           : "border-zinc-200 hover:bg-zinc-100 text-zinc-600"
                       }`}
                     >
-                      Batal
+                      Cancel
                     </button>
                   </div>
                 </motion.div>
@@ -3260,7 +3338,7 @@ export default function App() {
                               </div>
                               {isSelected && (
                                 <span className="text-[10px] font-mono font-medium text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20 shrink-0">
-                                  Aktif
+                                  Active
                                 </span>
                               )}
                             </div>
@@ -3282,7 +3360,7 @@ export default function App() {
                           : "border-zinc-200 hover:bg-zinc-100 text-zinc-600"
                       }`}
                     >
-                      Batal
+                      Cancel
                     </button>
                   </div>
                 </motion.div>

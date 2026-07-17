@@ -32,7 +32,7 @@ export function PublicProjectView({ projectId }: PublicProjectViewProps) {
       .then(async (res) => {
         if (!res.ok) {
           const data = await res.json().catch(() => ({}));
-          throw new Error(data.error || "Proyek tidak ditemukan di cloud.");
+          throw new Error(data.error || "Project not found on the cloud.");
         }
         return res.json();
       })
@@ -74,12 +74,12 @@ export function PublicProjectView({ projectId }: PublicProjectViewProps) {
           const url = URL.createObjectURL(blob);
           setPreviewUrl(url);
         } else {
-          throw new Error("Proyek kosong atau tidak memiliki file.");
+          throw new Error("Project is empty or has no files.");
         }
       })
       .catch((err: any) => {
         console.error("Public load error:", err);
-        setError(err.message || "Gagal memuat proyek publik.");
+        setError(err.message || "Failed to load public project.");
       })
       .finally(() => {
         setLoading(false);
@@ -97,7 +97,7 @@ export function PublicProjectView({ projectId }: PublicProjectViewProps) {
       <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-zinc-950 text-zinc-100 font-sans">
         <div className="flex flex-col items-center space-y-4">
           <Loader2 className="h-10 w-10 text-amber-500 animate-spin" />
-          <p className="text-sm font-mono text-zinc-400">Memuat proyek publik '{projectId}'...</p>
+          <p className="text-sm font-mono text-zinc-400">Loading public project '{projectId}'...</p>
         </div>
       </div>
     );
@@ -111,13 +111,13 @@ export function PublicProjectView({ projectId }: PublicProjectViewProps) {
             <AlertCircle className="h-12 w-12" />
           </div>
           <div className="space-y-2">
-            <h1 className="text-xl font-bold tracking-tight">Proyek Tidak Ditemukan</h1>
+            <h1 className="text-xl font-bold tracking-tight">Project Not Found</h1>
             <p className="text-sm text-zinc-400 leading-relaxed">
-              Proyek dengan ID <code className="px-1.5 py-0.5 bg-zinc-900 border border-zinc-800 rounded text-amber-400">{projectId}</code> tidak ditemukan atau belum dipublikasikan ke cloud.
+              Project with ID <code className="px-1.5 py-0.5 bg-zinc-900 border border-zinc-800 rounded text-amber-400">{projectId}</code> was not found or has not been published to the cloud.
             </p>
           </div>
           <p className="text-xs text-zinc-500">
-            Pastikan ID proyek benar atau minta pemilik untuk melakukan "Publish" terlebih dahulu di ExeCode Workspace.
+            Make sure the project ID is correct or ask the owner to save/publish it first in ExeCode Workspace.
           </p>
         </div>
       </div>

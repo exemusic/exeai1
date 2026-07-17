@@ -3,6 +3,7 @@ export interface Message {
   role: "user" | "model";
   content: string;
   timestamp: number;
+  thinkingDuration?: number;
   attachment?: {
     type: "audio" | "image" | "file";
     name: string;

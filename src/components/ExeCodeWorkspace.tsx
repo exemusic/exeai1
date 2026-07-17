@@ -70,7 +70,7 @@ const DEFAULT_FILES: VirtualFile[] = [
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Aplikasi Keren ExeCode</title>
+  <title>Cool ExeCode Application</title>
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- Google Fonts -->
@@ -119,17 +119,17 @@ const DEFAULT_FILES: VirtualFile[] = [
       </div>
       
       <h1 class="text-3xl md:text-4xl font-extrabold tracking-tight">
-        Selamat Datang di <span class="bg-gradient-to-r from-amber-400 via-amber-500 to-indigo-400 bg-clip-text text-transparent">ExeCode</span>
+        Welcome to <span class="bg-gradient-to-r from-amber-400 via-amber-500 to-indigo-400 bg-clip-text text-transparent">ExeCode</span>
       </h1>
       
       <p class="text-slate-400 text-sm leading-relaxed">
-        Ini adalah pratinjau interaktif real-time dari aplikasi Anda. Coba tulis prompt di AI Assistant di bawah untuk memodifikasi halaman ini secara ajaib!
+        This is a real-time interactive preview of your application. Try writing a prompt in the AI Assistant on the left to modify this page magically!
       </p>
 
       <div class="p-4 bg-slate-900/60 border border-slate-800 rounded-xl flex items-center justify-between">
-        <span class="text-xs text-slate-500 font-mono">Ketuk tombol di bawah untuk demo interaktif:</span>
+        <span class="text-xs text-slate-500 font-mono">Click the button below for an interactive demo:</span>
         <button id="actionBtn" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-bold transition-all shadow-md active:scale-95">
-          Klik Saya
+          Click Me
         </button>
       </div>
     </div>
@@ -137,7 +137,7 @@ const DEFAULT_FILES: VirtualFile[] = [
 
   <!-- Footer -->
   <footer class="p-6 border-t border-slate-900 text-center text-xs text-slate-600 z-10">
-    &copy; 2026 ExeCode Workspace. Semua hak dilindungi.
+    &copy; 2026 ExeCode Workspace. All rights reserved.
   </footer>
 
   <script src="app.js"></script>
@@ -146,23 +146,23 @@ const DEFAULT_FILES: VirtualFile[] = [
   },
   {
     path: "app.js",
-    content: `// Tulis kode interaktif JavaScript Anda di sini!
+    content: `// Write your interactive JavaScript code here!
 console.log("ExeCode App initialized!");
 
 const button = document.getElementById("actionBtn");
 if (button) {
   button.addEventListener("click", () => {
-    // Generate warna acak untuk efek visual
+    // Generate random color for visual effect
     const colors = ["#f59e0b", "#10b981", "#3b82f6", "#8b5cf6", "#ec4899", "#ef4444"];
     const randomColor = colors[Math.floor(Math.random() * colors.length)];
     
-    // Berikan efek perubahan visual
+    // Apply visual changes effect
     button.style.backgroundColor = randomColor;
     
-    // Tampilkan notifikasi toast sederhana
+    // Display a simple toast notification
     const notification = document.createElement("div");
     notification.className = "fixed bottom-20 left-1/2 transform -translate-x-1/2 bg-slate-900 border border-slate-800 px-4 py-2 rounded-lg text-xs font-bold text-white shadow-xl flex items-center gap-2 animate-fade-in";
-    notification.innerHTML = \`<span>Warna tombol diubah menjadi <span style="color: \${randomColor}">\${randomColor}</span>!</span>\`;
+    notification.innerHTML = \`<span>Button color changed to <span style="color: \${randomColor}">\${randomColor}</span>!</span>\`;
     
     document.body.appendChild(notification);
     
@@ -343,7 +343,7 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
           }
         }
       })
-      .catch(err => console.warn("Gagal mendapatkan konfigurasi cloud:", err));
+      .catch(err => console.warn("Failed to fetch cloud configuration:", err));
 
     const match = window.location.pathname.match(/^\/project\/([^/]+)/);
     if (match) {
@@ -401,7 +401,7 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
 
   const handleShareProject = () => {
     if (!projectName.trim()) {
-      triggerStatus("Nama project tidak boleh kosong!", "error");
+      triggerStatus("Project name cannot be empty!", "error");
       return;
     }
     const slug = encodeURIComponent(projectName.trim());
@@ -409,10 +409,10 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
     
     navigator.clipboard.writeText(shareUrl)
       .then(() => {
-        triggerStatus("Link project berhasil disalin ke clipboard!", "success");
+        triggerStatus("Project link copied to clipboard successfully!", "success");
       })
       .catch(() => {
-        triggerStatus(`Gagal menyalin. Ini link Anda: ${shareUrl}`, "info");
+        triggerStatus(`Failed to copy. Here is your link: ${shareUrl}`, "info");
       });
   };
 
@@ -597,26 +597,26 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
     if (!newFileName.trim()) return;
     const name = newFileName.trim();
     if (files.some(f => f.path.toLowerCase() === name.toLowerCase())) {
-      triggerStatus("Berkas dengan nama ini sudah ada!", "error");
+      triggerStatus("A file with this name already exists!", "error");
       return;
     }
 
     const newFile: VirtualFile = {
       path: name,
-      content: name.endsWith(".json") ? "{\n  \n}" : name.endsWith(".js") ? "// Tulis kode Javascript Anda\n" : "<!-- Tulis markup HTML/CSS Anda -->\n"
+      content: name.endsWith(".json") ? "{\n  \n}" : name.endsWith(".js") ? "// Write your Javascript code here\n" : "<!-- Write your HTML/CSS markup here -->\n"
     };
 
     setFiles(prev => [...prev, newFile]);
     setActiveFilePath(name);
     setNewFileName("");
     setShowNewFileInput(false);
-    triggerStatus(`Berkas '${name}' berhasil ditambahkan.`, "success");
+    triggerStatus(`File '${name}' was successfully added.`, "success");
   };
 
   // Delete file
   const handleDeleteFile = (pathToDelete: string) => {
     if (pathToDelete === "index.html") {
-      triggerStatus("Berkas 'index.html' adalah berkas utama dan tidak boleh dihapus!", "error");
+      triggerStatus("The file 'index.html' is the main file and cannot be deleted!", "error");
       return;
     }
 
@@ -624,7 +624,7 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
     if (activeFilePath === pathToDelete) {
       setActiveFilePath("index.html");
     }
-    triggerStatus(`Berkas '${pathToDelete}' berhasil dihapus.`, "success");
+    triggerStatus(`File '${pathToDelete}' was successfully deleted.`, "success");
     
     // Also trigger clean-up on Supabase
     if (supabaseUrl && supabaseAnonKey) {
@@ -646,9 +646,9 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
       link.download = `${projectName.toLowerCase().replace(/\s+/g, "_")}.zip`;
       link.click();
       URL.revokeObjectURL(url);
-      triggerStatus("Project berhasil diunduh dalam bentuk berkas ZIP!", "success");
+      triggerStatus("Project downloaded successfully as a ZIP file!", "success");
     } catch (err: any) {
-      triggerStatus(`Gagal mengunduh ZIP: ${err.message}`, "error");
+      triggerStatus(`Failed to download ZIP: ${err.message}`, "error");
     }
   };
 
@@ -681,18 +681,18 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
         if (!hasHtml) {
           extractedFiles.push({
             path: "index.html",
-            content: `<!DOCTYPE html>\n<html>\n<head><title>ExeCode</title></head>\n<body><h1>index.html otomatis dibuat</h1></body>\n</html>`
+            content: `<!DOCTYPE html>\n<html>\n<head><title>ExeCode</title></head>\n<body><h1>index.html automatically created</h1></body>\n</html>`
           });
         }
         setFiles(extractedFiles);
         setActiveFilePath("index.html");
         setProjectName(file.name.replace(/\.[^/.]+$/, ""));
-        triggerStatus(`ZIP berhasil diekstrak! Memuat ${extractedFiles.length} berkas ke workspace.`, "success");
+        triggerStatus(`ZIP successfully extracted! Loaded ${extractedFiles.length} files into the workspace.`, "success");
       } else {
-        triggerStatus("Berkas ZIP kosong atau tidak valid.", "error");
+        triggerStatus("ZIP file is empty or invalid.", "error");
       }
     } catch (err: any) {
-      triggerStatus(`Gagal mengekstrak berkas ZIP: ${err.message}`, "error");
+      triggerStatus(`Failed to extract ZIP file: ${err.message}`, "error");
     }
   };
 
@@ -1043,7 +1043,7 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
       }
 
       const reader = response.body;
-      if (!reader) throw new Error("Gagal membaca aliran data respons AI.");
+      if (!reader) throw new Error("Failed to read AI response data stream.");
 
       const decoder = new TextDecoder("utf-8");
       let fullText = "";
@@ -1124,26 +1124,26 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
           msg.id === assistantMsgId 
             ? { 
                 ...msg, 
-                content: (displayableText ? displayableText.trim() : "Saya telah memperbarui berkas kode Anda sesuai permintaan.") + "\n\n" + 
-                         `**Berkas yang diperbarui:**\n` + 
+                content: (displayableText ? displayableText.trim() : "I have updated your code files as requested.") + "\n\n" + 
+                         `**Updated files:**\n` + 
                          editedFiles.map(f => `• \`${f.path}\``).join("\n"), 
                 filesSnapshot: oldFiles 
               } 
             : msg
         ));
         
-        triggerStatus("Workspace Anda berhasil diperbarui!", "success");
+        triggerStatus("Your workspace was successfully updated!", "success");
       } else {
-        throw new Error("Format respons JSON tidak sesuai ekspektasi atau tidak dapat diparse.");
+        throw new Error("JSON response format is not as expected or could not be parsed.");
       }
     } catch (err: any) {
       console.error("AI Code Edit Error: ", err);
       setChatHistory(prev => prev.map(msg => 
         msg.id === assistantMsgId 
-          ? { ...msg, content: `Gagal memodifikasi kode: ${err.message}. Mohon kirim ulang prompt Anda.` } 
+          ? { ...msg, content: `Failed to modify code: ${err.message}. Please try again.` } 
           : msg
       ));
-      triggerStatus(`Gagal memproses AI edit: ${err.message}`, "error");
+      triggerStatus(`Failed to process AI edit: ${err.message}`, "error");
     } finally {
       setIsAIEditing(false);
     }
@@ -1171,19 +1171,19 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
       });
 
       const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "Gagal mengunggah.");
+      if (!response.ok) throw new Error(data.error || "Failed to upload.");
 
-      triggerStatus("Project berhasil disimpan di Cloud ExeChat!", "success");
+      triggerStatus("Project successfully saved to Cloud ExeChat!", "success");
     } catch (err: any) {
       console.error(err);
-      triggerStatus(`Gagal mengunggah: ${err.message}`, "error");
+      triggerStatus(`Failed to upload: ${err.message}`, "error");
     }
   };
 
   // Load project from Cloud Sandbox
   const handleLoadFromSupabase = async () => {
     try {
-      triggerStatus(`Membuka proyek '${projectName}' dari Cloud...`, "info");
+      triggerStatus(`Opening project '${projectName}' from Cloud...`, "info");
 
       const headers: Record<string, string> = {
         "Content-Type": "application/json"
@@ -1201,33 +1201,33 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
       });
 
       const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "Gagal memuat.");
+      if (!response.ok) throw new Error(data.error || "Failed to load.");
 
       if (data.files && data.files.length > 0) {
         setFiles(data.files);
         setActiveFilePath("index.html");
         setPreviewKey(prev => prev + 1);
         refreshPreview(data.files);
-        triggerStatus(`Berhasil membuka proyek '${projectName}' dari cloud!`, "success");
+        triggerStatus(`Successfully loaded project '${projectName}' from cloud!`, "success");
       } else {
-        triggerStatus(`Proyek '${projectName}' kosong atau belum tersimpan.`, "info");
+        triggerStatus(`Project '${projectName}' is empty or not yet saved.`, "info");
       }
     } catch (err: any) {
       console.error(err);
-      triggerStatus(`Gagal menarik proyek: ${err.message}`, "error");
+      triggerStatus(`Failed to pull project: ${err.message}`, "error");
     }
   };
 
   // Delete project from Supabase Cloud
   const handleDeleteProjectSupabase = async () => {
-    const confirmClear = window.confirm(`Apakah Anda yakin ingin menghapus seluruh penyimpanan Cloud untuk proyek '${projectName}'? Tindakan ini tidak bisa dibatalkan.`);
+    const confirmClear = window.confirm(`Are you sure you want to delete all Cloud storage for project '${projectName}'? This action cannot be undone.`);
     if (!confirmClear) return;
 
     try {
       await deleteProjectFromSupabase();
-      triggerStatus("Seluruh penyimpanan cloud proyek berhasil dibersihkan!", "success");
+      triggerStatus("All project cloud storage successfully cleared!", "success");
     } catch (err: any) {
-      triggerStatus(`Gagal membersihkan cloud: ${err.message}`, "error");
+      triggerStatus(`Failed to clear cloud storage: ${err.message}`, "error");
     }
   };
 
@@ -1248,7 +1248,7 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
     });
     if (!response.ok) {
       const errData = await response.json();
-      throw new Error(errData.error || "Gagal menghapus file.");
+      throw new Error(errData.error || "Failed to delete files.");
     }
   };
 
@@ -1270,7 +1270,7 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
         })
       });
     } catch (err) {
-      console.warn("Gagal menghapus single file cloud:", err);
+      console.warn("Failed to delete single cloud file:", err);
     }
   };
 
@@ -1473,21 +1473,21 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
             {/* Start New Chat/Reset */}
             <button
               onClick={() => {
-                const conf = window.confirm("Mulai percakapan AI baru? Riwayat obrolan di workspace ini akan dibersihkan.");
+                const conf = window.confirm("Start a new AI conversation? The chat history in this workspace will be cleared.");
                 if (conf) {
                   setChatHistory([
                     {
                       id: "initial",
                       role: "assistant",
-                      content: "Halo! Saya adalah Asisten AI ExeCode Anda. Beritahu saya apa yang ingin Anda buat atau ubah pada aplikasi web ini, dan saya akan memperbarui kodenya secara real-time!",
+                      content: "Hello! I am your ExeCode AI Assistant. Let me know what you want to create or change in this web application, and I will update the code in real-time!",
                       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
                     }
                   ]);
-                  triggerStatus("Riwayat percakapan dibersihkan.", "info");
+                  triggerStatus("Chat history cleared.", "info");
                 }
               }}
               className="p-1 rounded-lg hover:bg-zinc-900 text-zinc-400 hover:text-zinc-200 transition-all"
-              title="Mulai Percakapan Baru"
+              title="Start New Chat"
             >
               <Plus className="h-4 w-4" />
             </button>
@@ -1588,11 +1588,11 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
                             if (message.filesSnapshot) {
                               setFiles(message.filesSnapshot);
                               setPreviewKey(prev => prev + 1);
-                              triggerStatus("Kode berhasil di-restore ke snapshot versi ini!", "success");
+                              triggerStatus("Code successfully restored to this version snapshot!", "success");
                             }
                           }}
                           className="flex items-center gap-1 px-2 py-1 rounded-lg bg-zinc-950 border border-zinc-850 hover:bg-zinc-900 text-[10px] font-normal text-zinc-400 hover:text-zinc-200 transition-colors"
-                          title="Kembalikan file ke snapshot sebelum pengeditan ini"
+                          title="Restore files to the snapshot before this edit"
                         >
                           <RotateCcw className="h-3 w-3 text-amber-500" />
                           <span>Restore</span>
@@ -1607,21 +1607,21 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
               <div className="flex flex-col items-start space-y-1 animate-pulse">
                 <span className="text-[10px] text-zinc-500 font-medium px-1 flex items-center gap-1.5">
                   <Sparkles className="h-3.5 w-3.5 text-amber-500 animate-spin duration-3000" />
-                  {aiName} sedang berpikir...
+                  {aiName} is thinking...
                 </span>
                 <div className="px-3.5 py-3 rounded-2xl text-xs max-w-[85%] leading-relaxed bg-amber-500/5 border border-amber-500/15 text-zinc-300 rounded-tl-sm w-full space-y-2">
                   <div className="flex items-center gap-2">
                     <span className="h-2 w-2 rounded-full bg-amber-500 animate-ping" />
-                    <span className="font-semibold text-zinc-200">AI Code Engine Aktif</span>
+                    <span className="font-semibold text-zinc-200">AI Code Engine Active</span>
                   </div>
                   <div className="font-mono text-[10px] text-zinc-400 space-y-1 bg-zinc-950/40 p-2 rounded-lg border border-zinc-900">
                     <div className="flex items-center gap-1.5 text-emerald-400/90">
                       <span>✔</span>
-                      <span>Menganalisis instruksi Anda</span>
+                      <span>Analyzing your instructions</span>
                     </div>
                     <div className="flex items-center gap-1.5 text-amber-400">
                       <span className="animate-pulse">●</span>
-                      <span>Menyusun & mengedit berkas kode...</span>
+                      <span>Structuring & editing code files...</span>
                     </div>
                   </div>
                 </div>
@@ -1640,7 +1640,7 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
                 </div>
                 <button
                   onClick={() => {
-                    const fixPrompt = `Saya mendapat kesalahan berikut saat menjalankan program:\n\n"${runtimeError}"\n\nTolong bantu perbaiki bug ini dan update kodenya.`;
+                    const fixPrompt = `I encountered the following error while running the code:\n\n"${runtimeError}"\n\nPlease help me fix this bug and update the code.`;
                     handleSendPromptToAI(fixPrompt);
                   }}
                   disabled={isAIEditing}
@@ -1658,7 +1658,7 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
               <textarea
                 value={aiPrompt}
                 onChange={(e) => setAiPrompt(e.target.value)}
-                placeholder="Tulis instruksi: 'tambahkan navbar cantik', 'ubah tombol jadi modern', atau 'buat game tic-tac-toe'..."
+                placeholder="Write instructions: 'add a beautiful navbar', 'modernize buttons', or 'build a tic-tac-toe game'..."
                 disabled={isAIEditing}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && !e.shiftKey) {
@@ -1735,7 +1735,7 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
               </div>
 
               {/* Simulated Address path, refresh & reload controls */}
-              <div className="hidden sm:flex items-center gap-1 px-3 py-1 rounded-lg bg-zinc-900 border border-zinc-850 text-[11px] text-zinc-500 font-mono w-80 truncate">
+              <div className="hidden">
                 <span className="text-zinc-600">/</span>
                 <span className="truncate text-zinc-400">{projectName.toLowerCase().replace(/\s+/g, "-")}</span>
               </div>
@@ -1764,10 +1764,10 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
                   onClick={() => {
                     refreshPreview();
                     setPreviewKey(prev => prev + 1);
-                    triggerStatus("Pratinjau berhasil diperbarui dengan perubahan kode terbaru!", "success");
+                    triggerStatus("Preview successfully updated with the latest code changes!", "success");
                   }}
                   className="p-1.5 text-zinc-400 hover:text-zinc-200 transition-colors"
-                  title="Muat Ulang Preview"
+                  title="Reload Preview"
                 >
                   <RefreshCw className="h-3.5 w-3.5" />
                 </button>
@@ -1776,7 +1776,7 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
           )}
 
           {/* Tab Content 1: Preview mode active */}
-          {activeRightTab === "preview" && (
+          {!isFullscreen && activeRightTab === "preview" && (
             <div className="flex-1 flex flex-col min-h-0">
               {/* Sandbox interactive preview frame container */}
               <div className="flex-1 flex items-center justify-center p-6 bg-zinc-900/20 overflow-hidden relative">
@@ -1849,7 +1849,7 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
                           <button
                             onClick={() => setIsConsoleOpen(false)}
                             className="p-1 rounded hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 transition-colors"
-                            title="Tutup console"
+                            title="Close console"
                           >
                             <ChevronDown className="h-4 w-4" />
                           </button>
@@ -1859,7 +1859,7 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
                       <div className="flex-1 overflow-y-auto p-3 space-y-1.5">
                         {consoleLogs.length === 0 ? (
                           <div className="h-full flex items-center justify-center text-[10px] text-zinc-600 italic">
-                            Tidak ada log tertangkap. Panggil console.log() di proyek Anda.
+                            No logs captured. Call console.log() in your project.
                           </div>
                         ) : (
                           consoleLogs.map((log, idx) => {
@@ -1891,7 +1891,7 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
           )}
 
           {/* Tab Content 2: Code editing and source exploring mode active */}
-          {activeRightTab === "code" && (
+          {(isFullscreen || activeRightTab === "code") && (
             <div className="flex-1 flex overflow-hidden min-h-0">
               
               {/* Mini File list and storage section */}
@@ -1926,13 +1926,13 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
                           onClick={() => setShowNewFileInput(false)}
                           className="px-2 py-0.5 text-[10px] font-normal text-zinc-400 hover:bg-zinc-800 rounded"
                         >
-                          Batal
+                          Cancel
                         </button>
                         <button
                           onClick={handleAddFile}
                           className="px-2.5 py-0.5 text-[10px] font-semibold bg-amber-500 text-white rounded"
                         >
-                          Tambah
+                          Add
                         </button>
                       </div>
                     </div>
@@ -1993,14 +1993,14 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
                       <span className="text-[11px] font-bold font-mono px-2 py-0.5 rounded bg-amber-500/10 text-amber-500 border border-amber-500/20 animate-pulse">
                         {activeFilePath}
                       </span>
-                      <span className="text-[10px] text-zinc-400 font-sans">Full Screen Mode • Mengedit kode sumber</span>
+                      <span className="text-[10px] text-zinc-400 font-sans">Full Screen Mode • Editing source code</span>
                     </div>
                     <button
                       onClick={() => setIsFullscreen(false)}
                       className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-rose-500 hover:bg-rose-600 text-white flex items-center gap-1.5 transition-all shadow-md active:scale-95 cursor-pointer"
                     >
                       <Minimize2 className="h-3.5 w-3.5" />
-                      <span>Kembali ke Normal</span>
+                      <span>Return</span>
                     </button>
                   </div>
                 ) : (
@@ -2009,7 +2009,7 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
                       <span className="text-[11px] font-bold font-mono px-2 py-0.5 rounded bg-zinc-500/10 text-amber-500 border border-amber-500/20">
                         {activeFilePath}
                       </span>
-                      <span className="text-[9px] text-zinc-500 font-mono hidden sm:inline">• Kode Sumber Utama</span>
+                      <span className="text-[9px] text-zinc-500 font-mono hidden sm:inline">• Main Source Code</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="text-[9px] font-mono text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/25 flex items-center gap-1 shrink-0">

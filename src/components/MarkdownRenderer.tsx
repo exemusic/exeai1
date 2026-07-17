@@ -36,7 +36,7 @@ function EditableCodeBlock({ initialCode, language, onCopy, isCopied }: Editable
           <span className="font-semibold text-zinc-600 dark:text-zinc-350">{language || "plaintext"}</span>
           {code !== initialCode && (
             <span className="text-[9px] bg-amber-500/15 text-amber-500 border border-amber-500/20 rounded px-1.5 py-0.5 font-sans font-semibold animate-pulse">
-              Diedit oleh User
+              Edited by User
             </span>
           )}
         </div>
@@ -46,18 +46,18 @@ function EditableCodeBlock({ initialCode, language, onCopy, isCopied }: Editable
               <button
                 onClick={handleSave}
                 className="flex items-center gap-1 rounded-md px-2 py-1 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 font-sans font-semibold transition-all duration-200 cursor-pointer"
-                title="Simpan perubahan"
+                title="Save changes"
               >
                 <Save className="h-3 w-3" />
-                <span>Simpan</span>
+                <span>Save</span>
               </button>
               <button
                 onClick={handleCancel}
                 className="flex items-center gap-1 rounded-md px-2 py-1 bg-zinc-500/10 hover:bg-zinc-500/20 text-zinc-600 dark:text-zinc-400 font-sans font-semibold transition-all duration-200 cursor-pointer"
-                title="Batal"
+                title="Cancel"
               >
                 <X className="h-3 w-3" />
-                <span>Batal</span>
+                <span>Cancel</span>
               </button>
             </>
           ) : (
@@ -65,7 +65,7 @@ function EditableCodeBlock({ initialCode, language, onCopy, isCopied }: Editable
               <button
                 onClick={() => setIsEditing(true)}
                 className="flex items-center gap-1 rounded-md px-2.5 py-1 hover:bg-zinc-200 dark:hover:bg-zinc-800 hover:text-zinc-700 dark:hover:text-zinc-200 font-sans font-medium transition-all duration-200 cursor-pointer"
-                title="Edit kode ini"
+                title="Edit code"
               >
                 <Pencil className="h-3 w-3 text-zinc-500 dark:text-zinc-400" />
                 <span>Edit</span>
@@ -110,6 +110,64 @@ function EditableCodeBlock({ initialCode, language, onCopy, isCopied }: Editable
   );
 }
 
+function preprocessMarkdown(text: string): string {
+  if (!text) return text;
+  
+  let processed = text;
+  const replacements: [RegExp, string][] = [
+    [/\\\(/g, "$"],
+    [/\\\)/g, "$"],
+    [/\\\[/g, "$$"],
+    [/\\\]/g, "$$"],
+    [/\\rightarrow/g, "→"],
+    [/\\to/g, "→"],
+    [/\\leftarrow/g, "←"],
+    [/\\uparrow/g, "↑"],
+    [/\\downarrow/g, "↓"],
+    [/\\leftrightarrow/g, "↔"],
+    [/\\implies/g, "⇒"],
+    [/\\impliedby/g, "⇐"],
+    [/\\iff/g, "⇔"],
+    [/\\geq/g, "≥"],
+    [/\\le/g, "≤"],
+    [/\\leq/g, "≤"],
+    [/\\geq/g, "≥"],
+    [/\\neq/g, "≠"],
+    [/\\ne/g, "≠"],
+    [/\\approx/g, "≈"],
+    [/\\times/g, "×"],
+    [/\\div/g, "÷"],
+    [/\\pm/g, "±"],
+    [/\\infty/g, "∞"],
+    [/\\in/g, "∈"],
+    [/\\notin/g, "∉"],
+    [/\\pi/g, "π"],
+    [/\\alpha/g, "α"],
+    [/\\beta/g, "β"],
+    [/\\gamma/g, "γ"],
+    [/\\delta/g, "δ"],
+    [/\\theta/g, "θ"],
+    [/\\lambda/g, "λ"],
+    [/\\sigma/g, "σ"],
+    [/\\omega/g, "ω"],
+    [/\\Delta/g, "Δ"],
+    [/\\Sigma/g, "Σ"],
+    [/\\Omega/g, "Ω"],
+  ];
+
+  for (const [pattern, replacement] of replacements) {
+    processed = processed.replace(pattern, replacement);
+  }
+
+  // Handle inline math blocks like $x$ or $a + b$
+  // Strip the outer $ characters but keep the clean replaced content
+  processed = processed.replace(/\$([^\$]+)\$/g, (match, p1) => {
+    return p1;
+  });
+
+  return processed;
+}
+
 export function MarkdownRenderer({ content }: MarkdownRendererProps) {
   const [copiedText, setCopiedText] = useState<string | null>(null);
 
@@ -121,7 +179,8 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps) {
 
   if (!content) return null;
 
-  const parts = content.split(/(```[\s\S]*?```)/g);
+  const preprocessedContent = preprocessMarkdown(content);
+  const parts = preprocessedContent.split(/(```[\s\S]*?```)/g);
 
   return (
     <div className="space-y-4 text-zinc-800 dark:text-zinc-100 font-sans leading-relaxed text-[15px]">
