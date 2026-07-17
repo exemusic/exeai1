@@ -254,6 +254,13 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [chatHistory]);
 
+  // Activate code tab when entering fullscreen
+  useEffect(() => {
+    if (isFullscreen) {
+      setActiveRightTab("code");
+    }
+  }, [isFullscreen]);
+
   // Handle setting status message
   const triggerStatus = (text: string, type: "success" | "error" | "info" = "info") => {
     setStatusMessage({ text, type });
@@ -439,6 +446,16 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
         }
       }
     });
+
+    // Ensure viewport meta tag exists for mobile responsive scaling in preview
+    if (!finalHtml.toLowerCase().includes('name="viewport"') && !finalHtml.toLowerCase().includes("name='viewport'")) {
+      const viewportTag = `\n  <meta name="viewport" content="width=device-width, initial-scale=1.0">`;
+      if (finalHtml.includes("<head>")) {
+        finalHtml = finalHtml.replace("<head>", `<head>${viewportTag}`);
+      } else if (finalHtml.includes("</head>")) {
+        finalHtml = finalHtml.replace("</head>", `${viewportTag}\n</head>`);
+      }
+    }
 
     // Inject console logs interceptor & runtime error handling script
     const errorHandlingScript = `
@@ -968,14 +985,18 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
               content: `Instruksi Pengguna: "${promptToSend}"\n\n` +
                 `Berikut adalah seluruh daftar file di workspace saya beserta isi kodenya saat ini:\n\n` +
                 JSON.stringify(files, null, 2) + "\n\n" +
-                `PENTING (INSTRUKSI STRUKTUR & KEANDALAN):\n` +
-                `1. Berikan penjelasan ringkas (maksimal 2 kalimat) dalam bahasa Indonesia di luar blok kode JSON.\n` +
-                `2. Kemudian, berikan blok kode \`\`\`json berisi array berisi file-file yang Anda PERBARUI saja. JANGAN sertakan file yang tidak Anda edit sama sekali untuk menghemat token output!\n` +
-                `3. Tulis isi file baru secara LENGKAP di bagian "content". JANGAN PERNAH menyingkat isi file dengan ellipsis, komentar "// sisa kode" atau "/* ... */" karena itu akan merusak program pengguna.\n` +
-                `4. Agar aman dari batasan parsing JSON, usahakan meng-escape tanda kutip ganda (\`\"\`) di dalam kode Anda, atau gunakan tanda kutip tunggal (\`'\`) atau backticks (\`\` \` \`\`) dalam string kodenya.\n` +
-                `5. Jangan merusak atau menghapus file penting. Edit file index.html atau app.js sesuai kebutuhan, atau buat file baru jika diperlukan.\n\n` +
+                `PENTING (INSTRUKSI PERILAKU & STRUKTUR AI):\n` +
+                `1. Berikan penjelasan yang jelas mengenai: file apa yang Anda edit, untuk apa file tersebut, mengapa perubahan ini bagus/berguna, dan jelaskan implementasinya secara ringkas dan rapi.\n` +
+                `2. Fokus utama Anda adalah: MEMILIH/MENYESUAIKAN/MERAPIKAN file, MEMPERBAIKI BUG (fix bug), MENGEDIT berkas, dan MEMVERIFIKASI agar tidak ada kode yang salah.\n` +
+                `3. SANGAT PENTING: Anda hanya boleh mengikuti perintah pengguna secara tepat. JANGAN MENAMBAHKAN fitur, komponen, tombol, atau logic lain yang tidak disuruh atau tidak diminta oleh pengguna!\n` +
+                `4. Berikan penjelasan ringkas dan rapi di luar blok kode JSON dalam Bahasa Indonesia.\n` +
+                `5. Kemudian, berikan blok kode \`\`\`json berisi array dari file-file yang Anda PERBARUI saja. JANGAN sertakan file yang tidak diedit sama sekali.\n` +
+                `6. Tulis isi file baru secara LENGKAP di bagian "content". JANGAN PERNAH menyingkat isi file dengan ellipsis, komentar "// sisa kode", atau "/* ... */" karena itu akan merusak program pengguna.\n` +
+                `7. Agar aman dari batasan parsing JSON, usahakan meng-escape tanda kutip ganda (\`\"\`) di dalam kode Anda, atau gunakan tanda kutip tunggal (\`'\`) atau backticks (\`\` \` \`\`) dalam string kodenya.\n` +
+                `8. Jangan merusak atau menghapus file penting. Edit file index.html atau app.js sesuai kebutuhan, atau buat file baru jika diperlukan.\n\n` +
                 `Contoh format respons yang Anda HARUS ikuti:\n` +
-                `Beberapa perubahan yang saya lakukan: ... penjelasan singkat ...\n\n` +
+                `### Penjelasan Perubahan\n` +
+                `- **[File yang Diubah]**: [Penjelasan untuk apa file ini dan mengapa struktur/perubahan ini bagus...]\n\n` +
                 `\`\`\`json\n` +
                 `[\n` +
                 `  { "path": "index.html", "content": "...kode baru lengkap..." }\n` +
@@ -1291,80 +1312,84 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
     <div className={`fixed inset-0 z-50 flex flex-col backdrop-blur-xl ${isDark ? "bg-zinc-950 text-zinc-100 font-sans" : "bg-zinc-50 text-zinc-900 font-sans"}`}>
       
       {/* HEADER BAR (Visual Match: ExeChat brand with start/share/remix actions) */}
-      <div className={`px-5 py-3 flex items-center justify-between border-b ${isDark ? "border-zinc-850 bg-zinc-950" : "border-zinc-200 bg-white"} shrink-0`}>
-        {/* Left: Back to start */}
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => {
-              if (window.location.pathname.startsWith("/project/")) {
-                window.history.pushState({}, "", "/");
-              }
-              onClose();
-            }}
-            className={`px-3 py-1.5 rounded-xl text-xs font-normal flex items-center gap-1.5 border transition-all ${
-              isDark 
-                ? "bg-zinc-900 border-zinc-800 text-zinc-300 hover:bg-zinc-800" 
-                : "bg-white border-zinc-200 text-zinc-600 hover:bg-zinc-100"
-            }`}
-          >
-            <ArrowLeft className="h-4 w-4 text-zinc-400" />
-            <span>Back to start</span>
-          </button>
+      {!isFullscreen && (
+        <div className={`px-5 py-3 flex items-center justify-between border-b ${isDark ? "border-zinc-850 bg-zinc-950" : "border-zinc-200 bg-white"} shrink-0`}>
+          {/* Left: Back to start */}
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => {
+                if (window.location.pathname.startsWith("/project/")) {
+                  window.history.pushState({}, "", "/");
+                }
+                onClose();
+              }}
+              className={`px-3 py-1.5 rounded-xl text-xs font-normal flex items-center gap-1.5 border transition-all ${
+                isDark 
+                  ? "bg-zinc-900 border-zinc-800 text-zinc-300 hover:bg-zinc-800" 
+                  : "bg-white border-zinc-200 text-zinc-600 hover:bg-zinc-100"
+              }`}
+            >
+              <ArrowLeft className="h-4 w-4 text-zinc-400" />
+              <span>Back to start</span>
+            </button>
+          </div>
+
+          {/* Center: Brand name "ExeChat" */}
+          <div className="flex items-center gap-2">
+            <span className="font-sans font-bold text-base tracking-tight text-zinc-100">ExeChat</span>
+            <span className="text-[10px] font-normal uppercase tracking-wider px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-500 border border-amber-500/20">
+              ExeCode
+            </span>
+          </div>
+
+          {/* Right: Remix, Share, Publish, Fullscreen */}
+          <div className="flex items-center gap-2">
+            {statusMessage && (
+              <div className={`mr-2 px-3 py-1.5 rounded-lg text-[11px] font-normal flex items-center gap-1.5 shadow-sm animate-fade-in ${
+                statusMessage.type === "success" 
+                  ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20" 
+                  : statusMessage.type === "error"
+                    ? "bg-rose-500/10 text-rose-500 border border-rose-500/20"
+                    : "bg-amber-500/10 text-amber-500 border border-amber-500/20"
+              }`}>
+                {statusMessage.type === "success" ? <CheckCircle2 className="h-3 w-3" /> : <AlertCircle className="h-3 w-3" />}
+                <span>{statusMessage.text}</span>
+              </div>
+            )}
+
+            {/* Save / Sync button */}
+            <button
+              onClick={handleUploadToSupabase}
+              className="px-3 py-1.5 rounded-xl text-xs font-normal bg-amber-500 hover:bg-amber-450 text-white flex items-center gap-1.5 transition-all shadow-md active:scale-95 cursor-pointer"
+              title="Simpan Proyek ke Cloud"
+            >
+              <Upload className="h-3.5 w-3.5" />
+              <span>Save</span>
+            </button>
+
+            <button
+              onClick={() => setIsFullscreen(!isFullscreen)}
+              className={`p-1.5 rounded-xl border transition-all ${
+                isDark 
+                  ? "bg-zinc-900 border-zinc-800 text-zinc-300 hover:bg-zinc-800" 
+                  : "bg-white border-zinc-200 text-zinc-600 hover:bg-zinc-100"
+              }`}
+              title={isFullscreen ? "Show Chat Panel" : "Hide Chat Panel (Fullscreen)"}
+            >
+              {isFullscreen ? <Minimize2 className="h-4 w-4 text-zinc-400" /> : <Maximize2 className="h-4 w-4 text-zinc-400" />}
+            </button>
+          </div>
         </div>
-
-        {/* Center: Brand name "ExeChat" */}
-        <div className="flex items-center gap-2">
-          <span className="font-sans font-bold text-base tracking-tight text-zinc-100">ExeChat</span>
-          <span className="text-[10px] font-normal uppercase tracking-wider px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-500 border border-amber-500/20">
-            ExeCode
-          </span>
-        </div>
-
-        {/* Right: Remix, Share, Publish, Fullscreen */}
-        <div className="flex items-center gap-2">
-          {statusMessage && (
-            <div className={`mr-2 px-3 py-1.5 rounded-lg text-[11px] font-normal flex items-center gap-1.5 shadow-sm animate-fade-in ${
-              statusMessage.type === "success" 
-                ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20" 
-                : statusMessage.type === "error"
-                  ? "bg-rose-500/10 text-rose-500 border border-rose-500/20"
-                  : "bg-amber-500/10 text-amber-500 border border-amber-500/20"
-            }`}>
-              {statusMessage.type === "success" ? <CheckCircle2 className="h-3 w-3" /> : <AlertCircle className="h-3 w-3" />}
-              <span>{statusMessage.text}</span>
-            </div>
-          )}
-
-          {/* Publish / Sync button */}
-          <button
-            onClick={handleUploadToSupabase}
-            className="px-3 py-1.5 rounded-xl text-xs font-normal bg-amber-500 hover:bg-amber-450 text-white flex items-center gap-1.5 transition-all shadow-md active:scale-95 cursor-pointer"
-            title="Simpan Proyek ke Cloud"
-          >
-            <Upload className="h-3.5 w-3.5" />
-            <span>Publish</span>
-          </button>
-
-          <button
-            onClick={() => setIsFullscreen(!isFullscreen)}
-            className={`p-1.5 rounded-xl border transition-all ${
-              isDark 
-                ? "bg-zinc-900 border-zinc-800 text-zinc-300 hover:bg-zinc-800" 
-                : "bg-white border-zinc-200 text-zinc-600 hover:bg-zinc-100"
-            }`}
-            title={isFullscreen ? "Show Chat Panel" : "Hide Chat Panel (Fullscreen)"}
-          >
-            {isFullscreen ? <Minimize2 className="h-4 w-4 text-zinc-400" /> : <Maximize2 className="h-4 w-4 text-zinc-400" />}
-          </button>
-        </div>
-      </div>
+      )}
 
       {/* CORE WORKSPACE GRID */}
-      <div className="flex-1 flex overflow-hidden min-h-0 relative bg-zinc-950">
+      <div className="flex-1 flex flex-col md:flex-row overflow-hidden min-h-0 relative bg-zinc-950">
         
         {/* PANEL KIRI: AI CHAT CONVERSATION (Styled like Google AI Studio) */}
-        <div className={`border-r flex flex-col shrink-0 border-zinc-850 bg-[#121214] transition-all duration-300 ${
-          isFullscreen ? "w-0 overflow-hidden border-none opacity-0" : "w-96 md:w-[380px]"
+        <div className={`${
+          isFullscreen 
+            ? "hidden" 
+            : "w-full md:w-[380px] h-1/2 md:h-full border-b md:border-b-0 md:border-r flex flex-col shrink-0 border-zinc-850 bg-[#121214]"
         }`}>
           {/* Chat Header */}
           <div className="p-4 border-b border-zinc-850 flex items-center justify-between bg-zinc-950/40">
@@ -1506,12 +1531,36 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
                 </div>
               );
             })}
+            {isAIEditing && (
+              <div className="flex flex-col items-start space-y-1 animate-pulse">
+                <span className="text-[10px] text-zinc-500 font-medium px-1 flex items-center gap-1.5">
+                  <Sparkles className="h-3.5 w-3.5 text-amber-500 animate-spin duration-3000" />
+                  {aiName} sedang berpikir...
+                </span>
+                <div className="px-3.5 py-3 rounded-2xl text-xs max-w-[85%] leading-relaxed bg-amber-500/5 border border-amber-500/15 text-zinc-300 rounded-tl-sm w-full space-y-2">
+                  <div className="flex items-center gap-2">
+                    <span className="h-2 w-2 rounded-full bg-amber-500 animate-ping" />
+                    <span className="font-semibold text-zinc-200">AI Code Engine Aktif</span>
+                  </div>
+                  <div className="font-mono text-[10px] text-zinc-400 space-y-1 bg-zinc-950/40 p-2 rounded-lg border border-zinc-900">
+                    <div className="flex items-center gap-1.5 text-emerald-400/90">
+                      <span>✔</span>
+                      <span>Menganalisis instruksi Anda</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 text-amber-400">
+                      <span className="animate-pulse">●</span>
+                      <span>Menyusun & mengedit berkas kode...</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
             <div ref={messagesEndRef} />
           </div>
 
-          {/* CODE STATUS INTERACTIVE BOX (Placed below chat log) */}
-          <div className="px-4 py-2 border-t border-zinc-850 bg-zinc-950/40 shrink-0">
-            {runtimeError ? (
+          {/* CODE STATUS INTERACTIVE BOX (Only visible when runtimeError exists to keep the chat roomy) */}
+          {runtimeError && (
+            <div className="px-4 py-2 border-t border-zinc-850 bg-zinc-950/40 shrink-0">
               <div className="p-2.5 rounded-xl border border-rose-500/10 bg-rose-500/5 flex items-center justify-between gap-2 text-xs">
                 <div className="flex items-center gap-2 min-w-0">
                   <AlertCircle className="h-4 w-4 text-rose-500 shrink-0 animate-pulse" />
@@ -1528,16 +1577,8 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
                   Fix
                 </button>
               </div>
-            ) : (
-              <div className="p-2.5 rounded-xl border border-zinc-850 bg-zinc-950/30 flex items-center justify-between text-xs">
-                <div className="flex items-center gap-2">
-                  <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-                  <span className="text-zinc-400 font-normal">Semua file berjalan lancar</span>
-                </div>
-                <span className="text-[9px] font-mono text-emerald-500 bg-emerald-500/10 px-1.5 py-0.5 rounded">Ready</span>
-              </div>
-            )}
-          </div>
+            </div>
+          )}
 
           {/* PROMPT CHAT INPUT BAR */}
           <div className="p-4 border-t border-zinc-850 bg-zinc-950/80">
@@ -1591,131 +1632,80 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
         {/* PANEL KANAN: WORKSPACE INTERACTIVE / CODE EDITOR PANE */}
         <div className="flex-1 flex flex-col min-w-0 bg-zinc-950 relative">
           
-          {/* GORGEOUS GLASSMORPHIC AI THINKING OVERLAY */}
-          {isAIEditing && (
-            <div className="absolute inset-0 bg-zinc-950/95 backdrop-blur-md z-50 flex flex-col p-8 overflow-y-auto animate-fade-in font-sans">
-              <div className="max-w-md mx-auto w-full flex flex-col items-center space-y-6 my-auto">
-                {/* Dynamic Animated Pulse Ring */}
-                <div className="relative flex items-center justify-center">
-                  <div className="w-20 h-20 rounded-full border-2 border-dashed border-amber-500/30 animate-spin duration-[8s]" />
-                  <div className="absolute w-14 h-14 rounded-full border-2 border-amber-500/10 bg-amber-500/5 animate-ping duration-[2s]" />
-                  <Sparkles className="absolute h-8 w-8 text-amber-500 animate-pulse" />
-                </div>
+          {/* Segmented controls Preview vs Code */}
+          {!isFullscreen && (
+            <div className="p-3 border-b border-zinc-850 bg-zinc-950 flex items-center justify-between shrink-0">
+              <div className="flex items-center bg-zinc-900 p-1 rounded-xl border border-zinc-850">
+                <button
+                  onClick={() => {
+                    setActiveRightTab("preview");
+                    refreshPreview();
+                  }}
+                  className={`px-3.5 py-1.5 rounded-lg text-xs font-normal flex items-center gap-1.5 transition-all ${
+                    activeRightTab === "preview" 
+                      ? "bg-amber-500 text-white font-medium" 
+                      : "text-zinc-400 hover:text-zinc-200"
+                  }`}
+                >
+                  <span className="h-1.5 w-1.5 bg-current rounded-full" />
+                  <span>Preview</span>
+                </button>
+                <button
+                  onClick={() => setActiveRightTab("code")}
+                  className={`px-3.5 py-1.5 rounded-lg text-xs font-normal transition-all ${
+                    activeRightTab === "code" 
+                      ? "bg-amber-500 text-white font-medium" 
+                      : "text-zinc-400 hover:text-zinc-200"
+                  }`}
+                >
+                  Code
+                </button>
+              </div>
 
-                <div className="text-center space-y-2">
-                  <h3 className="text-sm font-bold tracking-tight text-zinc-100 uppercase">AI Code Engine Active</h3>
-                  <p className="text-xs text-zinc-400 font-mono">Status: Menghasilkan kode & menyusun file patch baru...</p>
-                </div>
+              {/* Simulated Address path, refresh & reload controls */}
+              <div className="hidden sm:flex items-center gap-1 px-3 py-1 rounded-lg bg-zinc-900 border border-zinc-850 text-[11px] text-zinc-500 font-mono w-80 truncate">
+                <span className="text-zinc-600">/</span>
+                <span className="truncate text-zinc-400">{projectName.toLowerCase().replace(/\s+/g, "-")}</span>
+              </div>
 
-                {/* Progress list steps */}
-                <div className="w-full bg-zinc-900/50 border border-zinc-850 rounded-xl p-4 space-y-3 font-mono text-[11px]">
-                  <div className="flex items-center justify-between text-zinc-500 pb-1 border-b border-zinc-800/50">
-                    <span>PIPELINE ENGINE</span>
-                    <span className="text-amber-500 animate-pulse">RUNNING</span>
-                  </div>
-                  
-                  <div className="flex items-center gap-2 text-emerald-400">
-                    <span>✔</span>
-                    <span>Analisis instruksi berhasil diselesaikan</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-emerald-400">
-                    <span>✔</span>
-                    <span>Pemindaian folder & struktur workspace selesai</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-amber-400">
-                    <span className="animate-pulse">●</span>
-                    <span>Menulis ulang baris kode & menyusun file patch baru...</span>
-                  </div>
-                </div>
+              <div className="flex items-center gap-1 bg-zinc-900/60 p-1 rounded-lg border border-zinc-850">
+                {activeRightTab === "preview" && (
+                  <>
+                    <button
+                      onClick={() => setDeviceMode("desktop")}
+                      className={`p-1.5 rounded-md transition-all ${deviceMode === "desktop" ? "bg-amber-500/10 text-amber-500" : "text-zinc-400 hover:text-zinc-200"}`}
+                      title="Pratinjau Desktop"
+                    >
+                      <Monitor className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      onClick={() => setDeviceMode("mobile")}
+                      className={`p-1.5 rounded-md transition-all ${deviceMode === "mobile" ? "bg-amber-500/10 text-amber-500" : "text-zinc-400 hover:text-zinc-200"}`}
+                      title="Pratinjau Smartphone"
+                    >
+                      <Smartphone className="h-3.5 w-3.5" />
+                    </button>
+                    <div className="h-4 w-px bg-zinc-800 mx-1" />
+                  </>
+                )}
+                <button
+                  onClick={() => {
+                    refreshPreview();
+                    setPreviewKey(prev => prev + 1);
+                    triggerStatus("Pratinjau berhasil diperbarui dengan perubahan kode terbaru!", "success");
+                  }}
+                  className="p-1.5 text-zinc-400 hover:text-zinc-200 transition-colors"
+                  title="Muat Ulang Preview"
+                >
+                  <RefreshCw className="h-3.5 w-3.5" />
+                </button>
               </div>
             </div>
           )}
-          
-          {/* Segmented controls Preview vs Code */}
-          <div className="p-3 border-b border-zinc-850 bg-zinc-950 flex items-center justify-between shrink-0">
-            <div className="flex items-center bg-zinc-900 p-1 rounded-xl border border-zinc-850">
-              <button
-                onClick={() => {
-                  setActiveRightTab("preview");
-                  refreshPreview();
-                }}
-                className={`px-3.5 py-1.5 rounded-lg text-xs font-normal flex items-center gap-1.5 transition-all ${
-                  activeRightTab === "preview" 
-                    ? "bg-amber-500 text-white font-medium" 
-                    : "text-zinc-400 hover:text-zinc-200"
-                }`}
-              >
-                <span className="h-1.5 w-1.5 bg-current rounded-full" />
-                <span>Preview</span>
-              </button>
-              <button
-                onClick={() => setActiveRightTab("code")}
-                className={`px-3.5 py-1.5 rounded-lg text-xs font-normal transition-all ${
-                  activeRightTab === "code" 
-                    ? "bg-amber-500 text-white font-medium" 
-                    : "text-zinc-400 hover:text-zinc-200"
-                }`}
-              >
-                Code
-              </button>
-            </div>
-
-            {/* Simulated Address path, refresh & reload controls */}
-            <div className="hidden sm:flex items-center gap-1 px-3 py-1 rounded-lg bg-zinc-900 border border-zinc-850 text-[11px] text-zinc-500 font-mono w-80 truncate">
-              <span className="text-zinc-600">/</span>
-              <span className="truncate text-zinc-400">{projectName.toLowerCase().replace(/\s+/g, "-")}</span>
-            </div>
-
-            <div className="flex items-center gap-1 bg-zinc-900/60 p-1 rounded-lg border border-zinc-850">
-              {activeRightTab === "preview" && (
-                <>
-                  <button
-                    onClick={() => setDeviceMode("desktop")}
-                    className={`p-1.5 rounded-md transition-all ${deviceMode === "desktop" ? "bg-amber-500/10 text-amber-500" : "text-zinc-400 hover:text-zinc-200"}`}
-                    title="Pratinjau Desktop"
-                  >
-                    <Monitor className="h-3.5 w-3.5" />
-                  </button>
-                  <button
-                    onClick={() => setDeviceMode("mobile")}
-                    className={`p-1.5 rounded-md transition-all ${deviceMode === "mobile" ? "bg-amber-500/10 text-amber-500" : "text-zinc-400 hover:text-zinc-200"}`}
-                    title="Pratinjau Smartphone"
-                  >
-                    <Smartphone className="h-3.5 w-3.5" />
-                  </button>
-                  <div className="h-4 w-px bg-zinc-800 mx-1" />
-                </>
-              )}
-              <button
-                onClick={() => {
-                  refreshPreview();
-                  setPreviewKey(prev => prev + 1);
-                  triggerStatus("Pratinjau berhasil diperbarui dengan perubahan kode terbaru!", "success");
-                }}
-                className="p-1.5 text-zinc-400 hover:text-zinc-200 transition-colors"
-                title="Muat Ulang Preview"
-              >
-                <RefreshCw className="h-3.5 w-3.5" />
-              </button>
-            </div>
-          </div>
 
           {/* Tab Content 1: Preview mode active */}
           {activeRightTab === "preview" && (
             <div className="flex-1 flex flex-col min-h-0">
-              {/* Simulated Browser Address bar */}
-              <div className="px-4 py-2 flex items-center gap-2 bg-zinc-950 border-b border-zinc-900/80 shrink-0">
-                <div className="flex gap-1.5">
-                  <div className="w-2.5 h-2.5 rounded-full bg-rose-500/80" />
-                  <div className="w-2.5 h-2.5 rounded-full bg-amber-500/80" />
-                  <div className="w-2.5 h-2.5 rounded-full bg-emerald-500/80" />
-                </div>
-                <div className="flex-1 bg-zinc-900/70 rounded-md border border-zinc-850 px-3 py-1 text-[10px] text-zinc-500 font-mono flex items-center justify-between overflow-hidden">
-                  <span className="truncate">https://exechat.vercel.app/{projectName.toLowerCase().replace(/\s+/g, "-")}/public</span>
-                  <Lock className="h-3 w-3 shrink-0 text-zinc-600" />
-                </div>
-              </div>
-
               {/* Sandbox interactive preview frame container */}
               <div className="flex-1 flex items-center justify-center p-6 bg-zinc-900/20 overflow-hidden relative">
                 {deviceMode === "mobile" ? (
@@ -1833,110 +1823,130 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
             <div className="flex-1 flex overflow-hidden min-h-0">
               
               {/* Mini File list and storage section */}
-              <div className="w-56 border-r border-zinc-850 bg-zinc-950/60 flex flex-col shrink-0">
-                <div className="p-3 border-b border-zinc-850 flex items-center justify-between bg-zinc-950/25">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Daftar Berkas</span>
-                  <button
-                    onClick={() => setShowNewFileInput(!showNewFileInput)}
-                    className="p-1 rounded hover:bg-amber-500/10 text-amber-500 transition-colors"
-                    title="Buat File Baru"
-                  >
-                    <Plus className="h-3.5 w-3.5" />
-                  </button>
-                </div>
-
-                {/* Inline new file name creator */}
-                {showNewFileInput && (
-                  <div className="p-3 border-b border-zinc-850 bg-amber-500/5 flex flex-col gap-2">
-                    <input
-                      type="text"
-                      value={newFileName}
-                      onChange={(e) => setNewFileName(e.target.value)}
-                      placeholder="style.css, app.js..."
-                      className="w-full px-2 py-1.5 text-xs rounded border border-zinc-800 bg-zinc-900 text-zinc-200 focus:outline-none focus:border-amber-500 font-mono"
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") handleAddFile();
-                      }}
-                    />
-                    <div className="flex justify-end gap-1.5">
-                      <button
-                        onClick={() => setShowNewFileInput(false)}
-                        className="px-2 py-0.5 text-[10px] font-normal text-zinc-400 hover:bg-zinc-800 rounded"
-                      >
-                        Batal
-                      </button>
-                      <button
-                        onClick={handleAddFile}
-                        className="px-2.5 py-0.5 text-[10px] font-semibold bg-amber-500 text-white rounded"
-                      >
-                        Tambah
-                      </button>
-                    </div>
+              {!isFullscreen && (
+                <div className="w-56 border-r border-zinc-850 bg-zinc-950/60 flex flex-col shrink-0">
+                  <div className="p-3 border-b border-zinc-850 flex items-center justify-between bg-zinc-950/25">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Daftar Berkas</span>
+                    <button
+                      onClick={() => setShowNewFileInput(!showNewFileInput)}
+                      className="p-1 rounded hover:bg-amber-500/10 text-amber-500 transition-colors"
+                      title="Buat File Baru"
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                    </button>
                   </div>
-                )}
 
-                {/* File Navigator List items */}
-                <div className="flex-1 overflow-y-auto p-2 space-y-0.5">
-                  {files.map(file => {
-                    const isActive = file.path === activeFilePath;
-                    const isHtml = file.path.endsWith(".html");
-                    const isJs = file.path.endsWith(".js");
-                    const isJson = file.path.endsWith(".json");
-                    
-                    return (
-                      <div
-                        key={file.path}
-                        className={`group w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-normal font-mono cursor-pointer transition-all ${
-                          isActive 
-                            ? "bg-amber-500/10 text-amber-400 border border-amber-500/15" 
-                            : "text-zinc-400 hover:bg-zinc-900/60 hover:text-zinc-200"
-                        }`}
-                        onClick={() => setActiveFilePath(file.path)}
-                      >
-                        <div className="flex items-center gap-1.5 min-w-0">
-                          {isHtml ? <Code className="h-3.5 w-3.5 text-orange-400 shrink-0" /> :
-                           isJs ? <FileCode className="h-3.5 w-3.5 text-yellow-400 shrink-0" /> :
-                           isJson ? <FileJson className="h-3.5 w-3.5 text-emerald-400 shrink-0" /> :
-                           <File className="h-3.5 w-3.5 text-zinc-400 shrink-0" />}
-                          <span className="truncate">{file.path}</span>
-                        </div>
-                        {file.path !== "index.html" && (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDeleteFile(file.path);
-                            }}
-                            className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-rose-500/10 text-rose-400 transition-all shrink-0"
-                            title="Hapus File"
-                          >
-                            <Trash className="h-3.5 w-3.5" />
-                          </button>
-                        )}
+                  {/* Inline new file name creator */}
+                  {showNewFileInput && (
+                    <div className="p-3 border-b border-zinc-850 bg-amber-500/5 flex flex-col gap-2">
+                      <input
+                        type="text"
+                        value={newFileName}
+                        onChange={(e) => setNewFileName(e.target.value)}
+                        placeholder="style.css, app.js..."
+                        className="w-full px-2 py-1.5 text-xs rounded border border-zinc-800 bg-zinc-900 text-zinc-200 focus:outline-none focus:border-amber-500 font-mono"
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") handleAddFile();
+                        }}
+                      />
+                      <div className="flex justify-end gap-1.5">
+                        <button
+                          onClick={() => setShowNewFileInput(false)}
+                          className="px-2 py-0.5 text-[10px] font-normal text-zinc-400 hover:bg-zinc-800 rounded"
+                        >
+                          Batal
+                        </button>
+                        <button
+                          onClick={handleAddFile}
+                          className="px-2.5 py-0.5 text-[10px] font-semibold bg-amber-500 text-white rounded"
+                        >
+                          Tambah
+                        </button>
                       </div>
-                    );
-                  })}
+                    </div>
+                  )}
+
+                  {/* File Navigator List items */}
+                  <div className="flex-1 overflow-y-auto p-2 space-y-0.5">
+                    {files.map(file => {
+                      const isActive = file.path === activeFilePath;
+                      const isHtml = file.path.endsWith(".html");
+                      const isJs = file.path.endsWith(".js");
+                      const isJson = file.path.endsWith(".json");
+                      
+                      return (
+                        <div
+                          key={file.path}
+                          className={`group w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-normal font-mono cursor-pointer transition-all ${
+                            isActive 
+                              ? "bg-amber-500/10 text-amber-400 border border-amber-500/15" 
+                              : "text-zinc-400 hover:bg-zinc-900/60 hover:text-zinc-200"
+                          }`}
+                          onClick={() => setActiveFilePath(file.path)}
+                        >
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            {isHtml ? <Code className="h-3.5 w-3.5 text-orange-400 shrink-0" /> :
+                             isJs ? <FileCode className="h-3.5 w-3.5 text-yellow-400 shrink-0" /> :
+                             isJson ? <FileJson className="h-3.5 w-3.5 text-emerald-400 shrink-0" /> :
+                             <File className="h-3.5 w-3.5 text-zinc-400 shrink-0" />}
+                            <span className="truncate">{file.path}</span>
+                          </div>
+                          {file.path !== "index.html" && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteFile(file.path);
+                              }}
+                              className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-rose-500/10 text-rose-400 transition-all shrink-0"
+                              title="Hapus File"
+                            >
+                              <Trash className="h-3.5 w-3.5" />
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Cloud ExeChat Settings removed as requested */}
+
                 </div>
-
-                {/* Cloud ExeChat Settings removed as requested */}
-
-              </div>
+              )}
 
               {/* Code text editor pane */}
               <div className="flex-1 flex flex-col min-w-0">
-                <div className="px-4 py-2 border-b border-zinc-850 bg-zinc-950 flex items-center justify-between shrink-0">
-                  <div className="flex items-center gap-2">
-                    <span className="text-[11px] font-bold font-mono px-2 py-0.5 rounded bg-zinc-500/10 text-amber-500 border border-amber-500/20">
-                      {activeFilePath}
-                    </span>
-                    <span className="text-[9px] text-zinc-500 font-mono hidden sm:inline">• Kode Sumber Utama</span>
+                {isFullscreen ? (
+                  <div className="px-4 py-2 border-b border-zinc-900 bg-zinc-950 flex items-center justify-between shrink-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[11px] font-bold font-mono px-2 py-0.5 rounded bg-amber-500/10 text-amber-500 border border-amber-500/20 animate-pulse">
+                        {activeFilePath}
+                      </span>
+                      <span className="text-[10px] text-zinc-400 font-sans">Full Screen Mode • Mengedit kode sumber</span>
+                    </div>
+                    <button
+                      onClick={() => setIsFullscreen(false)}
+                      className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-rose-500 hover:bg-rose-600 text-white flex items-center gap-1.5 transition-all shadow-md active:scale-95 cursor-pointer"
+                    >
+                      <Minimize2 className="h-3.5 w-3.5" />
+                      <span>Kembali ke Normal</span>
+                    </button>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-[9px] font-mono text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/25 flex items-center gap-1 shrink-0">
-                      <span className="h-1.5 w-1.5 bg-emerald-500 rounded-full animate-ping" />
-                      Auto-Saved
-                    </span>
+                ) : (
+                  <div className="px-4 py-2 border-b border-zinc-850 bg-zinc-950 flex items-center justify-between shrink-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[11px] font-bold font-mono px-2 py-0.5 rounded bg-zinc-500/10 text-amber-500 border border-amber-500/20">
+                        {activeFilePath}
+                      </span>
+                      <span className="text-[9px] text-zinc-500 font-mono hidden sm:inline">• Kode Sumber Utama</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[9px] font-mono text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/25 flex items-center gap-1 shrink-0">
+                        <span className="h-1.5 w-1.5 bg-emerald-500 rounded-full animate-ping" />
+                        Auto-Saved
+                      </span>
+                    </div>
                   </div>
-                </div>
+                )}
 
                 <div className="flex-1 flex font-mono overflow-hidden relative">
                   {/* Line Numbers column */}
