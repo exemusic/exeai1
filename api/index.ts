@@ -351,7 +351,7 @@ async function runCerebrasModel(
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      model: getCerebrasModel(model),
+      model,
       messages: allMessages,
       temperature: temperature !== undefined ? Number(temperature) : 0.7,
       stream: true,
