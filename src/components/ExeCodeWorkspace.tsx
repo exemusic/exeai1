@@ -392,20 +392,53 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
     }
 
     const htmlFile = customFiles.find(f => f.path.toLowerCase() === "index.html");
-    const jsFile = customFiles.find(f => f.path.toLowerCase() === "app.js");
-    const cssFile = customFiles.find(f => f.path.toLowerCase() === "style.css");
-
     let finalHtml = htmlFile ? htmlFile.content : "<h1>No index.html file found!</h1>";
 
-    // Inject styles if style.css exists
-    if (cssFile) {
-      const styleTag = `<style>\n${cssFile.content}\n</style>`;
-      if (finalHtml.includes("</head>")) {
-        finalHtml = finalHtml.replace("</head>", `${styleTag}\n</head>`);
-      } else {
-        finalHtml = styleTag + finalHtml;
+    // 1. Dynamic replacement of <link rel="stylesheet"> with virtual files content
+    const linkRegex = /<link\s+[^>]*rel=["']stylesheet["'][^>]*href=["']([^"']+)["'][^>]*\/?>|<link\s+[^>]*href=["']([^"']+)["'][^>]*rel=["']stylesheet["'][^>]*\/?>/gi;
+    const injectedStyles = new Set<string>();
+
+    finalHtml = finalHtml.replace(linkRegex, (match, href1, href2) => {
+      const href = href1 || href2;
+      if (!href) return match;
+      const matchedFile = customFiles.find(f => f.path.toLowerCase() === href.toLowerCase());
+      if (matchedFile) {
+        injectedStyles.add(matchedFile.path.toLowerCase());
+        return `<style>\n/* Injected from ${matchedFile.path} */\n${matchedFile.content}\n</style>`;
       }
-    }
+      return match;
+    });
+
+    // 2. Dynamic replacement of <script src="..."></script> with virtual files content
+    const scriptRegex = /<script\s+[^>]*src=["']([^"']+)["'][^>]*>\s*<\/script>/gi;
+    const injectedScripts = new Set<string>();
+
+    finalHtml = finalHtml.replace(scriptRegex, (match, src) => {
+      if (!src) return match;
+      const matchedFile = customFiles.find(f => f.path.toLowerCase() === src.toLowerCase());
+      if (matchedFile) {
+        injectedScripts.add(matchedFile.path.toLowerCase());
+        return `<script>\n// Injected from ${matchedFile.path}\n${matchedFile.content}\n</script>`;
+      }
+      return match;
+    });
+
+    // 3. Fallback injection for unlinked CSS files (e.g., style.css or styles.css)
+    const fallbackCssNames = ["style.css", "styles.css"];
+    fallbackCssNames.forEach(cssName => {
+      if (!injectedStyles.has(cssName)) {
+        const cssFile = customFiles.find(f => f.path.toLowerCase() === cssName);
+        if (cssFile) {
+          const styleTag = `<style>\n/* Fallback Injection for ${cssFile.path} */\n${cssFile.content}\n</style>`;
+          if (finalHtml.includes("</head>")) {
+            finalHtml = finalHtml.replace("</head>", `${styleTag}\n</head>`);
+          } else {
+            finalHtml = styleTag + finalHtml;
+          }
+          injectedStyles.add(cssName);
+        }
+      }
+    });
 
     // Inject console logs interceptor & runtime error handling script
     const errorHandlingScript = `
@@ -487,16 +520,17 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
       finalHtml = errorHandlingScript + finalHtml;
     }
 
-    if (jsFile) {
-      const scriptTag = `<script>\n${jsFile.content}\n</script>`;
-      if (finalHtml.includes("</body>")) {
-        if (finalHtml.includes('<script src="app.js"></script>')) {
-          finalHtml = finalHtml.replace('<script src="app.js"></script>', scriptTag);
-        } else {
+    // 4. Fallback injection for unlinked app.js
+    if (!injectedScripts.has("app.js")) {
+      const jsFile = customFiles.find(f => f.path.toLowerCase() === "app.js");
+      if (jsFile) {
+        const scriptTag = `<script>\n// Fallback Injection for app.js\n${jsFile.content}\n</script>`;
+        if (finalHtml.includes("</body>")) {
           finalHtml = finalHtml.replace("</body>", `${scriptTag}\n</body>`);
+        } else {
+          finalHtml += `\n${scriptTag}`;
         }
-      } else {
-        finalHtml += `\n${scriptTag}`;
+        injectedScripts.add("app.js");
       }
     }
 
