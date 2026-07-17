@@ -673,6 +673,12 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
     let lastSearchIndex = 0;
     for (let i = 0; i < blocks.length; i++) {
       const block = blocks[i];
+      
+      // Ignore blocks that are actually formatted JSON arrays to prevent them from overwriting individual files
+      if (block.lang.toLowerCase() === "json" && (block.content.trim().startsWith("[") || block.content.includes('"path"'))) {
+        continue;
+      }
+
       const precedingText = text.substring(lastSearchIndex, block.index).trim();
       lastSearchIndex = block.index + block.content.length + 8;
 
@@ -724,86 +730,65 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
 
   // Attempt to parse or extract a valid JSON array from the response text
   const tryExtractJsonArray = (text: string): VirtualFile[] | null => {
-    let cleanText = text.trim();
-    
-    // Extract JSON block if it resides in markdown code fences
-    const jsonBlockRegex = /```(?:json|javascript|js)?\s*([\s\S]*?)\s*(?:```|$)/i;
-    const blockMatch = cleanText.match(jsonBlockRegex);
-    if (blockMatch && blockMatch[1]) {
-      cleanText = blockMatch[1].trim();
-    }
+    if (!text) return null;
 
-    // 1. Try standard JSON.parse first
-    try {
-      const parsed = JSON.parse(cleanText);
-      if (Array.isArray(parsed)) return parsed;
-    } catch (e) {
-      // Try to clean up trailing commas
+    // Helper to validate and return virtual files
+    const parseAsVirtualFiles = (candidate: string): VirtualFile[] | null => {
       try {
-        const parsed = JSON.parse(cleanText.replace(/,(\s*[\]}])/g, "$1"));
-        if (Array.isArray(parsed)) return parsed;
-      } catch (e2) {}
-    }
-
-    // 2. Ultra-robust manual regex extractor that handles unquoted, single-quoted, backticked keys & values
-    console.log("Commencing ultra-robust file extractor...");
-    const extractedFiles: VirtualFile[] = [];
-    
-    // Regex matches keys like "path", 'path', path and supports value wrappers like ", ', or `
-    const pathRegex = /(?:"path"|'path'|\bpath\b)\s*:\s*(?:"([^"]+)"|'([^']+)'|`([^`]+)`)/gi;
-    const pathMatches: { path: string; index: number; lastIndex: number }[] = [];
-    let match;
-    while ((match = pathRegex.exec(cleanText)) !== null) {
-      const filePath = match[1] || match[2] || match[3];
-      if (filePath) {
-        pathMatches.push({
-          path: filePath,
-          index: match.index,
-          lastIndex: pathRegex.lastIndex
-        });
-      }
-    }
-
-    if (pathMatches.length > 0) {
-      for (let i = 0; i < pathMatches.length; i++) {
-        const currentPath = pathMatches[i].path;
-        const startOfSearch = pathMatches[i].lastIndex;
-        const endOfSearch = (i + 1 < pathMatches.length) ? pathMatches[i + 1].index : cleanText.length;
-        
-        const searchSub = cleanText.substring(startOfSearch, endOfSearch);
-        
-        // Locate content key with quote identifier: "content", 'content', or content
-        const contentKeyRegex = /(?:"content"|'content'|\bcontent\b)\s*:\s*(["'`])/i;
-        const contentMatch = searchSub.match(contentKeyRegex);
-        if (!contentMatch) continue;
-        
-        const quoteChar = contentMatch[1];
-        const contentStartIndex = searchSub.indexOf(contentMatch[0]) + contentMatch[0].length;
-        const contentSearchSub = searchSub.substring(contentStartIndex);
-        
-        let endQuoteIndex = -1;
-        
-        // Search backward for the matching unescaped closing quote character followed by structure endings
-        for (let j = contentSearchSub.length - 1; j >= 0; j--) {
-          if (contentSearchSub[j] === quoteChar) {
-            let backslashCount = 0;
-            let k = j - 1;
-            while (k >= 0 && contentSearchSub[k] === '\\') {
-              backslashCount++;
-              k--;
-            }
-            if (backslashCount % 2 !== 0) continue; // Escaped quote
-            
-            const after = contentSearchSub.substring(j + 1).trim();
-            if (after.startsWith("}") || after.startsWith(",") || after === "" || after.startsWith("]")) {
-              endQuoteIndex = j;
-              break;
-            }
-          }
+        let cleaned = candidate.trim();
+        let parsed = JSON.parse(cleaned);
+        if (Array.isArray(parsed) && parsed.length > 0 && parsed.every(item => item && typeof item === "object" && typeof item.path === "string" && typeof item.content === "string")) {
+          return parsed;
         }
-        
-        if (endQuoteIndex === -1) {
-          // Backward scan fallback for any unescaped quote character
+        // Try with trailing commas removed
+        cleaned = cleaned.replace(/,(\s*[\]}])/g, "$1");
+        parsed = JSON.parse(cleaned);
+        if (Array.isArray(parsed) && parsed.length > 0 && parsed.every(item => item && typeof item === "object" && typeof item.path === "string" && typeof item.content === "string")) {
+          return parsed;
+        }
+      } catch (e) {}
+      return null;
+    };
+
+    // Helper for manual robust regex extraction of file structures
+    const runManualExtractor = (rawText: string): VirtualFile[] | null => {
+      const extractedFiles: VirtualFile[] = [];
+      
+      // Regex matches keys like "path", 'path', path and supports value wrappers like ", ', or `
+      const pathRegex = /(?:"path"|'path'|\bpath\b)\s*:\s*(?:"([^"]+)"|'([^']+)'|`([^`]+)`)/gi;
+      const pathMatches: { path: string; index: number; lastIndex: number }[] = [];
+      let match;
+      while ((match = pathRegex.exec(rawText)) !== null) {
+        const filePath = match[1] || match[2] || match[3];
+        if (filePath) {
+          pathMatches.push({
+            path: filePath,
+            index: match.index,
+            lastIndex: pathRegex.lastIndex
+          });
+        }
+      }
+
+      if (pathMatches.length > 0) {
+        for (let i = 0; i < pathMatches.length; i++) {
+          const currentPath = pathMatches[i].path;
+          const startOfSearch = pathMatches[i].lastIndex;
+          const endOfSearch = (i + 1 < pathMatches.length) ? pathMatches[i + 1].index : rawText.length;
+          
+          const searchSub = rawText.substring(startOfSearch, endOfSearch);
+          
+          // Locate content key with quote identifier: "content", 'content', or content
+          const contentKeyRegex = /(?:"content"|'content'|\bcontent\b)\s*:\s*(["'`])/i;
+          const contentMatch = searchSub.match(contentKeyRegex);
+          if (!contentMatch) continue;
+          
+          const quoteChar = contentMatch[1];
+          const contentStartIndex = searchSub.indexOf(contentMatch[0]) + contentMatch[0].length;
+          const contentSearchSub = searchSub.substring(contentStartIndex);
+          
+          let endQuoteIndex = -1;
+          
+          // Search backward for the matching unescaped closing quote character followed by structure endings
           for (let j = contentSearchSub.length - 1; j >= 0; j--) {
             if (contentSearchSub[j] === quoteChar) {
               let backslashCount = 0;
@@ -812,58 +797,95 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
                 backslashCount++;
                 k--;
               }
-              if (backslashCount % 2 === 0) {
+              if (backslashCount % 2 !== 0) continue; // Escaped quote
+              
+              const after = contentSearchSub.substring(j + 1).trim();
+              if (after.startsWith("}") || after.startsWith(",") || after === "" || after.startsWith("]")) {
                 endQuoteIndex = j;
                 break;
               }
             }
           }
-        }
-        
-        if (endQuoteIndex !== -1) {
-          let contentValue = contentSearchSub.substring(0, endQuoteIndex);
           
-          // Decode typical escaped structures depending on wrapper quote
-          if (quoteChar === '"') {
-            contentValue = contentValue
-              .replace(/\\n/g, "\n")
-              .replace(/\\r/g, "\r")
-              .replace(/\\t/g, "\t")
-              .replace(/\\"/g, '"')
-              .replace(/\\\\/g, "\\");
-          } else if (quoteChar === "'") {
-            contentValue = contentValue
-              .replace(/\\n/g, "\n")
-              .replace(/\\r/g, "\r")
-              .replace(/\\t/g, "\t")
-              .replace(/\\'/g, "'")
-              .replace(/\\\\/g, "\\");
-          } else if (quoteChar === "`") {
-            contentValue = contentValue
-              .replace(/\\`/g, "`")
-              .replace(/\\\\/g, "\\");
+          if (endQuoteIndex === -1) {
+            // Backward scan fallback for any unescaped quote character
+            for (let j = contentSearchSub.length - 1; j >= 0; j--) {
+              if (contentSearchSub[j] === quoteChar) {
+                let backslashCount = 0;
+                let k = j - 1;
+                while (k >= 0 && contentSearchSub[k] === '\\') {
+                  backslashCount++;
+                  k--;
+                }
+                if (backslashCount % 2 === 0) {
+                  endQuoteIndex = j;
+                  break;
+                }
+              }
+            }
           }
           
-          extractedFiles.push({
-            path: currentPath,
-            content: contentValue
-          });
+          if (endQuoteIndex !== -1) {
+            let contentValue = contentSearchSub.substring(0, endQuoteIndex);
+            
+            // Decode typical escaped structures depending on wrapper quote
+            if (quoteChar === '"') {
+              contentValue = contentValue
+                .replace(/\\n/g, "\n")
+                .replace(/\\r/g, "\r")
+                .replace(/\\t/g, "\t")
+                .replace(/\\"/g, '"')
+                .replace(/\\\\/g, "\\");
+            } else if (quoteChar === "'") {
+              contentValue = contentValue
+                .replace(/\\n/g, "\n")
+                .replace(/\\r/g, "\r")
+                .replace(/\\t/g, "\t")
+                .replace(/\\'/g, "'")
+                .replace(/\\\\/g, "\\");
+            } else if (quoteChar === "`") {
+              contentValue = contentValue
+                .replace(/\\`/g, "`")
+                .replace(/\\\\/g, "\\");
+            }
+            
+            extractedFiles.push({
+              path: currentPath,
+              content: contentValue
+            });
+          }
         }
       }
 
-      if (extractedFiles.length > 0) {
-        console.log("Successfully parsed files using robust manual parser:", extractedFiles.map(f => f.path));
-        return extractedFiles;
-      }
+      return extractedFiles.length > 0 ? extractedFiles : null;
+    };
+
+    // --- STEP 1: Scan all markdown code blocks in the response ---
+    const codeBlockRegex = /```(?:json|javascript|js)?\s*([\s\S]*?)\s*```/gi;
+    let codeBlockMatch;
+    while ((codeBlockMatch = codeBlockRegex.exec(text)) !== null) {
+      const blockContent = codeBlockMatch[1].trim();
+      const parsed = parseAsVirtualFiles(blockContent);
+      if (parsed) return parsed;
+
+      const manualFromBlock = runManualExtractor(blockContent);
+      if (manualFromBlock) return manualFromBlock;
     }
 
-    // 3. Fallback bracket look-up (Smart bracket lookup that ignores markdown links like [Text](URL))
+    // --- STEP 2: Try to parse the entire text as JSON ---
+    const parsedAll = parseAsVirtualFiles(text);
+    if (parsedAll) return parsedAll;
+
+    // --- STEP 3: Try running manual extractor on the entire raw text ---
+    const manualFromAll = runManualExtractor(text);
+    if (manualFromAll) return manualFromAll;
+
+    // --- STEP 4: Smart bracket-to-bracket look-up on the entire text ---
     let startIdx = -1;
     let searchPos = 0;
     while (true) {
       const idx = text.indexOf("[", searchPos);
       if (idx === -1) break;
-      // Check if the next non-whitespace character after idx is '{' or '['
       const remaining = text.substring(idx + 1).trim();
       if (remaining.startsWith("{") || remaining.startsWith("[")) {
         startIdx = idx;
@@ -881,7 +903,6 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
       while (true) {
         const idx = text.lastIndexOf("]", searchEndPos - 1);
         if (idx === -1 || idx <= startIdx) break;
-        // Check if the preceding non-whitespace character is '}' or ']'
         const preceding = text.substring(0, idx).trim();
         if (preceding.endsWith("}") || preceding.endsWith("]")) {
           endIdx = idx;
@@ -895,19 +916,12 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
     }
 
     if (startIdx !== -1 && endIdx !== -1 && endIdx > startIdx) {
-      const candidate = text.substring(startIdx, endIdx + 1);
-      try {
-        const parsed = JSON.parse(candidate.trim());
-        if (Array.isArray(parsed)) return parsed;
-      } catch (e) {
-        try {
-          const cleanedCandidate = candidate
-            .replace(/,(\s*[\]}])/g, "$1")
-            .trim();
-          const parsed = JSON.parse(cleanedCandidate);
-          if (Array.isArray(parsed)) return parsed;
-        } catch (e2) {}
-      }
+      const candidate = text.substring(startIdx, endIdx + 1).trim();
+      const parsedBracket = parseAsVirtualFiles(candidate);
+      if (parsedBracket) return parsedBracket;
+
+      const manualFromBracket = runManualExtractor(candidate);
+      if (manualFromBracket) return manualFromBracket;
     }
 
     return null;
