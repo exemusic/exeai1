@@ -606,6 +606,18 @@ app.post("/api/chat/stream", async (req, res) => {
       return res.end();
     }
 
+    if (model === "llama-3.1-8b-instant") {
+      await streamGroq(messages, systemInstruction, temperature, res);
+      res.write("data: [DONE]\n\n");
+      return res.end();
+    }
+
+    if (model === "gemini-ai" || model === "gemini-3.5-flash" || webSearchEnabled) {
+      await streamGemini(messages, systemInstruction, temperature, webSearchEnabled, res);
+      res.write("data: [DONE]\n\n");
+      return res.end();
+    }
+
     const apiKey = getCerebrasApiKey();
     if (!apiKey) {
       res.write(`data: ${JSON.stringify({ error: "Cerebras API key is not configured" })}\n\n`);

@@ -996,7 +996,7 @@ export default function App() {
       (p) => p.id === (activeSessionState ? activeSessionState.systemInstructionId : selectedPresetId)
     ) || SYSTEM_PRESETS[0];
     const apiTemp = activeSessionState ? activeSessionState.temperature : temperature;
-    const apiWebSearch = false;
+    const apiWebSearch = apiModel === "gemini-ai";
 
     const updatedSession = sessions.find((s) => s.id === targetSessionId);
     const conversationHistory = updatedSession ? [...updatedSession.messages, userMessage] : [userMessage];
@@ -1247,7 +1247,7 @@ export default function App() {
       (p) => p.id === (activeSessionObj.systemInstructionId || selectedPresetId)
     ) || SYSTEM_PRESETS[0];
     const apiTemp = activeSessionObj.temperature || temperature;
-    const apiWebSearch = false;
+    const apiWebSearch = apiModel === "gemini-ai";
 
     const formattedHistory = priorMessages.map((m) => {
       let content = m.content;

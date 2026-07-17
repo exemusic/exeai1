@@ -18,6 +18,18 @@ export const MODEL_OPTIONS: ModelOption[] = [
     name: "exeai-glm-4.7",
     badge: "Preview",
     description: "Model exeai-glm-4.7 berukuran efisien dengan batas konteks 8.192 token untuk respons secepat kilat.",
+  },
+  {
+    id: "gemini-ai",
+    name: "Gemini AI",
+    badge: "Google AI",
+    description: "Model otomatis Google yang cerdas (Flash & Flash Lite). Otomatis beralih ke ExeAI jika kuota puncak tercapai.",
+  },
+  {
+    id: "llama-3.1-8b-instant",
+    name: "Llama 3.1 8B Instant",
+    badge: "FAST",
+    description: "Model super cepat Llama 3.1 8B Instant dengan respons secepat kilat.",
   }
 ];
 
