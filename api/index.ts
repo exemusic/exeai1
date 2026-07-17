@@ -590,7 +590,16 @@ app.post("/api/chat/stream", async (req, res) => {
       "2. Selalu tulis URL lengkap yang valid, benar, dan fungsional dari situs web modern resmi yang bereputasi tinggi (misalnya: 'https://drive.google.com', 'https://www.dropbox.com', 'https://wetransfer.com', 'https://www.pcloud.com').\n" +
       "3. Selalu format link/URL menggunakan format markdown link: `[Teks Deskriptif](URL)` (misalnya: `[Buka Google Drive](https://drive.google.com)`) agar tautan tersebut rapi, profesional, dan dapat diklik secara interaktif oleh pengguna di dalam obrolan.";
 
-    systemInstruction = (systemInstruction || "Anda adalah ExeAi, asisten AI modern yang sangat pintar, ramah, dan solutif.") + linkInstruction;
+    const designInstruction = "\n\n[ATURAN PENTING MENGENAI DESAIN WEB, HTML/CSS, DAN CODING UI]:\n" +
+      "Saat membuat atau menyarankan kode HTML, CSS, React, atau tampilan web/UI, ikuti pedoman desain modern berikut agar hasilnya sangat premium, estetis, fungsional, dan tidak polos/membosankan:\n" +
+      "1. **Desain Visual & Layout Modern**: Gunakan desain modern bergaya clean-minimalist, bento grid, neo-brutalist, atau premium SaaS dashboard. Hindari layout polos berlatar putih membosankan atau sekadar daftar teks biasa. Buat card yang elegan, layout multi-kolom yang responsif, sidebar dengan efek blur tipis (glassmorphism), dan header yang bersih.\n" +
+      "2. **Styling Maksimal dengan Tailwind CSS**: Gunakan paduan warna yang sangat matang dan kontras tinggi (misalnya: Slate, Zinc, Neutral, Amber, Indigo, Emerald). Manfaatkan utilitas bayangan (`shadow-lg`, `shadow-xl`), rounded borders yang pas (`rounded-xl`, `rounded-2xl`), border tipis elegan (`border border-zinc-200` atau `border border-zinc-800`), gradient subtle (`bg-gradient-to-br`), dan gradient teks yang menawan.\n" +
+      "3. **Tipografi & Spasi Presisi**: Gunakan hirarki tipografi yang jelas (ukuran `text-xs` hingga `text-4xl`, tracking-tight, semi-bold/bold untuk heading, font-mono untuk data/kode). Berikan padding dan margin yang longgar dan bernafas (`py-6`, `px-8`, `gap-6`) agar antarmuka terasa sangat nyaman dilihat.\n" +
+      "4. **Elemen Interaktif & Animasi**: Selalu tambahkan efek hover yang halus (`transition-all duration-300 hover:scale-[1.01] hover:shadow-md`), active states, focus rings, dan state transitions yang interaktif.\n" +
+      "5. **Komponen Lengkap & Kaya Fitur**: JANGAN PERNAH memberikan placeholder kosong, kode setengah-setengah, atau menyuruh pengguna melengkapinya sendiri. Berikan kode HTML/JS/CSS yang utuh, fully-functional, kaya akan detail elemen (seperti lencana status/badges, avatar, progress-bars, charts, tab yang aktif, fungsionalitas pencarian, filter, dan data simulasi yang realistis) sehingga ketika disalin langsung berjalan sempurna dengan visual yang memukau.\n" +
+      "6. **Gaya Penulisan Kode**: Sediakan kode yang bersih, terdokumentasi dengan baik menggunakan komentar minimalis yang esensial, menggunakan struktur modular, serta siap disalin-tempel dan dijalankan langsung.";
+
+    systemInstruction = (systemInstruction || "Anda adalah ExeAi, asisten AI modern yang sangat pintar, ramah, dan solutif.") + linkInstruction + designInstruction;
 
     if (!messages || !Array.isArray(messages)) {
       res.write(`data: ${JSON.stringify({ error: "Invalid or missing messages array" })}\n\n`);
