@@ -823,9 +823,43 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
       }
     }
 
-    // 3. Fallback bracket look-up
-    const startIdx = text.indexOf("[");
-    const endIdx = text.lastIndexOf("]");
+    // 3. Fallback bracket look-up (Smart bracket lookup that ignores markdown links like [Text](URL))
+    let startIdx = -1;
+    let searchPos = 0;
+    while (true) {
+      const idx = text.indexOf("[", searchPos);
+      if (idx === -1) break;
+      // Check if the next non-whitespace character after idx is '{' or '['
+      const remaining = text.substring(idx + 1).trim();
+      if (remaining.startsWith("{") || remaining.startsWith("[")) {
+        startIdx = idx;
+        break;
+      }
+      searchPos = idx + 1;
+    }
+    if (startIdx === -1) {
+      startIdx = text.indexOf("[");
+    }
+
+    let endIdx = -1;
+    if (startIdx !== -1) {
+      let searchEndPos = text.length;
+      while (true) {
+        const idx = text.lastIndexOf("]", searchEndPos - 1);
+        if (idx === -1 || idx <= startIdx) break;
+        // Check if the preceding non-whitespace character is '}' or ']'
+        const preceding = text.substring(0, idx).trim();
+        if (preceding.endsWith("}") || preceding.endsWith("]")) {
+          endIdx = idx;
+          break;
+        }
+        searchEndPos = idx;
+      }
+      if (endIdx === -1) {
+        endIdx = text.lastIndexOf("]");
+      }
+    }
+
     if (startIdx !== -1 && endIdx !== -1 && endIdx > startIdx) {
       const candidate = text.substring(startIdx, endIdx + 1);
       try {
@@ -1646,7 +1680,7 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
                       key={previewKey}
                       src={getCombinedPreviewBlob()}
                       className="w-full h-full border-none rounded-[28px] bg-slate-950"
-                      sandbox="allow-scripts"
+                      sandbox="allow-scripts allow-same-origin allow-popups"
                       title="Mobile App Preview"
                     />
                     <div className="absolute bottom-1.5 left-1/2 transform -translate-x-1/2 w-20 h-1 bg-zinc-800 rounded-full" />
@@ -1658,7 +1692,7 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
                       key={previewKey}
                       src={getCombinedPreviewBlob()}
                       className="w-full h-full border-none bg-slate-950"
-                      sandbox="allow-scripts"
+                      sandbox="allow-scripts allow-same-origin allow-popups"
                       title="Desktop App Preview"
                     />
                   </div>
