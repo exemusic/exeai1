@@ -2090,7 +2090,7 @@ export default function App() {
                         transition={{ duration: 0.6, ease: "easeOut" }}
                         className="inline-flex items-center justify-center"
                       >
-                        <img src="/exechat.png" alt="ExeChat Logo" className="h-14 w-14 md:h-18 md:w-18 object-contain" referrerPolicy="no-referrer" />
+                        <img src="/exechat.png" alt="" className="h-14 w-14 md:h-18 md:w-18 object-contain" referrerPolicy="no-referrer" />
                       </motion.div>
                     </div>
 

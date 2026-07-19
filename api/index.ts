@@ -1,5 +1,6 @@
 import express from "express";
 import dotenv from "dotenv";
+import path from "path";
 import { GoogleGenAI } from "@google/genai";
 import { createClient } from "@supabase/supabase-js";
 
@@ -8,6 +9,16 @@ dotenv.config();
 const app = express();
 
 app.use(express.json());
+
+// Endpoint to serve custom exechat logo directly from workspace root
+app.get("/exechat.png", (req, res) => {
+  res.sendFile(path.join(process.cwd(), "exechat.png"));
+});
+
+// Endpoint to serve favicon directly from workspace root
+app.get("/favicon.png", (req, res) => {
+  res.sendFile(path.join(process.cwd(), "favicon.png"));
+});
 
 function getCreditCost(text: string): number {
   const len = (text || "").trim().length;
