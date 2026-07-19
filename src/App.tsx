@@ -157,6 +157,7 @@ export default function App() {
   const [showCookieDetails, setShowCookieDetails] = useState(false);
   const [showPresetModal, setShowPresetModal] = useState(false);
   const [showModelModal, setShowModelModal] = useState(false);
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [hasApiKey, setHasApiKey] = useState<boolean | null>(null);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [isDesktopSidebarOpen, setIsDesktopSidebarOpen] = useState(false); 
@@ -480,11 +481,11 @@ export default function App() {
     const savedLoggedIn = localStorage.getItem("exechat_logged_in") === "true";
     const savedUserId = localStorage.getItem("exechat_user_id");
 
-    if (savedLoggedIn && savedUserId) {
+    if (savedLoggedIn && savedUserId && !savedUserId.startsWith("guest_")) {
       setUserId(savedUserId);
-      setUserEmail(localStorage.getItem("exechat_email") || "guest@exechat.local");
-      setUserName(localStorage.getItem("exechat_username") || "Guest");
-      setUserDisplayName(localStorage.getItem("exechat_display_name") || "Guest");
+      setUserEmail(localStorage.getItem("exechat_email") || "");
+      setUserName(localStorage.getItem("exechat_username") || "");
+      setUserDisplayName(localStorage.getItem("exechat_display_name") || "");
       setUserPhoto(localStorage.getItem("exechat_user_photo") || null);
       setCredits(99999); 
       setIsLoggedIn(true);
@@ -760,25 +761,6 @@ export default function App() {
     }
   };
 
-  const handleGuestLogin = () => {
-    const guestId = "guest_" + Math.random().toString(36).substring(2, 10);
-    setUserId(guestId);
-    setUserEmail("guest@exechat.local");
-    setUserName("Guest");
-    setUserDisplayName("Guest");
-    setUserPhoto(null);
-    setCredits(99999);
-    setErrorText(null);
-    setIsLoggedIn(true);
-    playNotifySound();
-
-    localStorage.setItem("exechat_logged_in", "true");
-    localStorage.setItem("exechat_email", "guest@exechat.local");
-    localStorage.setItem("exechat_user_id", guestId);
-    localStorage.setItem("exechat_username", "Guest");
-    localStorage.setItem("exechat_display_name", "Guest");
-  };
-
   const handleCompleteRegistrationWithChosenName = (finalChosenName: string) => {
     const finalName = finalChosenName.trim() || googleDefaultName || "User";
     setUserName(finalName);
@@ -984,6 +966,7 @@ export default function App() {
       content: text,
       timestamp: Date.now(),
       attachment: attachmentObj,
+      isPending: true,
     };
 
     setSessions((prev) =>
@@ -1134,6 +1117,9 @@ export default function App() {
                             thinkingDuration
                           };
                         }
+                        if (m.isPending) {
+                          return { ...m, isPending: false };
+                        }
                         return m;
                       }),
                     };
@@ -1218,6 +1204,19 @@ export default function App() {
     } finally {
       setIsGenerating(false);
       abortControllerRef.current = null;
+      setSessions((prev) =>
+        prev.map((s) => {
+          if (s.id === targetSessionId) {
+            return {
+              ...s,
+              messages: s.messages.map((m) =>
+                m.isPending ? { ...m, isPending: false } : m
+              ),
+            };
+          }
+          return s;
+        })
+      );
     }
   };
 
@@ -1982,7 +1981,7 @@ export default function App() {
 
                 {currentSession && currentSession.messages.length > 0 && (
                   <button
-                    onClick={handleClearCurrentSession}
+                    onClick={() => setShowClearConfirm(true)}
                     className={`p-2 rounded-xl transition-colors ${resolvedTheme === "dark" ? "hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200" : "hover:bg-zinc-200 text-zinc-600 hover:text-zinc-900"}`}
                     title="Clear chat"
                   >
@@ -2195,7 +2194,7 @@ export default function App() {
 
                              {/* Message content */}
                              {isUser ? (
-                               <div className={`whitespace-pre-wrap leading-relaxed font-sans text-xs sm:text-sm md:text-[15px] select-text flex flex-col gap-2.5 ${isDark ? "text-zinc-250" : "text-zinc-850"}`}>
+                               <div className={`whitespace-pre-wrap leading-relaxed font-sans text-xs sm:text-sm md:text-[15px] select-text flex flex-col gap-2.5 ${isDark ? "text-zinc-250" : "text-zinc-850"} ${msg.isPending ? "opacity-65" : ""}`}>
                                  {msg.attachment && (
                                    <div className={`flex items-center gap-3 p-3 rounded-xl border max-w-sm transition-all duration-300 ${
                                      isDark 
@@ -2230,7 +2229,14 @@ export default function App() {
                                      </div>
                                    </div>
                                  )}
-                                 <div>{msg.content}</div>
+                                 <div className="flex items-start justify-between gap-2.5">
+                                   <div className="flex-1">{msg.content}</div>
+                                   {msg.isPending && (
+                                     <span className="flex items-center gap-1 text-[10px] text-amber-500 font-sans select-none shrink-0 mt-1" title="Sending to ExeAI server...">
+                                       <Clock className="h-3.5 w-3.5 animate-spin" />
+                                     </span>
+                                   )}
+                                 </div>
                                </div>
                              ) : (
                               // Custom Markdown rendering
@@ -3434,6 +3440,73 @@ export default function App() {
                       }`}
                     >
                       Skip (Use Google Name)
+                    </button>
+                  </div>
+                </motion.div>
+              </div>
+            )}
+          </AnimatePresence>
+
+          {/* CLEAR CHAT CONFIRMATION MODAL */}
+          <AnimatePresence>
+            {showClearConfirm && (
+              <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 select-none animate-fadeIn">
+                {/* Backdrop overlay */}
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  onClick={() => setShowClearConfirm(false)}
+                  className="absolute inset-0 bg-black/75 backdrop-blur-sm"
+                />
+
+                {/* Modal Container */}
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.98, y: 8 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.98, y: 8 }}
+                  transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+                  className={`relative w-full max-w-[380px] rounded-2xl border p-6 shadow-xl z-10 transition-all ${
+                    isDark ? "bg-zinc-900 border-zinc-800 text-zinc-100" : "bg-white border-zinc-200 text-zinc-900"
+                  }`}
+                >
+                  {/* Header */}
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="h-10 w-10 rounded-xl flex items-center justify-center border bg-red-500/10 border-red-500/20 text-red-500">
+                      <Trash2 className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <p className={`text-[10px] font-medium ${isDark ? "text-zinc-500" : "text-zinc-400"}`}>Delete Warning</p>
+                      <h3 className={`font-sans font-semibold text-base ${isDark ? "text-zinc-100" : "text-zinc-900"}`}>Clear Conversation</h3>
+                    </div>
+                  </div>
+
+                  <p className={`text-xs leading-relaxed mb-5 font-sans ${isDark ? "text-zinc-400" : "text-zinc-500"}`}>
+                    Are you sure you want to delete all messages in this conversation? This action cannot be undone.
+                  </p>
+
+                  {/* Actions buttons */}
+                  <div className="flex flex-col gap-2.5">
+                    <button
+                      onClick={() => {
+                        setShowClearConfirm(false);
+                        handleClearCurrentSession();
+                        playNotifySound();
+                      }}
+                      className="w-full py-2.5 px-4 rounded-xl font-semibold text-xs transition-colors duration-150 cursor-pointer text-center bg-red-600 hover:bg-red-500 text-white shadow-sm"
+                    >
+                      Clear Chat
+                    </button>
+
+                    <button
+                      onClick={() => setShowClearConfirm(false)}
+                      className={`w-full py-2.5 px-4 rounded-xl border font-medium text-xs transition-colors duration-150 cursor-pointer text-center ${
+                        isDark 
+                          ? "border-zinc-800 hover:border-zinc-750 bg-transparent hover:bg-zinc-850 text-zinc-400 hover:text-zinc-200" 
+                          : "border-zinc-200 hover:border-zinc-300 bg-transparent hover:bg-zinc-50 text-zinc-600 hover:text-zinc-800"
+                      }`}
+                    >
+                      Cancel
                     </button>
                   </div>
                 </motion.div>

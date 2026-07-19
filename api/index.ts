@@ -217,13 +217,19 @@ async function runGeminiModel(
 
 async function streamGemini(messages: any[], systemInstruction: string, temperature: number, webSearchEnabled: boolean, res: any) {
   const geminiKey = process.env.GEMINI_API_KEY;
-  const geminiKey2 = process.env.GEMINI2_API_KEY;
+  const geminiKey2 = process.env.GEMINI2_API_KEY || process.env.GEMINI_API_KEY2 || process.env.GEMINI_API_KEY_2 || process.env.BACKUP_GEMINI_API_KEY;
+
+  const isPlaceholder = (k: string) => {
+    if (!k) return true;
+    const s = k.trim().toUpperCase();
+    return s === "" || s.includes("MY_GEMINI") || s.includes("YOUR_GEMINI") || s.includes("PLACEHOLDER") || s.startsWith("MY_") || s.startsWith("YOUR_");
+  };
 
   const keysToTry: { key: string; name: string }[] = [];
-  if (geminiKey) {
+  if (geminiKey && !isPlaceholder(geminiKey)) {
     keysToTry.push({ key: geminiKey, name: "Primary" });
   }
-  if (geminiKey2) {
+  if (geminiKey2 && !isPlaceholder(geminiKey2)) {
     keysToTry.push({ key: geminiKey2, name: "Backup" });
   }
 
@@ -238,7 +244,7 @@ async function streamGemini(messages: any[], systemInstruction: string, temperat
   };
 
   if (keysToTry.length === 0) {
-    console.warn("No Gemini API keys defined. Falling back directly to ExeAI (Cerebras)...");
+    console.warn("No valid Gemini API keys defined. Falling back directly to ExeAI (Cerebras)...");
     try {
       res.write(`data: ${JSON.stringify({ text: "*(System did not detect Google API Key, dynamically redirecting to ExeAI Engine...)*\n\n" })}\n\n`);
       await runCerebrasModel("gemma-4-31b", messages, systemInstruction, temperature, res);
@@ -263,22 +269,38 @@ async function streamGemini(messages: any[], systemInstruction: string, temperat
     });
 
     if (isBackup) {
-      res.write(`data: ${JSON.stringify({ text: "*(Primary API Key quota reached, connecting to Backup API Key...)*\n\n" })}\n\n`);
+      res.write(`data: ${JSON.stringify({ text: "*(Primary API Key exhausted or invalid, connecting to Backup API Key / Option 2...)*\n\n" })}\n\n`);
     }
 
     try {
       await runGeminiModel(ai, "gemini-3.5-flash", contents, config, webSearchEnabled, res);
       return;
     } catch (err1: any) {
-      const errStr1 = String(err1.message || JSON.stringify(err1));
+      const errStr1 = String(err1.message || JSON.stringify(err1)).toLowerCase();
       console.warn(`gemini-3.5-flash failed with Key ${name}:`, errStr1);
+      
+      const isSevereKeyError = errStr1.includes("not valid") || 
+                               errStr1.includes("invalid") || 
+                               errStr1.includes("expired") || 
+                               errStr1.includes("key_invalid") || 
+                               errStr1.includes("unauthorized") || 
+                               errStr1.includes("forbidden") || 
+                               errStr1.includes("quota") || 
+                               errStr1.includes("exhausted") || 
+                               errStr1.includes("429") || 
+                               errStr1.includes("limit");
+
+      if (isSevereKeyError && i < keysToTry.length - 1) {
+        console.log(`Severe key error with ${name} key. Immediately switching to Backup Key...`);
+        continue;
+      }
       
       try {
         res.write(`data: ${JSON.stringify({ text: "*(Activating power saving mode and switching to Gemini Flash Lite engine...)*\n\n" })}\n\n`);
         await runGeminiModel(ai, "gemini-3.1-flash-lite", contents, config, webSearchEnabled, res);
         return;
       } catch (err2: any) {
-        const errStr2 = String(err2.message || JSON.stringify(err2));
+        const errStr2 = String(err2.message || JSON.stringify(err2)).toLowerCase();
         console.warn(`gemini-3.1-flash-lite failed with Key ${name}:`, errStr2);
         
         if (i < keysToTry.length - 1) {

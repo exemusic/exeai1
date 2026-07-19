@@ -4,6 +4,7 @@ export interface Message {
   content: string;
   timestamp: number;
   thinkingDuration?: number;
+  isPending?: boolean;
   attachment?: {
     type: "audio" | "image" | "file";
     name: string;
