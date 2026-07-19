@@ -1338,19 +1338,39 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
   };
 
   const parseMessageThinking = (content: string) => {
-    const trimmed = content.trim();
-    if (trimmed.startsWith("<think>")) {
-      const closeIndex = trimmed.indexOf("</think>");
-      if (closeIndex !== -1) {
-        const thinking = trimmed.substring(7, closeIndex).trim();
-        const actual = trimmed.substring(closeIndex + 8).trim();
-        return { thinking, actual, isThinking: false };
-      } else {
-        const thinking = trimmed.substring(7).trim();
-        return { thinking, actual: "", isThinking: true };
-      }
+    if (!content) return { thinking: null, actual: "", isThinking: false };
+
+    // Case-insensitive regex to find <think>...</think>
+    const thinkRegex = /<think>([\s\S]*?)<\/think>/gi;
+    const match = thinkRegex.exec(content);
+
+    if (match) {
+      const thinking = match[1].trim();
+      // Remove all <think>...</think> blocks from actual content to be absolutely sure they never leak
+      const actual = content.replace(thinkRegex, "").trim();
+      return { thinking, actual, isThinking: false };
     }
-    return { thinking: null, actual: content, isThinking: false };
+
+    // If there is an open <think> but no closing </think> (streaming)
+    const openThinkRegex = /<think>([\s\S]*?)$/i;
+    const openMatch = openThinkRegex.exec(content);
+    if (openMatch) {
+      const thinking = openMatch[1].trim();
+      const actual = content.replace(openThinkRegex, "").trim();
+      return { thinking, actual, isThinking: true };
+    }
+
+    // Check if the content ends with a partial <think tag to prevent temporary flickering of partial tag
+    const partialThinkRegex = /<t(h(i(n(k)?)?)?)?$/i;
+    if (partialThinkRegex.test(content)) {
+      return { thinking: "", actual: content.replace(partialThinkRegex, "").trim(), isThinking: true };
+    }
+
+    // Just in case there is any stray/orphaned </think> or <think> in the text, clean them up
+    let cleaned = content;
+    cleaned = cleaned.replace(/<\/?think>/gi, "");
+
+    return { thinking: null, actual: cleaned.trim(), isThinking: false };
   };
 
   const extractUpdatedFilesFromContent = (text: string): string[] => {

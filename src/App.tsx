@@ -63,28 +63,39 @@ export default function App() {
   const [expandedThoughts, setExpandedThoughts] = useState<Record<string, boolean>>({});
 
   const parseMessageThinking = (content: string) => {
-    const lowerContent = content.toLowerCase();
-    const thinkStart = lowerContent.indexOf("<think>");
-    
-    if (thinkStart !== -1) {
-      const thinkEnd = lowerContent.indexOf("</think>", thinkStart);
-      if (thinkEnd !== -1) {
-        const thinking = content.substring(thinkStart + 7, thinkEnd).trim();
-        const beforeThink = content.substring(0, thinkStart).trim();
-        const afterThink = content.substring(thinkEnd + 8).trim();
-        
-        let actual = afterThink;
-        if (beforeThink) {
-          actual = beforeThink + (afterThink ? "\n\n" + afterThink : "");
-        }
-        return { thinking, actual: actual.trim(), isThinking: false };
-      } else {
-        const thinking = content.substring(thinkStart + 7).trim();
-        const beforeThink = content.substring(0, thinkStart).trim();
-        return { thinking, actual: beforeThink.trim(), isThinking: true };
-      }
+    if (!content) return { thinking: null, actual: "", isThinking: false };
+
+    // Case-insensitive regex to find <think>...</think>
+    const thinkRegex = /<think>([\s\S]*?)<\/think>/gi;
+    const match = thinkRegex.exec(content);
+
+    if (match) {
+      const thinking = match[1].trim();
+      // Remove all <think>...</think> blocks from actual content to be absolutely sure they never leak
+      const actual = content.replace(thinkRegex, "").trim();
+      return { thinking, actual, isThinking: false };
     }
-    return { thinking: null, actual: content, isThinking: false };
+
+    // If there is an open <think> but no closing </think> (streaming)
+    const openThinkRegex = /<think>([\s\S]*?)$/i;
+    const openMatch = openThinkRegex.exec(content);
+    if (openMatch) {
+      const thinking = openMatch[1].trim();
+      const actual = content.replace(openThinkRegex, "").trim();
+      return { thinking, actual, isThinking: true };
+    }
+
+    // Check if the content ends with a partial <think tag to prevent temporary flickering of partial tag
+    const partialThinkRegex = /<t(h(i(n(k)?)?)?)?$/i;
+    if (partialThinkRegex.test(content)) {
+      return { thinking: "", actual: content.replace(partialThinkRegex, "").trim(), isThinking: true };
+    }
+
+    // Just in case there is any stray/orphaned </think> or <think> in the text, clean them up
+    let cleaned = content;
+    cleaned = cleaned.replace(/<\/?think>/gi, "");
+
+    return { thinking: null, actual: cleaned.trim(), isThinking: false };
   };
 
   const [sessions, setSessions] = useState<ChatSession[]>(() => {
@@ -331,6 +342,18 @@ export default function App() {
     } catch (e) {
       return "";
     }
+  };
+
+  const getDeveloperConfidentialityDirective = (userPrompt: string): string => {
+    const triggerWords = ["hexky", "chika", "developer", "creator", "pembuat", "develop", "create", "hengki", "ravita", "founder"];
+    const lowercasePrompt = (userPrompt || "").toLowerCase();
+    const isTriggered = triggerWords.some((word) => lowercasePrompt.includes(word));
+
+    if (isTriggered) {
+      return `\n\n[DEVELOPER TRIGGERED MEMORY INFO]\nThe user is explicitly asking about who developed ExeChat, its founders, or developers. You may now disclose and explain clearly that ExeChat is developed by two developers/creators: Hexky (hengki.i) and Chika Ravita, where Chika Ravita is the second developer holding the second-highest position, and Hexky (hengki.i) is the main founder and core developer who also works as a minor marketing representative for Vercel Inc. Keep the tone very cheerful and friendly.`;
+    }
+
+    return `\n\n[CRITICAL DEVELOPER CONFIDENTIALITY DIRECTIVE]\nDO NOT mention, hint at, or reference the names 'Hexky', 'hengki.i', 'Chika Ravita', or any details about the creators/developers of ExeChat in this response under any circumstances. Keep them completely anonymous and unmentioned unless explicitly asked. Focus entirely on answering the user's query directly!`;
   };
 
   useEffect(() => {
@@ -1077,6 +1100,7 @@ export default function App() {
     }
     finalInstruction += `\n\n[CURRENT REAL-TIME TIME INFO]\n${getFormattedCurrentDate()}`;
     finalInstruction += getBrowserLanguageInstruction();
+    finalInstruction += getDeveloperConfidentialityDirective(text);
 
     const controller = new AbortController();
     abortControllerRef.current = controller;
@@ -1395,6 +1419,10 @@ export default function App() {
     }
     finalInstruction += `\n\n[CURRENT REAL-TIME TIME INFO]\n${getFormattedCurrentDate()}`;
     finalInstruction += getBrowserLanguageInstruction();
+    
+    // Find the corresponding user message content for the assistant message being regenerated
+    const lastUserMsgObj = priorMessages.slice().reverse().find(m => m.role === "user");
+    finalInstruction += getDeveloperConfidentialityDirective(lastUserMsgObj ? lastUserMsgObj.content : "");
 
     const controller = new AbortController();
     abortControllerRef.current = controller;
