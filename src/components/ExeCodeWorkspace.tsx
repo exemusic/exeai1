@@ -190,7 +190,18 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
   
   const [activeFilePath, setActiveFilePath] = useState<string>("index.html");
   const [projectName, setProjectName] = useState<string>(() => {
-    return localStorage.getItem("execode_project_name") || "ExeCode Project";
+    let persistentId = localStorage.getItem("execode_persistent_project_id");
+    if (!persistentId) {
+      const existingName = localStorage.getItem("execode_project_name");
+      if (existingName && existingName !== "ExeCode Project" && existingName.trim().length > 0) {
+        persistentId = existingName.replace(/[^a-zA-Z0-9-_]/g, "");
+      } else {
+        persistentId = "proj-" + Math.random().toString(36).substring(2, 10);
+      }
+      localStorage.setItem("execode_persistent_project_id", persistentId);
+    }
+    localStorage.setItem("execode_project_name", persistentId);
+    return persistentId;
   });
 
   const [selectedModel, setSelectedModel] = useState<string>(() => {
@@ -432,6 +443,7 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
 
   useEffect(() => {
     localStorage.setItem("execode_project_name", projectName);
+    localStorage.setItem("execode_persistent_project_id", projectName);
   }, [projectName]);
 
   useEffect(() => {
@@ -569,55 +581,65 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
       })
       .catch(err => console.warn("Failed to fetch cloud configuration:", err));
 
-    const match = window.location.pathname.match(/^\/project\/([^/]+)/);
-    if (match) {
-      const projectId = decodeURIComponent(match[1]);
-      setProjectName(projectId);
-      
-      triggerStatus(`Connecting to Cloud Sandbox...`, "info");
-      
-      fetch("/api/supabase/load", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          projectName: projectId,
-          bucket: "execode"
-        })
-      })
-      .then(res => {
-        if (!res.ok) throw new Error("Project not found in the cloud.");
-        return res.json();
-      })
-      .then(data => {
-        if (data.files && data.files.length > 0) {
-          setFiles(data.files);
-          setActiveFilePath("index.html");
-          refreshPreview(data.files);
-          triggerStatus(`Successfully loaded '${projectId}' from cloud!`, "success");
-        } else {
-          refreshPreview(initialFiles);
-          triggerStatus(`Project '${projectId}' is empty or has no files yet.`, "info");
-        }
-      })
-      .catch(err => {
-        console.warn(err);
-        refreshPreview(initialFiles);
-        triggerStatus(`Project '${projectId}' is not saved in the cloud yet or the name is incorrect.`, "info");
-      });
-    } else {
-      const randomId = "proj-" + Math.random().toString(36).substring(2, 10);
-      setProjectName(randomId);
-      window.history.pushState(null, "", `/project/${randomId}`);
-      refreshPreview(initialFiles);
-      triggerStatus(`Creating New Sandbox: ${randomId}`, "success");
+    let persistentId = localStorage.getItem("execode_persistent_project_id");
+    if (!persistentId) {
+      const existingName = localStorage.getItem("execode_project_name");
+      if (existingName && existingName !== "ExeCode Project" && existingName.trim().length > 0) {
+        persistentId = existingName.replace(/[^a-zA-Z0-9-_]/g, "");
+      } else {
+        persistentId = "proj-" + Math.random().toString(36).substring(2, 10);
+      }
+      localStorage.setItem("execode_persistent_project_id", persistentId);
     }
+    localStorage.setItem("execode_project_name", persistentId);
+
+    const match = window.location.pathname.match(/^\/project\/([^/]+)/);
+    const targetProjectName = match ? decodeURIComponent(match[1]) : persistentId;
+
+    setProjectName(targetProjectName);
+    if (!match) {
+      window.history.pushState(null, "", `/project/${targetProjectName}`);
+    }
+
+    triggerStatus(`Connecting to Cloud Sandbox...`, "info");
+    
+    fetch("/api/supabase/load", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        projectName: targetProjectName,
+        bucket: "execode"
+      })
+    })
+    .then(res => {
+      if (!res.ok) throw new Error("Project not found in the cloud.");
+      return res.json();
+    })
+    .then(data => {
+      if (data.files && data.files.length > 0) {
+        setFiles(data.files);
+        setActiveFilePath("index.html");
+        refreshPreview(data.files);
+        triggerStatus(`Successfully loaded '${targetProjectName}' from cloud!`, "success");
+      } else {
+        refreshPreview(initialFiles);
+        triggerStatus(`Project connected. Ready to code!`, "success");
+      }
+    })
+    .catch(err => {
+      console.warn(err);
+      refreshPreview(initialFiles);
+      triggerStatus(`Connected. Start editing and save your changes.`, "success");
+    });
   }, []);
 
   const handleProjectNameChange = (newName: string) => {
     const sanitized = newName.replace(/[^a-zA-Z0-9-_]/g, "");
     setProjectName(sanitized);
+    localStorage.setItem("execode_persistent_project_id", sanitized);
+    localStorage.setItem("execode_project_name", sanitized);
     window.history.replaceState(null, "", `/project/${sanitized}`);
   };
 
