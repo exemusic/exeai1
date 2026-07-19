@@ -59,6 +59,7 @@ interface ChatMessage {
   filesSnapshot?: VirtualFile[];
   modelId?: string;
   thinkingDuration?: number;
+  editedPaths?: string[];
 }
 
 interface ToastMessage {
@@ -1349,7 +1350,8 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
                          editedFiles.map(f => `• \`${f.path}\``).join("\n"), 
                 filesSnapshot: oldFiles,
                 thinkingDuration: finalDur,
-                modelId: selectedModel
+                modelId: selectedModel,
+                editedPaths: editedFiles.map(f => f.path)
               } 
             : msg
         ));
@@ -1546,8 +1548,11 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
   };
 
   const extractUpdatedFilesFromContent = (text: string): string[] => {
-    const lines = text.split("\n");
+    if (!text) return [];
     const foundFiles: string[] = [];
+    
+    // 1. Match standard bullet list under **Updated files:** header
+    const lines = text.split("\n");
     let startCollecting = false;
     for (const line of lines) {
       if (line.includes("**Updated files:**") || line.includes("Updated files:")) {
@@ -1555,12 +1560,40 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
         continue;
       }
       if (startCollecting) {
-        const match = line.match(/•\s*`([^`]+)`/) || line.match(/-\s*`([^`]+)`/);
+        const match = line.match(/(?:•|-|\*)\s*`([^`]+)`/) || line.match(/`([^`]+)`/);
         if (match) {
-          foundFiles.push(match[1]);
+          const fPath = match[1].trim();
+          if (fPath && !foundFiles.includes(fPath)) {
+            foundFiles.push(fPath);
+          }
         }
       }
     }
+    
+    if (foundFiles.length > 0) {
+      return foundFiles;
+    }
+    
+    // 2. Try JSON block extraction (extremely robust!)
+    try {
+      const jsonFiles = tryExtractJsonArray(text);
+      if (jsonFiles && jsonFiles.length > 0) {
+        return jsonFiles.map(f => f.path);
+      }
+    } catch (e) {}
+    
+    // 3. Fallback: Parse any markdown code block names or files mentioned inside backticks
+    try {
+      const fileRegex = /\b([a-zA-Z0-9_-]+\.(?:html|css|js|json|tsx|ts))\b/gi;
+      let match;
+      while ((match = fileRegex.exec(text)) !== null) {
+        const fPath = match[1];
+        if (!foundFiles.includes(fPath)) {
+          foundFiles.push(fPath);
+        }
+      }
+    } catch (e) {}
+    
     return foundFiles;
   };
 
@@ -1572,7 +1605,7 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
     const msgModelId = msg?.modelId || selectedModel;
     const msgModelName = MODEL_OPTIONS.find(m => m.id === msgModelId)?.name || "ExeAi";
     
-    const updatedFiles = msg ? extractUpdatedFilesFromContent(msg.content) : [];
+    const updatedFiles = msg?.editedPaths || (msg ? extractUpdatedFilesFromContent(msg.content) : []);
 
     return (
       <div className="flex flex-col gap-2.5 w-full max-w-full overflow-hidden text-xs">
@@ -2511,7 +2544,7 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
                             : "bg-amber-500/10 text-amber-500 border-amber-500/30 hover:bg-amber-500/20"
                         }`}
                       >
-                        {isEditingCode ? "💾 View Highlighted" : "✏️ Edit Code"}
+                        {isEditingCode ? "💾 View" : "✏️ Edit"}
                       </button>
                       <span className="text-[9px] font-mono text-emerald-500 bg-emerald-500/10 px-2 py-1 rounded-full border border-emerald-500/25 flex items-center gap-1 shrink-0 hidden sm:flex">
                         <span className="h-1.5 w-1.5 bg-emerald-500 rounded-full animate-ping" />
