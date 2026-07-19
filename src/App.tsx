@@ -453,6 +453,11 @@ export default function App() {
   const [hasApiKey, setHasApiKey] = useState<boolean | null>(null);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [isDesktopSidebarOpen, setIsDesktopSidebarOpen] = useState(false); 
+  const [isHistoryCollapsed, setIsHistoryCollapsed] = useState(false);
+  const [showAllHistory, setShowAllHistory] = useState(false);
+  const [showSearchModal, setShowSearchModal] = useState(false);
+  const [popupSearchQuery, setPopupSearchQuery] = useState("");
+  const [showProfileMenu, setShowProfileMenu] = useState(false);
 
   const [themeMode, setThemeMode] = useState<"system" | "dark" | "light">(() => {
     return (localStorage.getItem("exechat_theme_mode") as any) || "dark";
@@ -466,6 +471,17 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem("exechat_theme_mode", themeMode);
   }, [themeMode]);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setShowSearchModal(false);
+        setPopupSearchQuery("");
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -1941,33 +1957,23 @@ export default function App() {
 
   const groupSessionsByDate = (sessionsToGroup: ChatSession[]) => {
     const today: ChatSession[] = [];
-    const yesterday: ChatSession[] = [];
-    const previous7Days: ChatSession[] = [];
-    const older: ChatSession[] = [];
+    const earlier: ChatSession[] = [];
 
     const now = new Date();
     const todayMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-    const yesterdayMidnight = todayMidnight - 24 * 60 * 60 * 1000;
-    const sevenDaysAgoMidnight = todayMidnight - 6 * 24 * 60 * 60 * 1000;
 
     sessionsToGroup.forEach((s) => {
       const createdAt = s.createdAt || Date.now();
       if (createdAt >= todayMidnight) {
         today.push(s);
-      } else if (createdAt >= yesterdayMidnight) {
-        yesterday.push(s);
-      } else if (createdAt >= sevenDaysAgoMidnight) {
-        previous7Days.push(s);
       } else {
-        older.push(s);
+        earlier.push(s);
       }
     });
 
     const categories: { label: string; items: ChatSession[] }[] = [];
     if (today.length > 0) categories.push({ label: "Today", items: today });
-    if (yesterday.length > 0) categories.push({ label: "Yesterday", items: yesterday });
-    if (previous7Days.length > 0) categories.push({ label: "Previous 7 Days", items: previous7Days });
-    if (older.length > 0) categories.push({ label: "Older", items: older });
+    if (earlier.length > 0) categories.push({ label: "Earlier", items: earlier });
 
     return categories;
   };
@@ -2078,147 +2084,195 @@ export default function App() {
       </div>
 
       <div className="flex-1 overflow-y-auto px-2 py-2 scrollbar-thin">
+        {/* Toggleable Collapsible Header */}
+        <div className="px-3 py-1.5 flex items-center justify-between select-none">
+          <button
+            onClick={() => setIsHistoryCollapsed(!isHistoryCollapsed)}
+            className={`flex items-center gap-1 text-xs font-bold uppercase tracking-wider transition-colors hover:opacity-85 ${
+              isDark ? "text-zinc-400 hover:text-zinc-200" : "text-zinc-650 hover:text-zinc-900"
+            }`}
+          >
+            <span>History</span>
+            {isHistoryCollapsed ? (
+              <ChevronRight className="h-3.5 w-3.5 shrink-0" />
+            ) : (
+              <ChevronDown className="h-3.5 w-3.5 shrink-0" />
+            )}
+          </button>
+        </div>
+
         <AnimatePresence initial={false}>
-          {filteredSessions.length === 0 ? (
-            <div className={`text-center py-8 text-xs ${isDark ? "text-zinc-600" : "text-zinc-400"}`}>
-              {searchQuery ? "No search results found." : "No chat history yet."}
-            </div>
-          ) : (
-            groupSessionsByDate(filteredSessions).map((cat) => (
-              <div key={cat.label} className="mb-4 last:mb-0">
-                <div className={`px-3 py-2 text-[11px] font-semibold uppercase tracking-wider select-none ${isDark ? "text-zinc-500" : "text-zinc-400"}`}>
-                  {cat.label}
+          {!isHistoryCollapsed && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: "auto", opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="overflow-hidden"
+            >
+              {filteredSessions.length === 0 ? (
+                <div className={`text-center py-8 text-xs ${isDark ? "text-zinc-600" : "text-zinc-400"}`}>
+                  {searchQuery ? "No search results found." : "No chat history yet."}
                 </div>
-                <div className="space-y-0.5 mt-1">
-                  {cat.items.map((s) => {
-                    const isActive = s.id === currentSessionId;
-                    const isEditing = s.id === editingSessionId;
-                    const isMenuOpen = s.id === openMenuSessionId;
-
+              ) : (
+                <>
+                  {groupSessionsByDate(filteredSessions).map((cat) => {
+                    const displayedItems = showAllHistory ? cat.items : cat.items.slice(0, 4);
                     return (
-                      <motion.div
-                        key={s.id}
-                        initial={{ opacity: 0, y: 5 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, scale: 0.95 }}
-                        onClick={() => {
-                          if (!isEditing) {
-                            playNotifySound();
-                            setCurrentSessionId(s.id);
-                            setShowSettings(false);
-                            setErrorText(null);
-                            setOpenMenuSessionId(null);
-                            if (isMobile) setIsMobileSidebarOpen(false);
-                          }
-                        }}
-                        className={`group relative flex items-center justify-between rounded-xl p-2.5 cursor-pointer text-sm transition-all duration-200 select-none border ${
-                          isActive
-                            ? isDark
-                              ? "bg-zinc-800 border-zinc-700/50 text-zinc-100 font-medium"
-                              : "bg-zinc-100 border-zinc-200 text-zinc-900 font-medium shadow-sm"
-                            : isDark
-                              ? "border-transparent text-zinc-400 hover:bg-zinc-850 hover:text-zinc-200"
-                              : "border-transparent text-zinc-650 hover:bg-zinc-100/60 hover:text-zinc-900"
-                        }`}
-                      >
-                        <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                          <MessageSquare
-                            className={`h-4 w-4 shrink-0 transition-colors ${
-                              isActive 
-                                ? isDark ? "text-zinc-300" : "text-zinc-700" 
-                                : isDark ? "text-zinc-500 group-hover:text-zinc-400" : "text-zinc-400 group-hover:text-zinc-600"
-                            }`}
-                          />
-                          {isEditing ? (
-                            <form
-                              onSubmit={(e) => saveRenameSession(s.id, e)}
-                              className="flex-1 min-w-0"
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              <input
-                                type="text"
-                                value={editTitleInput}
-                                onChange={(e) => setEditTitleInput(e.target.value)}
-                                onBlur={() => saveRenameSession(s.id)}
-                                autoFocus
-                                className={`w-full rounded px-2 py-1 text-sm focus:outline-none border ${
-                                  isDark 
-                                    ? "bg-zinc-950 border-zinc-800 text-zinc-100 focus:border-zinc-750" 
-                                    : "bg-white border-zinc-300 text-zinc-900 focus:border-zinc-400"
-                                }`}
-                              />
-                            </form>
-                          ) : (
-                            <div className="truncate flex-1 pr-6 font-medium">
-                              {s.title}
-                            </div>
-                          )}
+                      <div key={cat.label} className="mb-4 last:mb-0">
+                        <div className={`px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wider select-none ${isDark ? "text-zinc-500" : "text-zinc-400"}`}>
+                          {cat.label}
                         </div>
+                        <div className="space-y-0.5 mt-1">
+                          {displayedItems.map((s) => {
+                            const isActive = s.id === currentSessionId;
+                            const isEditing = s.id === editingSessionId;
+                            const isMenuOpen = s.id === openMenuSessionId;
 
-                        {!isEditing && (
-                          <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center z-10">
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setOpenMenuSessionId(isMenuOpen ? null : s.id);
-                              }}
-                              className={`p-1 rounded transition-all duration-200 ${
-                                isMenuOpen ? "opacity-100" : "opacity-0 group-hover:opacity-100"
-                              } ${
-                                isDark 
-                                  ? "hover:bg-zinc-700 text-zinc-400 hover:text-zinc-200" 
-                                  : "hover:bg-zinc-200 text-zinc-500 hover:text-zinc-800"
-                              }`}
-                              title="Options"
-                            >
-                              <MoreHorizontal className="h-4 w-4" />
-                            </button>
-
-                            {isMenuOpen && (
-                              <div
-                                className={`absolute right-0 top-7 w-32 rounded-lg shadow-xl border z-50 py-1 ${
-                                  isDark 
-                                    ? "bg-zinc-900 border-zinc-800 text-zinc-300" 
-                                    : "bg-white border-zinc-200 text-zinc-700"
+                            return (
+                              <motion.div
+                                key={s.id}
+                                initial={{ opacity: 0, y: 5 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, scale: 0.95 }}
+                                onClick={() => {
+                                  if (!isEditing) {
+                                    playNotifySound();
+                                    setCurrentSessionId(s.id);
+                                    setShowSettings(false);
+                                    setErrorText(null);
+                                    setOpenMenuSessionId(null);
+                                    if (isMobile) setIsMobileSidebarOpen(false);
+                                  }
+                                }}
+                                className={`group relative flex items-center justify-between rounded-xl p-2.5 cursor-pointer text-sm transition-all duration-200 select-none border ${
+                                  isActive
+                                    ? isDark
+                                      ? "bg-zinc-800 border-zinc-700/50 text-zinc-100 font-medium"
+                                      : "bg-zinc-100 border-zinc-200 text-zinc-900 font-medium shadow-sm"
+                                    : isDark
+                                      ? "border-transparent text-zinc-400 hover:bg-zinc-850 hover:text-zinc-200"
+                                      : "border-transparent text-zinc-650 hover:bg-zinc-100/60 hover:text-zinc-900"
                                 }`}
-                                onClick={(e) => e.stopPropagation()}
                               >
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setOpenMenuSessionId(null);
-                                    startRenameSession(s.id, s.title, e);
-                                  }}
-                                  className={`w-full text-left px-3 py-2 text-xs md:text-[13px] font-medium flex items-center gap-2 transition-colors ${
-                                    isDark ? "hover:bg-zinc-800 hover:text-white" : "hover:bg-zinc-100 hover:text-zinc-900"
-                                  }`}
-                                >
-                                  <Edit2 className="h-3.5 w-3.5" />
-                                  Rename
-                                </button>
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setOpenMenuSessionId(null);
-                                    deleteSession(s.id, e);
-                                  }}
-                                  className={`w-full text-left px-3 py-2 text-xs md:text-[13px] font-medium flex items-center gap-2 text-red-500 transition-colors ${
-                                    isDark ? "hover:bg-zinc-800/80 hover:text-red-400" : "hover:bg-red-50 hover:text-red-600"
-                                  }`}
-                                >
-                                  <Trash2 className="h-3.5 w-3.5" />
-                                  Delete
-                                </button>
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </motion.div>
+                                <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                                  <MessageSquare
+                                    className={`h-4 w-4 shrink-0 transition-colors ${
+                                      isActive 
+                                        ? isDark ? "text-zinc-300" : "text-zinc-700" 
+                                        : isDark ? "text-zinc-500 group-hover:text-zinc-400" : "text-zinc-400 group-hover:text-zinc-600"
+                                    }`}
+                                  />
+                                  {isEditing ? (
+                                    <form
+                                      onSubmit={(e) => saveRenameSession(s.id, e)}
+                                      className="flex-1 min-w-0"
+                                      onClick={(e) => e.stopPropagation()}
+                                    >
+                                      <input
+                                        type="text"
+                                        value={editTitleInput}
+                                        onChange={(e) => setEditTitleInput(e.target.value)}
+                                        onBlur={() => saveRenameSession(s.id)}
+                                        autoFocus
+                                        className={`w-full rounded px-2 py-1 text-sm focus:outline-none border ${
+                                          isDark 
+                                            ? "bg-zinc-950 border-zinc-800 text-zinc-100 focus:border-zinc-750" 
+                                            : "bg-white border-zinc-300 text-zinc-900 focus:border-zinc-400"
+                                        }`}
+                                      />
+                                    </form>
+                                  ) : (
+                                    <div className="truncate flex-1 pr-6 font-medium">
+                                      {s.title}
+                                    </div>
+                                  )}
+                                </div>
+
+                                {!isEditing && (
+                                  <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center z-10">
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setOpenMenuSessionId(isMenuOpen ? null : s.id);
+                                      }}
+                                      className={`p-1 rounded transition-all duration-200 ${
+                                        isMenuOpen ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                                      } ${
+                                        isDark 
+                                          ? "hover:bg-zinc-700 text-zinc-400 hover:text-zinc-200" 
+                                          : "hover:bg-zinc-200 text-zinc-500 hover:text-zinc-800"
+                                      }`}
+                                      title="Options"
+                                    >
+                                      <MoreHorizontal className="h-4 w-4" />
+                                    </button>
+
+                                    {isMenuOpen && (
+                                      <div
+                                        className={`absolute right-0 top-7 w-32 rounded-lg shadow-xl border z-50 py-1 ${
+                                          isDark 
+                                            ? "bg-zinc-900 border-zinc-800 text-zinc-300" 
+                                            : "bg-white border-zinc-200 text-zinc-700"
+                                        }`}
+                                        onClick={(e) => e.stopPropagation()}
+                                      >
+                                        <button
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            setOpenMenuSessionId(null);
+                                            startRenameSession(s.id, s.title, e);
+                                          }}
+                                          className={`w-full text-left px-3 py-2 text-xs md:text-[13px] font-medium flex items-center gap-2 transition-colors ${
+                                            isDark ? "hover:bg-zinc-800 hover:text-white" : "hover:bg-zinc-100 hover:text-zinc-900"
+                                          }`}
+                                        >
+                                          <Edit2 className="h-3.5 w-3.5" />
+                                          Rename
+                                        </button>
+                                        <button
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            setOpenMenuSessionId(null);
+                                            deleteSession(s.id, e);
+                                          }}
+                                          className={`w-full text-left px-3 py-2 text-xs md:text-[13px] font-medium flex items-center gap-2 text-red-500 transition-colors ${
+                                            isDark ? "hover:bg-zinc-800/80 hover:text-red-400" : "hover:bg-red-50 hover:text-red-600"
+                                          }`}
+                                        >
+                                          <Trash2 className="h-3.5 w-3.5" />
+                                          Delete
+                                        </button>
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+                              </motion.div>
+                            );
+                          })}
+                        </div>
+                      </div>
                     );
                   })}
-                </div>
-              </div>
-            ))
+
+                  {/* See all clickable text */}
+                  {filteredSessions.length > 0 && (
+                    <div className="px-3 py-2">
+                      <button
+                        onClick={() => {
+                          setShowAllHistory(true);
+                          setShowSearchModal(true);
+                          playNotifySound();
+                        }}
+                        className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 hover:text-[#1a73e8] dark:hover:text-[#59a6ff] hover:underline transition-all cursor-pointer"
+                      >
+                        See all
+                      </button>
+                    </div>
+                  )}
+                </>
+              )}
+            </motion.div>
           )}
         </AnimatePresence>
       </div>
@@ -2365,6 +2419,16 @@ export default function App() {
 
             <button
               onClick={() => {
+                setShowSearchModal(true);
+              }}
+              className={`p-2.5 rounded-xl hover:bg-zinc-500/10 transition-all duration-200 ${resolvedTheme === "dark" ? "text-zinc-400 hover:text-white" : "text-zinc-600 hover:text-zinc-900"}`}
+              title="Search Chat"
+            >
+              <Search className="h-4.5 w-4.5" />
+            </button>
+
+            <button
+              onClick={() => {
                 setShowExeCode(prev => !prev);
                 setShowSettings(false);
               }}
@@ -2394,27 +2458,80 @@ export default function App() {
             </button>
           </div>
 
-          <div className="flex flex-col items-center gap-4">
+          <div className="flex flex-col items-center gap-4 relative">
             <div className="relative">
               {isLoggedIn ? (
-                userPhoto ? (
-                  <img
-                    onClick={() => setShowSettings(true)}
-                    src={userPhoto}
-                    alt="Profile"
-                    referrerPolicy="no-referrer"
-                    className="h-8 w-8 rounded-full object-cover border border-zinc-800 shadow-md cursor-pointer hover:scale-105 transition-all"
-                    title="View Profile"
-                  />
-                ) : (
-                  <div 
-                    onClick={() => setShowSettings(true)}
-                    className="h-8 w-8 rounded-full bg-gradient-to-tr from-[#59a6ff] to-[#c084fc] flex items-center justify-center text-xs font-bold text-white shadow-md border border-white/20 cursor-pointer hover:scale-105 transition-all"
-                    title="View Profile"
-                  >
-                    {(userDisplayName || userName || "U").charAt(0).toUpperCase()}
-                  </div>
-                )
+                <>
+                  {userPhoto ? (
+                    <img
+                      onClick={() => setShowProfileMenu(prev => !prev)}
+                      src={userPhoto}
+                      alt="Profile"
+                      referrerPolicy="no-referrer"
+                      className="h-8 w-8 rounded-full object-cover border border-zinc-800 shadow-md cursor-pointer hover:scale-105 transition-all"
+                      title="View Profile"
+                    />
+                  ) : (
+                    <div 
+                      onClick={() => setShowProfileMenu(prev => !prev)}
+                      className="h-8 w-8 rounded-full bg-gradient-to-tr from-[#59a6ff] to-[#c084fc] flex items-center justify-center text-xs font-bold text-white shadow-md border border-white/20 cursor-pointer hover:scale-105 transition-all"
+                      title="View Profile"
+                    >
+                      {(userDisplayName || userName || "U").charAt(0).toUpperCase()}
+                    </div>
+                  )}
+
+                  {/* Profile Menu Dropdown Popup */}
+                  <AnimatePresence>
+                    {showProfileMenu && (
+                      <>
+                        <div className="fixed inset-0 z-40" onClick={() => setShowProfileMenu(false)} />
+                        <motion.div
+                          initial={{ opacity: 0, scale: 0.95, y: 10 }}
+                          animate={{ opacity: 1, scale: 1, y: 0 }}
+                          exit={{ opacity: 0, scale: 0.95, y: 10 }}
+                          className={`absolute bottom-12 left-4 w-48 rounded-2xl border p-1.5 shadow-2xl z-50 transition-all ${
+                            isDark 
+                              ? "bg-zinc-900/95 border-zinc-800 text-zinc-100 backdrop-blur-md" 
+                              : "bg-white/95 border-zinc-250 text-zinc-900 backdrop-blur-md"
+                          }`}
+                        >
+                          <div className="px-3 py-2 border-b border-zinc-800/40 text-xs text-zinc-500 dark:text-zinc-400 truncate">
+                            {userDisplayName || userName || "User"}
+                          </div>
+                          <div className="p-1 space-y-0.5">
+                            <button
+                              onClick={() => {
+                                setShowSettings(true);
+                                setShowProfileMenu(false);
+                              }}
+                              className={`flex items-center gap-2.5 w-full text-left px-3 py-2 text-xs md:text-sm font-medium transition-colors rounded-lg ${
+                                isDark 
+                                  ? "hover:bg-zinc-850 text-zinc-300 hover:text-white" 
+                                  : "hover:bg-zinc-100 text-zinc-700 hover:text-zinc-900"
+                              }`}
+                            >
+                              <Settings className="h-4 w-4 text-zinc-400" />
+                              <span>Settings</span>
+                            </button>
+                            <button
+                              onClick={() => {
+                                handleLogout();
+                                setShowProfileMenu(false);
+                              }}
+                              className={`flex items-center gap-2.5 w-full text-left px-3 py-2 text-xs md:text-sm font-medium transition-colors rounded-lg text-red-500 ${
+                                isDark ? "hover:bg-red-950/20 hover:text-red-400" : "hover:bg-red-50 hover:text-red-600"
+                              }`}
+                            >
+                              <LogOut className="h-4 w-4 text-red-500" />
+                              <span>Sign Out</span>
+                            </button>
+                          </div>
+                        </motion.div>
+                      </>
+                    )}
+                  </AnimatePresence>
+                </>
               ) : (
                 <button
                   onClick={handleGoogleLoginClick}
@@ -3957,6 +4074,130 @@ export default function App() {
                     >
                       Cancel
                     </button>
+                  </div>
+                </motion.div>
+              </div>
+            )}
+          </AnimatePresence>
+
+          {/* SEARCH CHAT POPUP/MODAL */}
+          <AnimatePresence>
+            {showSearchModal && (
+              <div className="fixed inset-0 z-[100] flex items-start justify-center p-4 pt-[10vh]">
+                {/* Backdrop overlay */}
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  onClick={() => {
+                    setShowSearchModal(false);
+                    setPopupSearchQuery("");
+                  }}
+                  className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+                />
+
+                {/* Modal Container */}
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.97, y: -10 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.97, y: -10 }}
+                  transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+                  className={`relative w-full max-w-lg rounded-2xl border shadow-2xl overflow-hidden z-10 transition-all ${
+                    isDark ? "bg-[#1e1f20] border-zinc-800 text-zinc-100" : "bg-white border-zinc-200 text-zinc-900"
+                  }`}
+                >
+                  {/* Search Bar Input Header */}
+                  <div className="relative border-b border-zinc-500/10 p-4">
+                    <Search className="absolute left-7 top-7 h-5 w-5 text-zinc-500" />
+                    <input
+                      type="text"
+                      value={popupSearchQuery}
+                      onChange={(e) => setPopupSearchQuery(e.target.value)}
+                      placeholder="Search for conversations..."
+                      className={`w-full pl-11 pr-10 py-3 rounded-xl text-base transition-all duration-200 focus:outline-none border ${
+                        isDark 
+                          ? "border-zinc-800 bg-zinc-950/45 text-zinc-100 placeholder-zinc-600 focus:border-zinc-700 focus:bg-zinc-950/70" 
+                          : "border-zinc-200 bg-zinc-50 text-zinc-900 placeholder-zinc-400 focus:border-zinc-300 focus:bg-white"
+                      }`}
+                      autoFocus
+                    />
+                    {popupSearchQuery ? (
+                      <button
+                        onClick={() => setPopupSearchQuery("")}
+                        className={`absolute right-7 top-7 transition-colors ${isDark ? "hover:text-zinc-300 text-zinc-500" : "hover:text-zinc-700 text-zinc-400"}`}
+                      >
+                        <X className="h-5 w-5" />
+                      </button>
+                    ) : (
+                      <kbd className="absolute right-7 top-7 text-[10px] font-mono px-1.5 py-0.5 rounded border border-zinc-500/25 text-zinc-500 bg-zinc-500/5 select-none">
+                        ESC
+                      </kbd>
+                    )}
+                  </div>
+
+                  {/* Results List Area */}
+                  <div className="max-h-[380px] overflow-y-auto p-2 scrollbar-thin space-y-0.5">
+                    {(() => {
+                      const popupFiltered = sessions.filter((s) =>
+                        s.title.toLowerCase().includes(popupSearchQuery.toLowerCase())
+                      );
+
+                      if (popupFiltered.length === 0) {
+                        return (
+                          <div className={`text-center py-12 text-sm ${isDark ? "text-zinc-500" : "text-zinc-400"}`}>
+                            No conversations found for "{popupSearchQuery}"
+                          </div>
+                        );
+                      }
+
+                      return (
+                        <>
+                          <div className={`px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider select-none ${isDark ? "text-zinc-500" : "text-zinc-400"}`}>
+                            {popupSearchQuery ? "Matching Conversations" : "Recent Conversations"}
+                          </div>
+                          {popupFiltered.map((s) => {
+                            const isActive = s.id === currentSessionId;
+                            return (
+                              <div
+                                key={s.id}
+                                onClick={() => {
+                                  playNotifySound();
+                                  setCurrentSessionId(s.id);
+                                  setShowSettings(false);
+                                  setShowSearchModal(false);
+                                  setPopupSearchQuery("");
+                                }}
+                                className={`flex items-center justify-between rounded-xl p-3 cursor-pointer text-sm transition-all duration-150 select-none border ${
+                                  isActive
+                                    ? isDark
+                                      ? "bg-zinc-800 border-zinc-700 text-zinc-100 font-medium"
+                                      : "bg-zinc-100 border-zinc-250 text-zinc-900 font-medium shadow-sm"
+                                    : isDark
+                                      ? "border-transparent text-zinc-300 hover:bg-zinc-850 hover:text-white"
+                                      : "border-transparent text-zinc-700 hover:bg-zinc-50 hover:text-zinc-900"
+                                }`}
+                              >
+                                <div className="flex items-center gap-3 min-w-0 flex-1">
+                                  <MessageSquare className={`h-4.5 w-4.5 shrink-0 ${isActive ? "text-[#1a73e8]" : "text-zinc-500"}`} />
+                                  <span className="truncate pr-4 font-medium">{s.title}</span>
+                                </div>
+                                <span className={`text-[10px] font-mono shrink-0 ${isDark ? "text-zinc-600" : "text-zinc-400"}`}>
+                                  {new Date(s.createdAt || Date.now()).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </>
+                      );
+                    })()}
+                  </div>
+
+                  {/* Keyboard help footer */}
+                  <div className={`px-4 py-3 border-t text-[11px] flex justify-between select-none ${
+                    isDark ? "bg-zinc-900/40 border-zinc-800/80 text-zinc-500" : "bg-zinc-50/50 border-zinc-150 text-zinc-400"
+                  }`}>
+                    <span>Click on a conversation to jump to it</span>
+                    <span>Press ESC to close</span>
                   </div>
                 </motion.div>
               </div>
