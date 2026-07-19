@@ -250,6 +250,156 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
   const fileUploadRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const activeFile = files.find(f => f.path === activeFilePath) || files[0];
+  const [isEditingCode, setIsEditingCode] = useState<boolean>(false);
+
+  const highlightCode = (code: string, filepath: string) => {
+    const lines = code.split("\n");
+    const ext = filepath.split(".").pop()?.toLowerCase() || "html";
+
+    return lines.map((line, lineIdx) => {
+      if (line === "") {
+        return (
+          <div key={lineIdx} className="h-6 leading-6 text-transparent select-none">
+            &nbsp;
+          </div>
+        );
+      }
+
+      const tokens: React.ReactNode[] = [];
+      let currentPos = 0;
+
+      if (ext === "html") {
+        const htmlRegex = /(<!--[\s\S]*?-->|<\/?[a-zA-Z0-9:-]+(?:\s+[a-zA-Z0-9:-]+(?:=(?:"[^"]*"|'[^']*'|[^\s'">=]+))?)*\s*\/?>)/g;
+        let match;
+        while ((match = htmlRegex.exec(line)) !== null) {
+          if (match.index > currentPos) {
+            tokens.push(
+              <span key={`text-${currentPos}`} className={isDark ? "text-zinc-300" : "text-zinc-850"}>
+                {line.substring(currentPos, match.index)}
+              </span>
+            );
+          }
+
+          const tag = match[1];
+          if (tag.startsWith("<!--")) {
+            tokens.push(
+              <span key={`comment-${match.index}`} className="text-zinc-500 italic">
+                {tag}
+              </span>
+            );
+          } else {
+            const tagParts = tag.split(/(\s+)/);
+            const highlightedTag = tagParts.map((part, pIdx) => {
+              if (pIdx === 0) {
+                return (
+                  <span key={pIdx} className="text-pink-500 font-semibold">
+                    {part}
+                  </span>
+                );
+              } else if (part.includes("=")) {
+                const eqIdx = part.indexOf("=");
+                const attrName = part.substring(0, eqIdx);
+                const attrVal = part.substring(eqIdx);
+                return (
+                  <span key={pIdx}>
+                    <span className="text-amber-500 font-semibold">{attrName}</span>
+                    <span className={isDark ? "text-zinc-400" : "text-zinc-500"}>=</span>
+                    <span className="text-emerald-400 font-medium">{attrVal}</span>
+                  </span>
+                );
+              } else {
+                return (
+                  <span key={pIdx} className={isDark ? "text-zinc-400" : "text-zinc-650"}>
+                    {part}
+                  </span>
+                );
+              }
+            });
+            tokens.push(<span key={`tag-${match.index}`}>{highlightedTag}</span>);
+          }
+          currentPos = htmlRegex.lastIndex;
+        }
+        if (currentPos < line.length) {
+          tokens.push(
+            <span key={`text-end`} className={isDark ? "text-zinc-300" : "text-zinc-850"}>
+              {line.substring(currentPos)}
+            </span>
+          );
+        }
+      } else if (ext === "js" || ext === "json" || ext === "css") {
+        const jsRegex = /(\/\/.*|\/\*[\s\S]*?\*\/|"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|`(?:[^`\\]|\\.)*`|\b(?:const|let|var|function|return|if|else|for|while|import|export|from|default|class|extends|new|this|typeof|null|undefined|true|false)\b|\b\d+\b)/g;
+        let match;
+        while ((match = jsRegex.exec(line)) !== null) {
+          if (match.index > currentPos) {
+            tokens.push(
+              <span key={`text-${currentPos}`} className={isDark ? "text-zinc-300" : "text-zinc-850"}>
+                {line.substring(currentPos, match.index)}
+              </span>
+            );
+          }
+
+          const token = match[1];
+          if (token.startsWith("//") || token.startsWith("/*")) {
+            tokens.push(
+              <span key={`comment-${match.index}`} className="text-zinc-500 italic">
+                {token}
+              </span>
+            );
+          } else if (token.startsWith('"') || token.startsWith("'") || token.startsWith('`')) {
+            tokens.push(
+              <span key={`string-${match.index}`} className="text-emerald-400 font-medium">
+                {token}
+              </span>
+            );
+          } else if (/^(?:const|let|var|function|return|if|else|for|while|import|export|from|default|class|extends|new|this|typeof)\b$/.test(token)) {
+            tokens.push(
+              <span key={`keyword-${match.index}`} className="text-indigo-400 font-semibold">
+                {token}
+              </span>
+            );
+          } else if (/^(?:true|false|null|undefined)\b$/.test(token)) {
+            tokens.push(
+              <span key={`literal-${match.index}`} className="text-amber-500">
+                {token}
+              </span>
+            );
+          } else if (/^\d+$/.test(token)) {
+            tokens.push(
+              <span key={`number-${match.index}`} className="text-purple-400 font-medium">
+                {token}
+              </span>
+            );
+          } else {
+            tokens.push(
+              <span key={`token-${match.index}`} className={isDark ? "text-zinc-300" : "text-zinc-850"}>
+                {token}
+              </span>
+            );
+          }
+          currentPos = jsRegex.lastIndex;
+        }
+        if (currentPos < line.length) {
+          tokens.push(
+            <span key={`text-end`} className={isDark ? "text-zinc-300" : "text-zinc-850"}>
+              {line.substring(currentPos)}
+            </span>
+          );
+        }
+      } else {
+        tokens.push(
+          <span key="fallback" className={isDark ? "text-zinc-300" : "text-zinc-850"}>
+            {line}
+          </span>
+        );
+      }
+
+      return (
+        <div key={lineIdx} className="h-6 leading-6 whitespace-pre pl-4">
+          {tokens}
+        </div>
+      );
+    });
+  };
 
   useEffect(() => {
     const checkMobile = () => {
@@ -1405,19 +1555,18 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
     return (
       <div className="flex flex-col gap-2.5 w-full max-w-full overflow-hidden text-xs">
         {thinking !== null && (
-          <div className="mb-1 font-sans select-none flex flex-col items-start w-full">
+          <div className="mb-2.5 font-sans select-none flex flex-col items-start w-full">
             <button
               onClick={() => setExpandedThoughts(prev => ({ ...prev, [msgId]: !prev[msgId] }))}
-              className="w-full flex items-center justify-between gap-3 text-[10.5px] text-zinc-400 hover:text-zinc-200 transition-all font-semibold bg-zinc-900/80 border border-zinc-800/80 hover:border-zinc-700/60 px-3 py-2 rounded-xl cursor-pointer shadow-sm active:scale-[0.99]"
+              className={`flex items-center gap-2 text-[11px] font-semibold px-3.5 py-1.5 rounded-full transition-all duration-300 cursor-pointer ${
+                isDark 
+                  ? "bg-amber-500/5 hover:bg-amber-500/10 border border-amber-500/20 text-amber-400 shadow-[0_0_12px_rgba(245,158,11,0.04)]" 
+                  : "bg-zinc-100 hover:bg-zinc-200 border border-zinc-200 text-zinc-600"
+              }`}
             >
-              <div className="flex items-center gap-2">
-                <span className="shrink-0 text-amber-500 animate-pulse">💡</span>
-                <span>{isThinking ? "Thinking Process..." : "Thought process"}</span>
-              </div>
-              <div className="flex items-center gap-1.5 text-zinc-500">
-                {!isThinking && <span className="text-[9.5px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400 font-mono">Thought for {msgDuration}s</span>}
-                <ChevronDown className={`h-3 w-3 shrink-0 transition-transform duration-250 ${expandedThoughts[msgId] ? "rotate-180 text-zinc-300" : ""}`} />
-              </div>
+              <span className="shrink-0 text-amber-500 animate-pulse text-[12px]">💡</span>
+              <span>{isThinking ? "Thinking Process..." : `Thought for ${msgDuration}s`}</span>
+              <ChevronDown className={`h-3 w-3 shrink-0 transition-transform duration-250 ${expandedThoughts[msgId] ? "rotate-180" : ""} ${isDark ? "text-amber-400/80" : "text-zinc-500"}`} />
             </button>
 
             <AnimatePresence>
@@ -1429,7 +1578,11 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
                   transition={{ duration: 0.2 }}
                   className="overflow-hidden w-full"
                 >
-                  <div className="mt-2 w-full bg-zinc-950/70 border border-zinc-900/60 p-3 rounded-xl font-mono text-[10px] text-zinc-500 leading-relaxed whitespace-pre-wrap max-h-[160px] overflow-y-auto scrollbar-thin border-l-2 border-l-amber-500/60 pl-3">
+                  <div className={`mt-2.5 w-full border p-3 rounded-xl font-mono text-[10.5px] leading-relaxed whitespace-pre-wrap max-h-[160px] overflow-y-auto scrollbar-thin border-l-2 pl-3 ${
+                    isDark 
+                      ? "bg-zinc-950/20 border-zinc-900/40 border-l-amber-500/40 text-zinc-400" 
+                      : "bg-zinc-50 border-zinc-200 border-l-amber-500/60 text-zinc-600"
+                  }`}>
                     {thinking || "Processing..."}
                   </div>
                 </motion.div>
@@ -1439,19 +1592,23 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
         )}
 
         {/* Dynamic Action History Timeline logs */}
-        {msg && (
-          <div className="mb-1 font-sans select-none flex flex-col items-start w-full">
+        {msg && updatedFiles.length > 0 && (
+          <div className="mb-2.5 font-sans select-none flex flex-col items-start w-full">
             <button
               onClick={() => setExpandedActions(prev => ({ ...prev, [msgId]: !prev[msgId] }))}
-              className="w-full flex items-center justify-between gap-3 text-[10.5px] text-zinc-400 hover:text-zinc-200 transition-all font-semibold bg-zinc-900/50 border border-zinc-900/80 px-3 py-1.5 rounded-xl cursor-pointer"
+              className={`w-full flex items-center justify-between gap-3 text-[11px] font-semibold px-3 py-2 rounded-xl border transition-all duration-200 cursor-pointer ${
+                isDark 
+                  ? "bg-zinc-900/40 border-zinc-800 hover:border-zinc-700 hover:bg-zinc-900/60 text-zinc-300 hover:text-zinc-100" 
+                  : "bg-zinc-50 border-zinc-200 hover:bg-zinc-100 text-zinc-700 hover:text-zinc-900"
+              }`}
             >
               <div className="flex items-center gap-2">
-                <span className="shrink-0 text-zinc-400 text-[11px]">⚙️</span>
-                <span>Execution Logs</span>
+                <span className="shrink-0 text-amber-500">⚡</span>
+                <span className="font-semibold">Action History</span>
               </div>
-              <div className="flex items-center gap-1.5 text-zinc-500">
-                <span className="text-[8.5px] uppercase tracking-wider px-1 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded">Success</span>
-                <ChevronDown className={`h-3 w-3 shrink-0 transition-transform duration-250 ${expandedActions[msgId] ? "rotate-180 text-zinc-300" : ""}`} />
+              <div className="flex items-center gap-1.5">
+                <span className="text-[9px] font-semibold uppercase tracking-wider px-1.5 py-0.5 bg-emerald-500/10 text-emerald-500 dark:text-emerald-400 border border-emerald-500/20 rounded">Success</span>
+                <ChevronDown className={`h-3 w-3 shrink-0 transition-transform duration-250 ${expandedActions[msgId] ? "rotate-180 text-zinc-400" : "text-zinc-500"}`} />
               </div>
             </button>
 
@@ -1464,16 +1621,21 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
                   transition={{ duration: 0.2 }}
                   className="overflow-hidden w-full"
                 >
-                  <div className="mt-1.5 w-full bg-zinc-950/40 border border-zinc-900/60 p-3 rounded-xl font-sans text-[10px] text-zinc-400 leading-relaxed flex flex-col gap-2.5">
+                  <div className={`mt-2 w-full p-3.5 rounded-xl border text-[10.5px] leading-relaxed flex flex-col gap-3 transition-colors duration-200 ${
+                    isDark ? "bg-zinc-950/40 border-zinc-900 text-zinc-350" : "bg-zinc-50/50 border-zinc-200 text-zinc-600"
+                  }`}>
                     
                     {/* Read File step */}
-                    <div className="flex items-start gap-2">
-                      <span className="text-emerald-500 font-semibold shrink-0">✓</span>
+                    <div className="flex items-start gap-2.5">
+                      <div className="w-5 h-5 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-500 flex items-center justify-center text-[10px] shrink-0 font-bold">R</div>
                       <div className="flex flex-col gap-1">
-                        <span className="font-semibold text-zinc-300">Read workspace files</span>
-                        <div className="flex flex-wrap gap-1 mt-0.5">
-                          {files.map(f => (
-                            <span key={f.path} className="px-1.5 py-0.5 rounded bg-zinc-900 border border-zinc-800 text-[9px] font-mono text-zinc-400">
+                        <span className={`font-semibold ${isDark ? "text-zinc-200" : "text-zinc-800"}`}>Read Workspace Context</span>
+                        <p className={`text-[10px] ${isDark ? "text-zinc-400" : "text-zinc-500"}`}>Loaded workspace files into the model context window for reasoning:</p>
+                        <div className="flex flex-wrap gap-1.5 mt-1">
+                          {(msg.filesSnapshot || files).map(f => (
+                            <span key={f.path} className={`px-2 py-0.5 rounded-lg border text-[9.5px] font-mono flex items-center gap-1 ${
+                              isDark ? "bg-zinc-900 border-zinc-800 text-zinc-300" : "bg-white border-zinc-200 text-zinc-700"
+                            }`}>
                               📄 {f.path}
                             </span>
                           ))}
@@ -1481,36 +1643,49 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
                       </div>
                     </div>
 
-                    {/* Analyze step */}
-                    <div className="flex items-center gap-2">
-                      <span className="text-emerald-500 font-semibold shrink-0">✓</span>
-                      <span className="font-semibold text-zinc-300">Analyzed project structure & dependencies</span>
-                    </div>
+                    <div className={`h-px w-full ${isDark ? "bg-zinc-900/50" : "bg-zinc-200/60"}`} />
 
                     {/* Inference step */}
-                    <div className="flex items-center gap-2">
-                      <span className="text-emerald-500 font-semibold shrink-0">✓</span>
-                      <span className="font-semibold text-zinc-300">
-                        Inference via <span className="text-amber-400 font-mono">{msgModelName}</span> ({msgDuration}s)
-                      </span>
+                    <div className="flex items-start gap-2.5">
+                      <div className="w-5 h-5 rounded-full bg-purple-500/10 border border-purple-500/20 text-purple-500 flex items-center justify-center text-[10px] shrink-0 font-bold">G</div>
+                      <div className="flex flex-col gap-0.5">
+                        <span className={`font-semibold ${isDark ? "text-zinc-200" : "text-zinc-800"}`}>AI Model Inference</span>
+                        <p className={`text-[10px] ${isDark ? "text-zinc-400" : "text-zinc-500"}`}>
+                          Executed prompt via <span className="text-amber-500 font-mono font-bold">{msgModelName}</span> in <span className="font-semibold text-emerald-500">{msgDuration} seconds</span>.
+                        </p>
+                      </div>
                     </div>
 
+                    <div className={`h-px w-full ${isDark ? "bg-zinc-900/50" : "bg-zinc-200/60"}`} />
+
                     {/* Edit step */}
-                    {updatedFiles.length > 0 && (
-                      <div className="flex items-start gap-2">
-                        <span className="text-emerald-500 font-semibold shrink-0">✓</span>
-                        <div className="flex flex-col gap-1">
-                          <span className="font-semibold text-zinc-300">Modified file contents</span>
-                          <div className="flex flex-wrap gap-1 mt-0.5">
-                            {updatedFiles.map(filePath => (
-                              <span key={filePath} className="px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/20 text-[9px] font-mono text-amber-400">
-                                ✏️ {filePath}
-                              </span>
-                            ))}
-                          </div>
+                    <div className="flex items-start gap-2.5">
+                      <div className="w-5 h-5 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-500 flex items-center justify-center text-[10px] shrink-0 font-bold">W</div>
+                      <div className="flex flex-col gap-1">
+                        <span className={`font-semibold ${isDark ? "text-zinc-200" : "text-zinc-800"}`}>Modified Files Write</span>
+                        <p className={`text-[10px] ${isDark ? "text-zinc-400" : "text-zinc-500"}`}>Wrote edits to target workspace files system:</p>
+                        <div className="flex flex-wrap gap-1.5 mt-1">
+                          {updatedFiles.map(filePath => (
+                            <span key={filePath} className="px-2 py-0.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-[9.5px] font-mono text-amber-500 flex items-center gap-1 font-semibold animate-pulse">
+                              ✏️ {filePath}
+                            </span>
+                          ))}
                         </div>
                       </div>
-                    )}
+                    </div>
+
+                    <div className={`h-px w-full ${isDark ? "bg-zinc-900/50" : "bg-zinc-200/60"}`} />
+
+                    {/* Compile step */}
+                    <div className="flex items-start gap-2.5">
+                      <div className="w-5 h-5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 flex items-center justify-center text-[10px] shrink-0 font-bold">✓</div>
+                      <div className="flex flex-col gap-0.5">
+                        <span className={`font-semibold ${isDark ? "text-zinc-200" : "text-zinc-800"}`}>Compile Applet & Verify Build</span>
+                        <p className={`text-[10px] ${isDark ? "text-zinc-400" : "text-zinc-500"}`}>
+                          Build succeeded. Verification status: <span className="text-emerald-500 font-semibold font-mono bg-emerald-500/10 px-1.5 py-0.2 rounded">SUCCESS</span>. Live preview hot-reloaded successfully.
+                        </p>
+                      </div>
+                    </div>
 
                   </div>
                 </motion.div>
@@ -1709,7 +1884,7 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
                               isDark ? "bg-zinc-950 text-zinc-500 border-zinc-800" : "bg-zinc-50 text-zinc-500 border-zinc-200"
                             }`}>{m.badge}</span>
                           </div>
-                          <span className="text-[9px] text-zinc-500 line-clamp-1">{m.description}</span>
+                          <span className={`text-[9.5px] line-clamp-1 ${isDark ? "text-zinc-400" : "text-zinc-500"}`}>{m.description}</span>
                         </button>
                       );
                     })}
@@ -1876,11 +2051,6 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
                   >
                     <Trash2 className="h-4 w-4" />
                   </button>
-                  <button className={`p-1.5 rounded-lg transition-colors ${
-                    isDark ? "hover:bg-zinc-800 hover:text-zinc-300" : "hover:bg-zinc-100 hover:text-zinc-750"
-                  }`} title="Input suara">
-                    <Volume2 className="h-4 w-4" />
-                  </button>
                 </div>
 
                 <button
@@ -2032,7 +2202,7 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
 
               <div className="flex-1 flex items-center justify-center p-6 bg-zinc-900/20 overflow-hidden relative">
                 {deviceMode === "mobile" ? (
-                  <div className="w-[360px] h-[640px] max-w-full max-h-[90%] rounded-[40px] bg-zinc-950 border-[12px] border-zinc-900 shadow-2xl relative flex flex-col overflow-hidden animate-fade-in ring-1 ring-zinc-800/50">
+                  <div className="w-[320px] h-[680px] max-w-full max-h-[95%] rounded-[40px] bg-zinc-950 border-[12px] border-zinc-900 shadow-2xl relative flex flex-col overflow-hidden animate-fade-in ring-1 ring-zinc-800/50">
                     <div className="absolute top-0 left-1/2 transform -translate-x-1/2 w-32 h-5 bg-zinc-900 rounded-b-xl z-20 flex items-center justify-center">
                       <div className="w-10 h-1 bg-zinc-800 rounded-full" />
                     </div>
@@ -2142,6 +2312,13 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
                   <div className={`p-3 border-b flex items-center justify-between transition-colors duration-200 ${isDark ? "border-zinc-850 bg-zinc-950/25" : "border-zinc-200 bg-zinc-100/50"}`}>
                     <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">File List</span>
                     <div className="flex items-center gap-1.5">
+                      <input
+                        ref={fileUploadRef}
+                        type="file"
+                        onChange={handleDeviceFileUpload}
+                        className="hidden"
+                        accept=".html,.js,.css,.json,.txt,.md,image/*"
+                      />
                       <button
                         onClick={() => fileUploadRef.current?.click()}
                         className="p-1 rounded hover:bg-amber-500/10 text-amber-500 transition-colors"
@@ -2262,7 +2439,17 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
                       <span className="text-[9px] text-zinc-500 font-mono hidden sm:inline">• Main Source Code</span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="text-[9px] font-mono text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/25 flex items-center gap-1 shrink-0">
+                      <button
+                        onClick={() => setIsEditingCode(!isEditingCode)}
+                        className={`text-[10px] font-mono font-bold px-2.5 py-1 rounded-lg border transition-all cursor-pointer flex items-center gap-1 shadow-sm active:scale-95 ${
+                          isEditingCode
+                            ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20"
+                            : "bg-amber-500/10 text-amber-500 border-amber-500/30 hover:bg-amber-500/20"
+                        }`}
+                      >
+                        {isEditingCode ? "💾 View Highlighted" : "✏️ Edit Code"}
+                      </button>
+                      <span className="text-[9px] font-mono text-emerald-500 bg-emerald-500/10 px-2 py-1 rounded-full border border-emerald-500/25 flex items-center gap-1 shrink-0 hidden sm:flex">
                         <span className="h-1.5 w-1.5 bg-emerald-500 rounded-full animate-ping" />
                         Auto-Saved
                       </span>
@@ -2277,12 +2464,25 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
                     ))}
                   </div>
 
-                  <textarea
-                    value={activeFile.content}
-                    onChange={handleEditorChange}
-                    className={`flex-1 h-full p-4 text-xs font-mono focus:outline-none resize-none leading-6 leading-relaxed transition-colors duration-200 ${isDark ? "bg-zinc-950 text-zinc-200 focus:bg-zinc-950" : "bg-white text-zinc-850 focus:bg-white"}`}
-                    spellCheck="false"
-                  />
+                  {isEditingCode ? (
+                    <textarea
+                      value={activeFile.content}
+                      onChange={handleEditorChange}
+                      className={`flex-1 h-full p-4 text-xs font-mono focus:outline-none resize-none leading-6 leading-relaxed transition-colors duration-200 ${isDark ? "bg-zinc-950 text-zinc-200 focus:bg-zinc-950" : "bg-white text-zinc-850 focus:bg-white"}`}
+                      spellCheck="false"
+                      placeholder="Write code here..."
+                    />
+                  ) : (
+                    <div 
+                      onClick={() => setIsEditingCode(true)}
+                      className={`flex-1 h-full overflow-y-auto pt-4 pb-12 text-xs font-mono transition-colors duration-200 cursor-text select-text scrollbar-thin ${
+                        isDark ? "bg-zinc-950 text-zinc-350" : "bg-white text-zinc-800"
+                      }`}
+                      title="Click to edit code"
+                    >
+                      {highlightCode(activeFile.content, activeFile.path)}
+                    </div>
+                  )}
                 </div>
               </div>
 
