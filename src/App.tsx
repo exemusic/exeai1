@@ -1525,7 +1525,13 @@ export default function App() {
     } else {
       ttsSynthRef.current.cancel();
 
-      const cleanText = text
+      // Filter out <think>...</think> blocks from voice synthesis
+      let speakText = text || "";
+      speakText = speakText.replace(/<think>[\s\S]*?<\/think>/gi, "");
+      speakText = speakText.replace(/<think>[\s\S]*?$/gi, "");
+      speakText = speakText.replace(/<\/?think>/gi, "");
+
+      const cleanText = speakText
         .replace(/```[\s\S]*?```/g, "") 
         .replace(/`([^`]+)`/g, "$1") // inline code
         .replace(/\*\*([^*]+)\*\*/g, "$1") // bold
