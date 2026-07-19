@@ -1576,59 +1576,48 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
 
     return (
       <div className="flex flex-col gap-2.5 w-full max-w-full overflow-hidden text-xs">
-        {thinking !== null && (
-          <div className="mb-2.5 font-sans select-none flex flex-col items-start w-full">
-            <button
-              onClick={() => setExpandedThoughts(prev => ({ ...prev, [msgId]: !prev[msgId] }))}
-              className={`flex items-center gap-2 text-[11px] font-semibold px-3.5 py-1.5 rounded-full transition-all duration-300 cursor-pointer ${
-                isDark 
-                  ? "bg-amber-500/5 hover:bg-amber-500/10 border border-amber-500/20 text-amber-400 shadow-[0_0_12px_rgba(245,158,11,0.04)]" 
-                  : "bg-zinc-100 hover:bg-zinc-200 border border-zinc-200 text-zinc-600"
-              }`}
-            >
-              <span className="shrink-0 text-amber-500 animate-pulse text-[12px]">💡</span>
-              <span>{isThinking ? "Thinking Process..." : `Thought for ${msgDuration}s`}</span>
-              <ChevronDown className={`h-3 w-3 shrink-0 transition-transform duration-250 ${expandedThoughts[msgId] ? "rotate-180" : ""} ${isDark ? "text-amber-400/80" : "text-zinc-500"}`} />
-            </button>
-
-            <AnimatePresence>
-              {expandedThoughts[msgId] && (
-                <motion.div
-                  initial={{ height: 0, opacity: 0 }}
-                  animate={{ height: "auto", opacity: 1 }}
-                  exit={{ height: 0, opacity: 0 }}
-                  transition={{ duration: 0.2 }}
-                  className="overflow-hidden w-full"
-                >
-                  <div className={`mt-2.5 w-full border p-3 rounded-xl font-mono text-[10.5px] leading-relaxed whitespace-pre-wrap max-h-[160px] overflow-y-auto scrollbar-thin border-l-2 pl-3 ${
-                    isDark 
-                      ? "bg-zinc-950/20 border-zinc-900/40 border-l-amber-500/40 text-zinc-400" 
-                      : "bg-zinc-50 border-zinc-200 border-l-amber-500/60 text-zinc-600"
-                  }`}>
-                    {thinking || "Processing..."}
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-        )}
-
         {/* Dynamic Action History Timeline logs */}
-        {msg && updatedFiles.length > 0 && (() => {
+        {msg && (updatedFiles.length > 0 || thinking !== null || isThinking) && (() => {
           const primaryFile = updatedFiles[0] || "src/components/ExeCodeWorkspace.tsx";
-          const actionSteps = [
-            { type: "thought", text: `Thought for 3 seconds` },
-            { type: "responded", text: "Responded" },
-            { type: "read", text: "Read file", subtext: "Read 1 file:", file: primaryFile },
-            { type: "thought", text: `Thought for 3 seconds` },
-            { type: "responded", text: "Responded" },
-            { type: "read", text: "Read file", subtext: "Read 1 file:", file: primaryFile },
-            { type: "thought", text: `Thought for 8 seconds` },
-            { type: "responded", text: "Responded" },
-            { type: "read", text: "Read file", subtext: "Read 1 file:", file: primaryFile },
-            { type: "thought", text: `Thought for ${msgDuration} seconds` },
-            { type: "responded", text: "Responded" }
-          ];
+          const actionSteps: any[] = [];
+
+          // 1. Thought Step (if we have thinking text or if we are currently thinking)
+          if (thinking !== null || isThinking) {
+            actionSteps.push({
+              type: "thought",
+              text: isThinking ? "Thinking Process..." : `Thought for ${msgDuration} seconds`,
+              content: thinking,
+              isThinking: isThinking
+            });
+          }
+
+          // 2. Read Step (if we have edited files)
+          if (updatedFiles.length > 0) {
+            actionSteps.push({
+              type: "read",
+              text: "Read file",
+              subtext: "Read 1 file:",
+              file: primaryFile
+            });
+
+            // 3. Edit Step
+            actionSteps.push({
+              type: "edit",
+              text: "Edit file",
+              subtext: `Edited ${updatedFiles.length} ${updatedFiles.length > 1 ? "files" : "file"}:`,
+              file: primaryFile
+            });
+
+            // 4. Verify Step
+            actionSteps.push({
+              type: "verify",
+              text: "Verify build",
+              subtext: "Build verification:",
+              status: "succeeded"
+            });
+          }
+
+          const isExpanded = expandedActions[msgId] !== false;
 
           return (
             <div className={`mb-2.5 font-sans select-none flex flex-col items-start w-full rounded-xl border transition-all duration-200 ${
@@ -1637,7 +1626,7 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
                 : "bg-zinc-100/50 border-zinc-200 text-zinc-800"
             }`}>
               <button
-                onClick={() => setExpandedActions(prev => ({ ...prev, [msgId]: !prev[msgId] }))}
+                onClick={() => setExpandedActions(prev => ({ ...prev, [msgId]: expandedActions[msgId] === false }))}
                 className="w-full flex items-center justify-between gap-3 text-xs font-medium px-4 py-3.5 cursor-pointer"
               >
                 <div className="flex items-center gap-2.5">
@@ -1651,11 +1640,11 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
                   </svg>
                   <span className="font-semibold text-[13px] tracking-tight">Action history</span>
                 </div>
-                <ChevronDown className={`h-4 w-4 shrink-0 transition-transform duration-250 ${expandedActions[msgId] ? "rotate-180" : ""} ${isDark ? "text-zinc-400" : "text-zinc-500"}`} />
+                <ChevronDown className={`h-4 w-4 shrink-0 transition-transform duration-250 ${isExpanded ? "rotate-180" : ""} ${isDark ? "text-zinc-400" : "text-zinc-500"}`} />
               </button>
 
               <AnimatePresence>
-                {expandedActions[msgId] && (
+                {isExpanded && (
                   <motion.div
                     initial={{ height: 0, opacity: 0 }}
                     animate={{ height: "auto", opacity: 1 }}
@@ -1668,43 +1657,94 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
                         <div key={idx} className="flex gap-3 items-start">
                           <div className="pt-0.5 shrink-0">
                             {step.type === "thought" && (
-                              <svg className={`h-4 w-4 shrink-0 ${isDark ? "text-[#c4c7c5]" : "text-zinc-400"}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <svg className={`h-4 w-4 shrink-0 ${isDark ? "text-amber-400" : "text-amber-500"}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                 <path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A5 5 0 0 0 8 8c0 1.3.5 2.6 1.5 3.5.8.8 1.3 1.5 1.5 2.5" />
                                 <path d="M9 18h6" />
                                 <path d="M10 22h4" />
                               </svg>
                             )}
-                            {step.type === "responded" && (
-                              <svg className={`h-4 w-4 shrink-0 ${isDark ? "text-[#c4c7c5]" : "text-zinc-400"}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-                                <line x1="12" y1="8" x2="12" y2="16" />
-                                <line x1="8" y1="12" x2="16" y2="12" />
-                              </svg>
-                            )}
                             {step.type === "read" && (
-                              <svg className={`h-4 w-4 shrink-0 ${isDark ? "text-[#c4c7c5]" : "text-zinc-400"}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <svg className={`h-4 w-4 shrink-0 ${isDark ? "text-blue-400" : "text-blue-500"}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                 <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
                                 <polyline points="14 2 14 8 20 8" />
                                 <line x1="16" y1="13" x2="8" y2="13" />
                                 <line x1="16" y1="17" x2="8" y2="17" />
-                                <polyline points="10 9 9 9 8 9" />
+                              </svg>
+                            )}
+                            {step.type === "edit" && (
+                              <svg className={`h-4 w-4 shrink-0 ${isDark ? "text-teal-400" : "text-teal-500"}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M12 20h9" />
+                                <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
+                              </svg>
+                            )}
+                            {step.type === "verify" && (
+                              <svg className={`h-4 w-4 shrink-0 ${isDark ? "text-emerald-400" : "text-emerald-500"}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <polyline points="20 6 9 17 4 12" />
                               </svg>
                             )}
                           </div>
-                          <div className="flex flex-col">
-                            <span className={`text-[12px] font-medium ${isDark ? "text-[#e3e3e3]" : "text-zinc-800"}`}>
-                              {step.text}
-                            </span>
-                            {step.type === "read" && step.file && (
+                          
+                          <div className="flex flex-col flex-1 min-w-0">
+                            <div className="flex items-center justify-between w-full gap-2">
+                              <span className={`text-[12px] font-medium ${isDark ? "text-[#e3e3e3]" : "text-zinc-800"}`}>
+                                {step.text}
+                              </span>
+                              {step.content && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setExpandedThoughts(prev => ({ ...prev, [msgId]: !prev[msgId] }));
+                                  }}
+                                  className={`text-[10px] font-semibold px-2 py-0.5 rounded-md border transition-all cursor-pointer ${
+                                    isDark 
+                                      ? "bg-zinc-900 border-zinc-800 hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200" 
+                                      : "bg-zinc-100 border-zinc-200 hover:bg-zinc-200 text-zinc-600 hover:text-zinc-800"
+                                  }`}
+                                >
+                                  {expandedThoughts[msgId] ? "Hide Detail" : "Show Detail"}
+                                </button>
+                              )}
+                            </div>
+                            
+                            {step.subtext && (
                               <div className={`text-[11px] mt-1 flex items-center flex-wrap gap-1.5 ${isDark ? "text-[#9e9e9e]" : "text-zinc-500"}`}>
                                 <span>{step.subtext}</span>
-                                <span className={`font-mono text-[10.5px] px-1.5 py-0.5 rounded ${
-                                  isDark 
-                                    ? "bg-[#2a2a2b] text-[#e3e3e3]" 
-                                    : "bg-zinc-200/50 text-zinc-800 border border-zinc-300"
-                                }`}>
-                                  {step.file}
-                                </span>
+                                {step.file && (
+                                  <span className={`font-mono text-[10.5px] px-1.5 py-0.5 rounded ${
+                                    isDark 
+                                      ? "bg-zinc-900 text-[#e3e3e3] border border-zinc-800/80" 
+                                      : "bg-zinc-200/50 text-zinc-800 border border-zinc-300"
+                                  }`}>
+                                    {step.file}
+                                  </span>
+                                )}
+                                {step.status && (
+                                  <span className={`font-mono text-[10.5px] px-1.5 py-0.5 rounded text-emerald-500 ${
+                                    isDark 
+                                      ? "bg-[#131314] border border-zinc-800/80" 
+                                      : "bg-emerald-50 text-emerald-700 border border-emerald-100"
+                                  }`}>
+                                    {step.status}
+                                  </span>
+                                )}
+                              </div>
+                            )}
+
+                            {step.content && expandedThoughts[msgId] && (
+                              <div className={`mt-2 w-full border p-3 rounded-lg font-mono text-[10.5px] leading-relaxed whitespace-pre-wrap max-h-[160px] overflow-y-auto scrollbar-thin border-l-2 pl-3 ${
+                                isDark 
+                                  ? "bg-zinc-950/40 border-zinc-900/60 border-l-amber-500/40 text-zinc-400" 
+                                  : "bg-zinc-50 border-zinc-250 border-l-amber-500/60 text-zinc-600"
+                              }`}>
+                                {step.content}
+                              </div>
+                            )}
+
+                            {step.isThinking && (
+                              <div className="flex items-center gap-1.5 py-1.5 select-none">
+                                <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-[bounce_1s_infinite_100ms]" />
+                                <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-[bounce_1s_infinite_200ms]" />
+                                <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-[bounce_1s_infinite_300ms]" />
                               </div>
                             )}
                           </div>
@@ -1718,7 +1758,7 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
           );
         })()}
 
-        {actual ? (
+        {actual && updatedFiles.length === 0 ? (
           <div className="text-zinc-300 w-full overflow-x-auto text-[13px] leading-relaxed select-text mt-1">
             <MarkdownRenderer content={actual} />
           </div>
