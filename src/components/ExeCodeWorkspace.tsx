@@ -1791,18 +1791,18 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
           );
         })()}
 
-        {actual && updatedFiles.length === 0 ? (
+        {actual && (
           <div className="text-zinc-300 w-full overflow-x-auto text-[13px] leading-relaxed select-text mt-1">
             <MarkdownRenderer content={actual} />
           </div>
-        ) : (
-          isThinking && (
-            <div className="flex items-center gap-1.5 py-1 select-none">
-              <span className="h-1 w-1 rounded-full bg-zinc-500 animate-[bounce_1s_infinite_100ms]" />
-              <span className="h-1 w-1 rounded-full bg-zinc-500 animate-[bounce_1s_infinite_200ms]" />
-              <span className="h-1 w-1 rounded-full bg-zinc-500 animate-[bounce_1s_infinite_300ms]" />
-            </div>
-          )
+        )}
+
+        {isThinking && (
+          <div className="flex items-center gap-1.5 py-1 select-none">
+            <span className="h-1 w-1 rounded-full bg-zinc-500 animate-[bounce_1s_infinite_100ms]" />
+            <span className="h-1 w-1 rounded-full bg-zinc-500 animate-[bounce_1s_infinite_200ms]" />
+            <span className="h-1 w-1 rounded-full bg-zinc-500 animate-[bounce_1s_infinite_300ms]" />
+          </div>
         )}
       </div>
     );
