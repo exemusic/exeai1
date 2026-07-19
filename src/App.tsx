@@ -63,16 +63,25 @@ export default function App() {
   const [expandedThoughts, setExpandedThoughts] = useState<Record<string, boolean>>({});
 
   const parseMessageThinking = (content: string) => {
-    const trimmed = content.trim();
-    if (trimmed.startsWith("<think>")) {
-      const closeIndex = trimmed.indexOf("</think>");
-      if (closeIndex !== -1) {
-        const thinking = trimmed.substring(7, closeIndex).trim();
-        const actual = trimmed.substring(closeIndex + 8).trim();
-        return { thinking, actual, isThinking: false };
+    const lowerContent = content.toLowerCase();
+    const thinkStart = lowerContent.indexOf("<think>");
+    
+    if (thinkStart !== -1) {
+      const thinkEnd = lowerContent.indexOf("</think>", thinkStart);
+      if (thinkEnd !== -1) {
+        const thinking = content.substring(thinkStart + 7, thinkEnd).trim();
+        const beforeThink = content.substring(0, thinkStart).trim();
+        const afterThink = content.substring(thinkEnd + 8).trim();
+        
+        let actual = afterThink;
+        if (beforeThink) {
+          actual = beforeThink + (afterThink ? "\n\n" + afterThink : "");
+        }
+        return { thinking, actual: actual.trim(), isThinking: false };
       } else {
-        const thinking = trimmed.substring(7).trim();
-        return { thinking, actual: "", isThinking: true };
+        const thinking = content.substring(thinkStart + 7).trim();
+        const beforeThink = content.substring(0, thinkStart).trim();
+        return { thinking, actual: beforeThink.trim(), isThinking: true };
       }
     }
     return { thinking: null, actual: content, isThinking: false };
@@ -276,6 +285,52 @@ export default function App() {
     const hours = String(now.getHours()).padStart(2, "0");
     const minutes = String(now.getMinutes()).padStart(2, "0");
     return `Today is ${dayName}, ${monthName} ${date}, ${year}, at ${hours}:${minutes}.`;
+  };
+
+  const getBrowserLanguageInstruction = () => {
+    try {
+      const browserLanguages = navigator.languages || [navigator.language || "en"];
+      const primaryLang = (browserLanguages[0] || "en").toLowerCase();
+      const languageNames: Record<string, string> = {
+        id: "Indonesian",
+        ar: "Arabic",
+        es: "Spanish",
+        fr: "French",
+        de: "German",
+        ja: "Japanese",
+        ko: "Korean",
+        zh: "Chinese",
+        pt: "Portuguese",
+        it: "Italian",
+        ru: "Russian",
+        tr: "Turkish",
+        vi: "Vietnamese",
+        th: "Thai",
+        nl: "Dutch",
+      };
+      
+      const langCode = primaryLang.split("-")[0];
+      const targetLangName = languageNames[langCode] || langCode.toUpperCase();
+      
+      let localeInstruction = `\n\n[CRITICAL USER REGION & AUTO-LANGUAGE DETECTION]\n`;
+      localeInstruction += `User Browser Primary Language: ${primaryLang} (${targetLangName})\n`;
+      localeInstruction += `Preferred Languages: ${browserLanguages.join(", ")}\n\n`;
+      
+      localeInstruction += `CRITICAL TRANSLATION DIRECTIVE:\n`;
+      localeInstruction += `The user's web browser (Chrome, Edge, Safari, etc.) indicates they are from a region where the primary language is ${targetLangName}.\n`;
+      if (langCode === "id") {
+        localeInstruction += `Always prioritize translating text between English <-> Indonesian (Inggris <-> Indonesia) by default when translation is requested, and respond to general queries in Indonesian.\n`;
+      } else if (langCode === "ar") {
+        localeInstruction += `Always prioritize translating text between English <-> Arabic (إنجليزي <-> عربي) by default when translation is requested, and respond to general queries in Arabic.\n`;
+      } else {
+        localeInstruction += `Always prioritize translating text between English <-> ${targetLangName} by default when translation is requested, and respond to general queries in ${targetLangName}.\n`;
+      }
+      localeInstruction += `Keep your translations natural, idiomatic, and highly contextual. Explain any grammatical differences or cultural nuances beautifully.`;
+      
+      return localeInstruction;
+    } catch (e) {
+      return "";
+    }
   };
 
   useEffect(() => {
@@ -1021,6 +1076,7 @@ export default function App() {
       finalInstruction += "\n\n[AI MEMORY (Saved user memories)]:\n" + memories.map((m, idx) => `${idx + 1}. ${m}`).join("\n");
     }
     finalInstruction += `\n\n[CURRENT REAL-TIME TIME INFO]\n${getFormattedCurrentDate()}`;
+    finalInstruction += getBrowserLanguageInstruction();
 
     const controller = new AbortController();
     abortControllerRef.current = controller;
@@ -1338,6 +1394,7 @@ export default function App() {
       finalInstruction += "\n\n[AI MEMORY (Saved user memories)]:\n" + memories.map((m, idx) => `${idx + 1}. ${m}`).join("\n");
     }
     finalInstruction += `\n\n[CURRENT REAL-TIME TIME INFO]\n${getFormattedCurrentDate()}`;
+    finalInstruction += getBrowserLanguageInstruction();
 
     const controller = new AbortController();
     abortControllerRef.current = controller;
@@ -2312,14 +2369,21 @@ export default function App() {
 
                                         {actual ? (
                                           <MarkdownRenderer content={actual} />
+                                        ) : isGenerating && index === currentSession.messages.length - 1 ? (
+                                          <div className="flex items-center gap-2 py-2">
+                                            <span className="h-1.5 w-1.5 rounded-full bg-zinc-500 animate-[bounce_1s_infinite_100ms]" />
+                                            <span className="h-1.5 w-1.5 rounded-full bg-zinc-500 animate-[bounce_1s_infinite_200ms]" />
+                                            <span className="h-1.5 w-1.5 rounded-full bg-zinc-500 animate-[bounce_1s_infinite_300ms]" />
+                                          </div>
                                         ) : (
-                                          isGenerating && index === currentSession.messages.length - 1 && (
-                                            <div className="flex items-center gap-2 py-2">
-                                              <span className="h-1.5 w-1.5 rounded-full bg-zinc-500 animate-[bounce_1s_infinite_100ms]" />
-                                              <span className="h-1.5 w-1.5 rounded-full bg-zinc-500 animate-[bounce_1s_infinite_200ms]" />
-                                              <span className="h-1.5 w-1.5 rounded-full bg-zinc-500 animate-[bounce_1s_infinite_300ms]" />
-                                            </div>
-                                          )
+                                          <div className="text-zinc-400 dark:text-zinc-500 italic text-xs mt-1.5 select-none font-sans flex items-center gap-1.5">
+                                            <span className="text-sm">⚠️</span>
+                                            <span>
+                                              {navigator.language?.toLowerCase()?.startsWith("id")
+                                                ? "Maaf, sistem tidak menghasilkan jawaban teks. Silakan coba kirim ulang atau ketik pertanyaan lain!"
+                                                : "Sorry, no text response was generated. Please try resending or rephrasing your message!"}
+                                            </span>
+                                          </div>
                                         )}
                                       </div>
                                     );
@@ -2625,7 +2689,7 @@ export default function App() {
 
                   {/* Footnote instruction advice */}
                   <p className="text-[9px] md:text-[10px] text-zinc-600 text-center select-none mt-1.5 md:mt-2 font-sans">
-                    Type your message and press <kbd className="px-1 py-0.5 bg-zinc-900 border border-zinc-850 rounded text-zinc-500 text-[8px] md:text-[9px]">Enter</kbd> to send. ExeChat may display inaccurate information.
+                    ExeChat can make mistakes.
                   </p>
                 </div>
               </div>
