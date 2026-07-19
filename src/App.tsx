@@ -1637,8 +1637,8 @@ export default function App() {
           }}
           className={`w-full flex items-center justify-center gap-2 rounded-xl font-semibold py-2.5 px-4 transition-all duration-200 text-xs tracking-wide border ${
             isDark 
-              ? "bg-zinc-100 hover:bg-zinc-200 text-zinc-950 border-transparent shadow-md shadow-black/20" 
-              : "bg-zinc-900 hover:bg-zinc-800 text-white border-transparent shadow-sm"
+              ? "bg-zinc-900 hover:bg-zinc-850 text-zinc-100 border-zinc-800 hover:border-zinc-750 shadow-sm" 
+              : "bg-white hover:bg-zinc-50 text-zinc-900 border-zinc-200 shadow-sm"
           }`}
         >
           <Plus className="h-3.5 w-3.5 stroke-[2.5]" />
