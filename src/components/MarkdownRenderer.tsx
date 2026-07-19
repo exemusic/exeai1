@@ -180,7 +180,7 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps) {
   const parts = preprocessedContent.split(/(```[\s\S]*?```)/g);
 
   return (
-    <div className="space-y-4 text-zinc-800 dark:text-zinc-100 font-sans leading-relaxed text-[15px]">
+    <div className="space-y-4 text-zinc-800 dark:text-zinc-100 font-sans leading-relaxed text-base md:text-[17px]">
       {parts.map((part, index) => {
 
         if (part.startsWith("```")) {
@@ -249,7 +249,7 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps) {
               return [
                 <code
                   key={subIdx}
-                  className="rounded bg-zinc-100 dark:bg-zinc-900/90 border border-zinc-200 dark:border-zinc-800 px-1.5 py-0.5 font-mono text-xs text-amber-600 dark:text-amber-400/90"
+                  className="rounded bg-zinc-100 dark:bg-zinc-900/90 border border-zinc-200 dark:border-zinc-800 px-1.5 py-0.5 font-mono text-[13px] md:text-sm text-amber-600 dark:text-amber-400/90"
                 >
                   {inlinePart.slice(1, -1)}
                 </code>
@@ -323,7 +323,7 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps) {
           if (trimmed.startsWith("### ")) {
             flushListBuffer(lineIdx);
             renderedElements.push(
-              <h4 key={lineIdx} className="text-base font-semibold text-zinc-900 dark:text-zinc-50 tracking-tight mt-5 mb-2">
+              <h4 key={lineIdx} className="text-lg md:text-[19px] font-semibold text-zinc-900 dark:text-zinc-50 tracking-tight mt-5 mb-2">
                 {renderInlineStyles(trimmed.slice(4))}
               </h4>
             );
@@ -332,7 +332,7 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps) {
           if (trimmed.startsWith("## ")) {
             flushListBuffer(lineIdx);
             renderedElements.push(
-              <h3 key={lineIdx} className="text-lg font-semibold text-zinc-900 dark:text-zinc-50 tracking-tight mt-6 mb-2">
+              <h3 key={lineIdx} className="text-xl md:text-2xl font-semibold text-zinc-900 dark:text-zinc-50 tracking-tight mt-6 mb-2">
                 {renderInlineStyles(trimmed.slice(3))}
               </h3>
             );
@@ -341,7 +341,7 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps) {
           if (trimmed.startsWith("# ")) {
             flushListBuffer(lineIdx);
             renderedElements.push(
-              <h2 key={lineIdx} className="text-xl font-bold text-zinc-900 dark:text-zinc-50 tracking-tight mt-7 mb-3">
+              <h2 key={lineIdx} className="text-2xl md:text-3xl font-bold text-zinc-900 dark:text-zinc-50 tracking-tight mt-7 mb-3">
                 {renderInlineStyles(trimmed.slice(2))}
               </h2>
             );

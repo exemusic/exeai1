@@ -982,6 +982,23 @@ export default function App() {
     }
   };
 
+  const handleContinueAsGuest = () => {
+    setUserId("guest_user");
+    setUserEmail("guest@exechat.local");
+    setUserPhoto(null);
+    setUserName("Guest");
+    setUserDisplayName("Guest");
+    setIsLoggedIn(true);
+    setCredits(99999);
+    setErrorText(null);
+    localStorage.setItem("exechat_logged_in", "true");
+    localStorage.setItem("exechat_username", "Guest");
+    localStorage.setItem("exechat_display_name", "Guest");
+    localStorage.setItem("exechat_user_id", "guest_user");
+    localStorage.setItem("exechat_email", "guest@exechat.local");
+    playNotifySound();
+  };
+
   const handleCompleteRegistrationWithChosenName = (finalChosenName: string) => {
     const finalName = finalChosenName.trim() || googleDefaultName || "User";
     setUserName(finalName);
@@ -1774,7 +1791,7 @@ export default function App() {
       <div className={`p-5 border-b ${curTheme.border} flex items-center justify-between shrink-0`}>
         <div className="flex items-center gap-3">
           <div>
-            <h1 className={`font-display font-bold text-sm tracking-tight flex items-center gap-1.5 ${isDark ? "text-zinc-100" : "text-zinc-900"}`}>
+            <h1 className={`font-display font-bold text-base tracking-tight flex items-center gap-1.5 ${isDark ? "text-zinc-100" : "text-zinc-900"}`}>
               ExeChat
             </h1>
           </div>
@@ -1819,13 +1836,13 @@ export default function App() {
             setShowExeCode(false);
             if (isMobile) setIsMobileSidebarOpen(false);
           }}
-          className={`w-full flex items-center justify-center gap-2 rounded-xl font-semibold py-2.5 px-4 transition-all duration-200 text-xs tracking-wide border ${
+          className={`w-full flex items-center justify-center gap-2 rounded-xl font-semibold py-3 px-4 transition-all duration-200 text-sm tracking-wide border ${
             isDark 
               ? "bg-zinc-900 hover:bg-zinc-850 text-zinc-100 border-zinc-800 hover:border-zinc-750 shadow-sm" 
               : "bg-white hover:bg-zinc-50 text-zinc-900 border-zinc-200 shadow-sm"
           }`}
         >
-          <Plus className="h-3.5 w-3.5 stroke-[2.5]" />
+          <Plus className="h-4 w-4 stroke-[2.5]" />
           <span>New Chat</span>
         </button>
 
@@ -1836,7 +1853,7 @@ export default function App() {
             setShowSettings(false);
             if (isMobile) setIsMobileSidebarOpen(false);
           }}
-          className={`w-full flex items-center justify-center gap-2 rounded-xl font-semibold py-2.5 px-4 transition-all duration-205 text-xs tracking-wide border ${
+          className={`w-full flex items-center justify-center gap-2 rounded-xl font-semibold py-3 px-4 transition-all duration-205 text-sm tracking-wide border ${
             showExeCode
               ? "bg-amber-500/20 text-amber-500 border-amber-500/40"
               : isDark 
@@ -1844,20 +1861,20 @@ export default function App() {
                 : "bg-white hover:bg-zinc-50 text-zinc-700 border-zinc-200"
           }`}
         >
-          <Code className="h-3.5 w-3.5 text-amber-500" />
+          <Code className="h-4 w-4 text-amber-500" />
           <span>ExeCode Workspace</span>
         </button>
       </div>
 
       <div className="px-4 py-2">
         <div className="relative">
-          <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-zinc-500" />
+          <Search className="absolute left-3.5 top-3 h-4 w-4 text-zinc-500" />
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search conversations..."
-            className={`w-full pl-9 pr-4 py-2 rounded-xl text-xs transition-all duration-200 focus:outline-none border ${
+            className={`w-full pl-10 pr-4 py-2.5 rounded-xl text-sm transition-all duration-200 focus:outline-none border ${
               isDark 
                 ? "border-zinc-800/80 bg-zinc-950/40 text-zinc-300 placeholder-zinc-600 focus:border-zinc-700 focus:bg-zinc-950/70" 
                 : "border-zinc-200 bg-zinc-100/50 text-zinc-850 placeholder-zinc-400 focus:border-zinc-300 focus:bg-white"
@@ -1866,9 +1883,9 @@ export default function App() {
           {searchQuery && (
             <button
               onClick={() => setSearchQuery("")}
-              className={`absolute right-2.5 top-2.5 transition-colors ${isDark ? "hover:text-zinc-300 text-zinc-500" : "hover:text-zinc-700 text-zinc-400"}`}
+              className={`absolute right-3 top-3 transition-colors ${isDark ? "hover:text-zinc-300 text-zinc-500" : "hover:text-zinc-700 text-zinc-400"}`}
             >
-              <X className="h-3.5 w-3.5" />
+              <X className="h-4 w-4" />
             </button>
           )}
         </div>
@@ -1883,7 +1900,7 @@ export default function App() {
           ) : (
             groupSessionsByDate(filteredSessions).map((cat) => (
               <div key={cat.label} className="mb-4 last:mb-0">
-                <div className={`px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider select-none ${isDark ? "text-zinc-500" : "text-zinc-400"}`}>
+                <div className={`px-3 py-2 text-[11px] font-semibold uppercase tracking-wider select-none ${isDark ? "text-zinc-500" : "text-zinc-400"}`}>
                   {cat.label}
                 </div>
                 <div className="space-y-0.5 mt-1">
@@ -1908,7 +1925,7 @@ export default function App() {
                             if (isMobile) setIsMobileSidebarOpen(false);
                           }
                         }}
-                        className={`group relative flex items-center justify-between rounded-xl p-2 cursor-pointer text-xs transition-all duration-200 select-none border ${
+                        className={`group relative flex items-center justify-between rounded-xl p-2.5 cursor-pointer text-sm transition-all duration-200 select-none border ${
                           isActive
                             ? isDark
                               ? "bg-zinc-800 border-zinc-700/50 text-zinc-100 font-medium"
@@ -1918,9 +1935,9 @@ export default function App() {
                               : "border-transparent text-zinc-650 hover:bg-zinc-100/60 hover:text-zinc-900"
                         }`}
                       >
-                        <div className="flex items-center gap-2 min-w-0 flex-1">
+                        <div className="flex items-center gap-2.5 min-w-0 flex-1">
                           <MessageSquare
-                            className={`h-3.5 w-3.5 shrink-0 transition-colors ${
+                            className={`h-4 w-4 shrink-0 transition-colors ${
                               isActive 
                                 ? isDark ? "text-zinc-300" : "text-zinc-700" 
                                 : isDark ? "text-zinc-500 group-hover:text-zinc-400" : "text-zinc-400 group-hover:text-zinc-600"
@@ -1938,7 +1955,7 @@ export default function App() {
                                 onChange={(e) => setEditTitleInput(e.target.value)}
                                 onBlur={() => saveRenameSession(s.id)}
                                 autoFocus
-                                className={`w-full rounded px-1.5 py-0.5 text-xs focus:outline-none border ${
+                                className={`w-full rounded px-2 py-1 text-sm focus:outline-none border ${
                                   isDark 
                                     ? "bg-zinc-950 border-zinc-800 text-zinc-100 focus:border-zinc-750" 
                                     : "bg-white border-zinc-300 text-zinc-900 focus:border-zinc-400"
@@ -1968,12 +1985,12 @@ export default function App() {
                               }`}
                               title="Options"
                             >
-                              <MoreHorizontal className="h-3.5 w-3.5" />
+                              <MoreHorizontal className="h-4 w-4" />
                             </button>
 
                             {isMenuOpen && (
                               <div
-                                className={`absolute right-0 top-6 w-28 rounded-lg shadow-xl border z-50 py-1 ${
+                                className={`absolute right-0 top-7 w-32 rounded-lg shadow-xl border z-50 py-1 ${
                                   isDark 
                                     ? "bg-zinc-900 border-zinc-800 text-zinc-300" 
                                     : "bg-white border-zinc-200 text-zinc-700"
@@ -1986,11 +2003,11 @@ export default function App() {
                                     setOpenMenuSessionId(null);
                                     startRenameSession(s.id, s.title, e);
                                   }}
-                                  className={`w-full text-left px-3 py-1.5 text-[11px] font-medium flex items-center gap-2 transition-colors ${
+                                  className={`w-full text-left px-3 py-2 text-xs md:text-[13px] font-medium flex items-center gap-2 transition-colors ${
                                     isDark ? "hover:bg-zinc-800 hover:text-white" : "hover:bg-zinc-100 hover:text-zinc-900"
                                   }`}
                                 >
-                                  <Edit2 className="h-3 w-3" />
+                                  <Edit2 className="h-3.5 w-3.5" />
                                   Rename
                                 </button>
                                 <button
@@ -1999,11 +2016,11 @@ export default function App() {
                                     setOpenMenuSessionId(null);
                                     deleteSession(s.id, e);
                                   }}
-                                  className={`w-full text-left px-3 py-1.5 text-[11px] font-medium flex items-center gap-2 text-red-500 transition-colors ${
+                                  className={`w-full text-left px-3 py-2 text-xs md:text-[13px] font-medium flex items-center gap-2 text-red-500 transition-colors ${
                                     isDark ? "hover:bg-zinc-800/80 hover:text-red-400" : "hover:bg-red-50 hover:text-red-600"
                                   }`}
                                 >
-                                  <Trash2 className="h-3 w-3" />
+                                  <Trash2 className="h-3.5 w-3.5" />
                                   Delete
                                 </button>
                               </div>
@@ -2100,6 +2117,23 @@ export default function App() {
               theme="filled_black"
               shape="pill"
             />
+            
+            <div className="flex items-center gap-2 w-full my-1">
+              <div className="h-[1px] bg-zinc-800 flex-1" />
+              <span className="text-[10px] uppercase tracking-wider text-zinc-600 font-semibold font-mono">or</span>
+              <div className="h-[1px] bg-zinc-800 flex-1" />
+            </div>
+
+            <button
+              onClick={handleContinueAsGuest}
+              className="w-full py-2.5 px-4 rounded-full border border-zinc-700 hover:border-zinc-500 bg-zinc-800/40 hover:bg-zinc-800/80 text-zinc-200 hover:text-white transition-all duration-200 text-sm font-semibold flex items-center justify-center gap-2 shadow-sm cursor-pointer"
+            >
+              <svg className="h-4 w-4 text-amber-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
+                <circle cx="12" cy="7" r="4" />
+              </svg>
+              <span>Continue as Guest</span>
+            </button>
           </div>
 
           <p className="mt-8 text-[11px] text-zinc-500 font-medium select-none">
@@ -2504,7 +2538,7 @@ export default function App() {
 
                              {/* Message content */}
                              {isUser ? (
-                               <div className={`whitespace-pre-wrap leading-relaxed font-sans text-xs sm:text-sm md:text-[15px] select-text flex flex-col gap-2.5 ${isDark ? "text-zinc-250" : "text-zinc-850"} ${msg.isPending ? "opacity-65" : ""}`}>
+                               <div className={`whitespace-pre-wrap leading-relaxed font-sans text-sm sm:text-[15px] md:text-base select-text flex flex-col gap-2.5 ${isDark ? "text-zinc-250" : "text-zinc-850"} ${msg.isPending ? "opacity-65" : ""}`}>
                                  {msg.attachment && (
                                    <div className={`flex items-center gap-3 p-3 rounded-xl border max-w-sm transition-all duration-300 ${
                                      isDark 
@@ -2562,7 +2596,7 @@ export default function App() {
                                   </span>
                                 </div>
                               ) : (
-                                <div className="text-zinc-800 dark:text-zinc-100 font-sans text-sm sm:text-base md:text-[16px] leading-relaxed select-text">
+                                <div className="text-zinc-800 dark:text-zinc-100 font-sans text-[15px] sm:text-[16px] md:text-[18px] leading-relaxed select-text">
                                   {(() => {
                                     const { thinking, actual, isThinking } = parseMessageThinking(msg.content);
                                     const duration = msg.thinkingDuration || 2;
