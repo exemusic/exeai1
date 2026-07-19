@@ -459,6 +459,34 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
   const [expandedActions, setExpandedActions] = useState<Record<string, boolean>>({});
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const thinkingStartTimesRef = useRef<Record<string, number>>({});
+  const activeAssistantMsgIdRef = useRef<string | null>(null);
+
+  // Live ticking of thinkingDuration in ExeCodeWorkspace
+  useEffect(() => {
+    let intervalId: any;
+    if (isAIEditing) {
+      intervalId = setInterval(() => {
+        const activeId = activeAssistantMsgIdRef.current;
+        if (!activeId) return;
+        const startTime = thinkingStartTimesRef.current[activeId];
+        if (!startTime) return;
+        
+        // Calculate dynamic elapsed time
+        const elapsed = Math.max(1, Math.round((Date.now() - startTime) / 1000));
+        
+        setChatHistory(prev =>
+          prev.map((m) =>
+            m.id === activeId ? { ...m, thinkingDuration: elapsed } : m
+          )
+        );
+      }, 500); // Check every 500ms
+    } else {
+      activeAssistantMsgIdRef.current = null;
+    }
+    return () => {
+      if (intervalId) clearInterval(intervalId);
+    };
+  }, [isAIEditing]);
 
   const handleClearChat = () => {
     setShowClearChatConfirm(true);
@@ -1205,6 +1233,7 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
 
     const assistantMsgId = "ai-" + Date.now();
     thinkingStartTimesRef.current[assistantMsgId] = Date.now();
+    activeAssistantMsgIdRef.current = assistantMsgId;
 
     const tempAssistantMsg: ChatMessage = {
       id: assistantMsgId,
@@ -1511,6 +1540,100 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
     }
   };
 
+  const sanitizeAndShortenThought = (thinking: string): string => {
+    if (!thinking) return "";
+
+    // Keywords to completely filter out (privacy, internal directives, system guidelines, massive dumps)
+    const forbiddenKeywords = [
+      "chika",
+      "ravita",
+      "hexky",
+      "hengki",
+      "system memory",
+      "vercel",
+      "developer",
+      "private",
+      "confidential",
+      "instruction",
+      "directive",
+      "preset",
+      "designinstruction",
+      "thinkinstruction",
+      "linkinstruction",
+      "moderneventinstruction",
+      "userrequestedpersonality",
+      "important rule",
+      "formatting rule",
+      "file list",
+      "workspace file",
+      "index.html",
+      "src/",
+      "\\\"path\\\":",
+      "\\\"content\\\":",
+      "{\"path\"",
+      "{\"content\"",
+      "\"path\":",
+      "\"content\":"
+    ];
+
+    const lines = thinking.split("\n");
+    const filteredLines: string[] = [];
+
+    for (const line of lines) {
+      const lowerLine = line.toLowerCase();
+      
+      // Check if the line contains any forbidden keywords
+      const isForbidden = forbiddenKeywords.some(keyword => lowerLine.includes(keyword));
+      if (isForbidden) {
+        continue; // Skip lines containing private/system metadata
+      }
+
+      // Clean up any JSON brackets or markup leaking in the thought
+      if (lowerLine.trim().startsWith("{") || lowerLine.trim().startsWith("}") || lowerLine.trim().startsWith("[") || lowerLine.trim().startsWith("]")) {
+        continue;
+      }
+
+      const trimmed = line.trim();
+      if (trimmed) {
+        filteredLines.push(trimmed);
+      }
+    }
+
+    const polishedLines = filteredLines
+      .filter(l => l.length < 150)
+      .map(l => {
+        // Clean up bullet point formatting to be uniform
+        let clean = l.replace(/^(?:\d+\.|\*|-|•)\s*/, "").trim();
+        clean = clean.replace(/\*\*/g, "").trim();
+        // Capitalize first letter
+        if (clean) {
+          clean = clean.charAt(0).toUpperCase() + clean.slice(1);
+        }
+        return clean;
+      })
+      .filter(Boolean);
+
+    // If we ended up with nothing, provide an elegant short fallback
+    if (polishedLines.length === 0) {
+      return "• Analyzing prompt requirements\n• Formulating solution strategy";
+    }
+
+    // Deduplicate lines
+    const uniqueLines: string[] = [];
+    for (const line of polishedLines) {
+      if (!uniqueLines.includes(line)) {
+        uniqueLines.push(line);
+      }
+    }
+
+    // Cap the number of steps to 4 to make it extremely concise and focused, like Grok xAI!
+    const maxSteps = 4;
+    const slicedLines = uniqueLines.slice(0, maxSteps);
+
+    // Return formatted as concise bullet points
+    return slicedLines.map(step => `• ${step}`).join("\n");
+  };
+
   const parseMessageThinking = (content: string) => {
     if (!content) return { thinking: null, actual: "", isThinking: false };
 
@@ -1522,7 +1645,7 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
       const thinking = match[1].trim();
       // Remove all <think>...</think> blocks from actual content to be absolutely sure they never leak
       const actual = content.replace(thinkRegex, "").trim();
-      return { thinking, actual, isThinking: false };
+      return { thinking: sanitizeAndShortenThought(thinking), actual, isThinking: false };
     }
 
     // If there is an open <think> but no closing </think> (streaming)
@@ -1531,7 +1654,7 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
     if (openMatch) {
       const thinking = openMatch[1].trim();
       const actual = content.replace(openThinkRegex, "").trim();
-      return { thinking, actual, isThinking: true };
+      return { thinking: sanitizeAndShortenThought(thinking), actual, isThinking: true };
     }
 
     // Check if the content ends with a partial <think tag to prevent temporary flickering of partial tag
