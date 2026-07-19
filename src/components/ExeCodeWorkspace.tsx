@@ -1209,7 +1209,7 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
     const tempAssistantMsg: ChatMessage = {
       id: assistantMsgId,
       role: "assistant",
-      content: "AI is reading files and analyzing edits...",
+      content: "<think>Thinking...</think>",
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       modelId: selectedModel,
       thinkingDuration: 1,
