@@ -1618,19 +1618,19 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
           <div className="mb-2.5 font-sans select-none flex flex-col items-start w-full">
             <button
               onClick={() => setExpandedActions(prev => ({ ...prev, [msgId]: !prev[msgId] }))}
-              className={`w-full flex items-center justify-between gap-3 text-[11px] font-semibold px-3 py-2 rounded-xl border transition-all duration-200 cursor-pointer ${
+              className={`w-full flex items-center justify-between gap-3 text-[11px] font-medium px-3.5 py-2 rounded-xl border transition-all duration-200 cursor-pointer ${
                 isDark 
-                  ? "bg-zinc-900/40 border-zinc-800 hover:border-zinc-700 hover:bg-zinc-900/60 text-zinc-300 hover:text-zinc-100" 
-                  : "bg-zinc-50 border-zinc-200 hover:bg-zinc-100 text-zinc-700 hover:text-zinc-900"
+                  ? "bg-[#131314] border-zinc-800/80 hover:bg-[#1e1e1f] text-zinc-300 hover:text-zinc-100" 
+                  : "bg-zinc-50 border-zinc-200 hover:bg-zinc-100 text-zinc-600 hover:text-zinc-900"
               }`}
             >
               <div className="flex items-center gap-2">
-                <span className="shrink-0 text-amber-500">⚡</span>
-                <span className="font-semibold">Action History</span>
+                <Terminal className="h-3.5 w-3.5 text-amber-500" />
+                <span className="font-semibold tracking-tight">Action details</span>
               </div>
               <div className="flex items-center gap-1.5">
-                <span className="text-[9px] font-semibold uppercase tracking-wider px-1.5 py-0.5 bg-emerald-500/10 text-emerald-500 dark:text-emerald-400 border border-emerald-500/20 rounded">Success</span>
-                <ChevronDown className={`h-3 w-3 shrink-0 transition-transform duration-250 ${expandedActions[msgId] ? "rotate-180 text-zinc-400" : "text-zinc-500"}`} />
+                <span className="text-[9px] font-semibold uppercase tracking-wider px-1.5 py-0.5 bg-emerald-500/10 text-emerald-500 dark:text-emerald-400 border border-emerald-500/10 rounded">success</span>
+                <ChevronDown className={`h-3.5 w-3.5 shrink-0 transition-transform duration-250 ${expandedActions[msgId] ? "rotate-180 text-zinc-400" : "text-zinc-500"}`} />
               </div>
             </button>
 
@@ -1643,19 +1643,34 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
                   transition={{ duration: 0.2 }}
                   className="overflow-hidden w-full"
                 >
-                  <div className={`mt-2 w-full p-3.5 rounded-xl border text-[10.5px] leading-relaxed flex flex-col gap-3 transition-colors duration-200 ${
-                    isDark ? "bg-zinc-950/40 border-zinc-900 text-zinc-350" : "bg-zinc-50/50 border-zinc-200 text-zinc-600"
+                  <div className={`mt-2 w-full p-4 rounded-xl border text-[10.5px] leading-relaxed flex flex-col gap-4 transition-colors duration-200 ${
+                    isDark ? "bg-[#131314] border-zinc-800 text-zinc-300" : "bg-zinc-50 border-zinc-200 text-zinc-700"
                   }`}>
                     
                     {/* Read File step */}
-                    <div className="flex items-start gap-2.5">
-                      <div className="w-5 h-5 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-500 flex items-center justify-center text-[10px] shrink-0 font-bold">R</div>
-                      <div className="flex flex-col gap-1">
-                        <span className={`font-semibold ${isDark ? "text-zinc-200" : "text-zinc-800"}`}>Read Workspace Context</span>
-                        <p className={`text-[10px] ${isDark ? "text-zinc-400" : "text-zinc-500"}`}>Loaded workspace files into the model context window for reasoning:</p>
-                        <div className="flex flex-wrap gap-1.5 mt-1">
+                    <div className="flex gap-3 relative">
+                      {/* Timeline vertical connector line */}
+                      <div className="flex flex-col items-center shrink-0 w-6">
+                        <div className={`w-6 h-6 rounded-full flex items-center justify-center border ${
+                          isDark ? "bg-[#1e1e21] border-zinc-800 text-amber-500" : "bg-white border-zinc-200 text-amber-500"
+                        }`}>
+                          <Database className="h-3 w-3" />
+                        </div>
+                        <div className={`w-[1px] flex-1 my-1 ${isDark ? "bg-zinc-800/80" : "bg-zinc-200/85"}`} />
+                      </div>
+                      <div className="flex-1 pb-1 min-w-0">
+                        <div className="flex items-center justify-between">
+                          <span className={`font-mono text-[11px] font-semibold ${isDark ? "text-zinc-200" : "text-zinc-800"}`}>
+                            read_workspace_context()
+                          </span>
+                          <span className={`text-[9px] font-mono ${isDark ? "text-zinc-500" : "text-zinc-400"}`}>Completed</span>
+                        </div>
+                        <p className={`text-[10px] mt-1 ${isDark ? "text-zinc-400" : "text-zinc-500"}`}>
+                          Loaded workspace file snapshots into the model context for reasoning:
+                        </p>
+                        <div className="flex flex-wrap gap-1 mt-1.5">
                           {(msg.filesSnapshot || files).map(f => (
-                            <span key={f.path} className={`px-2 py-0.5 rounded-lg border text-[9.5px] font-mono flex items-center gap-1 ${
+                            <span key={f.path} className={`px-2 py-0.5 rounded text-[9.5px] font-mono border ${
                               isDark ? "bg-zinc-900 border-zinc-800 text-zinc-300" : "bg-white border-zinc-200 text-zinc-700"
                             }`}>
                               📄 {f.path}
@@ -1665,30 +1680,65 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
                       </div>
                     </div>
 
-                    <div className={`h-px w-full ${isDark ? "bg-zinc-900/50" : "bg-zinc-200/60"}`} />
-
                     {/* Inference step */}
-                    <div className="flex items-start gap-2.5">
-                      <div className="w-5 h-5 rounded-full bg-purple-500/10 border border-purple-500/20 text-purple-500 flex items-center justify-center text-[10px] shrink-0 font-bold">G</div>
-                      <div className="flex flex-col gap-0.5">
-                        <span className={`font-semibold ${isDark ? "text-zinc-200" : "text-zinc-800"}`}>AI Model Inference</span>
-                        <p className={`text-[10px] ${isDark ? "text-zinc-400" : "text-zinc-500"}`}>
-                          Executed prompt via <span className="text-amber-500 font-mono font-bold">{msgModelName}</span> in <span className="font-semibold text-emerald-500">{msgDuration} seconds</span>.
-                        </p>
+                    <div className="flex gap-3 relative">
+                      <div className="flex flex-col items-center shrink-0 w-6">
+                        <div className={`w-6 h-6 rounded-full flex items-center justify-center border ${
+                          isDark ? "bg-[#1e1e21] border-zinc-800 text-purple-400" : "bg-white border-zinc-200 text-purple-600"
+                        }`}>
+                          <Sparkles className="h-3 w-3" />
+                        </div>
+                        <div className={`w-[1px] flex-1 my-1 ${isDark ? "bg-zinc-800/80" : "bg-zinc-200/85"}`} />
+                      </div>
+                      <div className="flex-1 pb-1 min-w-0">
+                        <div className="flex items-center justify-between">
+                          <span className={`font-mono text-[11px] font-semibold ${isDark ? "text-zinc-200" : "text-zinc-800"}`}>
+                            ai_model_inference()
+                          </span>
+                          <span className={`text-[9px] font-mono ${isDark ? "text-zinc-500" : "text-zinc-400"}`}>Completed</span>
+                        </div>
+                        <div className={`p-2 rounded-lg font-mono text-[10px] mt-1.5 border leading-relaxed ${
+                          isDark ? "bg-[#0b0b0c] border-zinc-900 text-zinc-400" : "bg-zinc-100/50 border-zinc-150 text-zinc-600"
+                        }`}>
+                          <div className="flex justify-between">
+                            <span className={isDark ? "text-zinc-500" : "text-zinc-400"}>model:</span>
+                            <span className="text-amber-500 font-semibold">{msgModelName}</span>
+                          </div>
+                          <div className="flex justify-between mt-0.5">
+                            <span className={isDark ? "text-zinc-500" : "text-zinc-400"}>latency:</span>
+                            <span className="text-emerald-500 font-semibold">{msgDuration}s</span>
+                          </div>
+                        </div>
                       </div>
                     </div>
 
-                    <div className={`h-px w-full ${isDark ? "bg-zinc-900/50" : "bg-zinc-200/60"}`} />
-
                     {/* Edit step */}
-                    <div className="flex items-start gap-2.5">
-                      <div className="w-5 h-5 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-500 flex items-center justify-center text-[10px] shrink-0 font-bold">W</div>
-                      <div className="flex flex-col gap-1">
-                        <span className={`font-semibold ${isDark ? "text-zinc-200" : "text-zinc-800"}`}>Modified Files Write</span>
-                        <p className={`text-[10px] ${isDark ? "text-zinc-400" : "text-zinc-500"}`}>Wrote edits to target workspace files system:</p>
-                        <div className="flex flex-wrap gap-1.5 mt-1">
+                    <div className="flex gap-3 relative">
+                      <div className="flex flex-col items-center shrink-0 w-6">
+                        <div className={`w-6 h-6 rounded-full flex items-center justify-center border ${
+                          isDark ? "bg-[#1e1e21] border-zinc-800 text-amber-500" : "bg-white border-zinc-200 text-amber-500"
+                        }`}>
+                          <Code className="h-3 w-3" />
+                        </div>
+                        <div className={`w-[1px] flex-1 my-1 ${isDark ? "bg-zinc-800/80" : "bg-zinc-200/85"}`} />
+                      </div>
+                      <div className="flex-1 pb-1 min-w-0">
+                        <div className="flex items-center justify-between">
+                          <span className={`font-mono text-[11px] font-semibold ${isDark ? "text-zinc-200" : "text-zinc-800"}`}>
+                            write_workspace_files()
+                          </span>
+                          <span className={`text-[9px] font-mono ${isDark ? "text-zinc-500" : "text-zinc-400"}`}>Completed</span>
+                        </div>
+                        <p className={`text-[10px] mt-1 ${isDark ? "text-zinc-400" : "text-zinc-500"}`}>
+                          Successfully wrote code modifications to:
+                        </p>
+                        <div className="flex flex-wrap gap-1 mt-1.5">
                           {updatedFiles.map(filePath => (
-                            <span key={filePath} className="px-2 py-0.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-[9.5px] font-mono text-amber-500 flex items-center gap-1 font-semibold animate-pulse">
+                            <span key={filePath} className={`px-2 py-0.5 rounded text-[9.5px] font-mono font-semibold border ${
+                              isDark 
+                                ? "bg-amber-500/5 border-amber-500/10 text-amber-400" 
+                                : "bg-amber-50/50 border-amber-200 text-amber-600"
+                            }`}>
                               ✏️ {filePath}
                             </span>
                           ))}
@@ -1696,16 +1746,34 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
                       </div>
                     </div>
 
-                    <div className={`h-px w-full ${isDark ? "bg-zinc-900/50" : "bg-zinc-200/60"}`} />
-
                     {/* Compile step */}
-                    <div className="flex items-start gap-2.5">
-                      <div className="w-5 h-5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 flex items-center justify-center text-[10px] shrink-0 font-bold">✓</div>
-                      <div className="flex flex-col gap-0.5">
-                        <span className={`font-semibold ${isDark ? "text-zinc-200" : "text-zinc-800"}`}>Compile Applet & Verify Build</span>
-                        <p className={`text-[10px] ${isDark ? "text-zinc-400" : "text-zinc-500"}`}>
-                          Build succeeded. Verification status: <span className="text-emerald-500 font-semibold font-mono bg-emerald-500/10 px-1.5 py-0.2 rounded">SUCCESS</span>. Live preview hot-reloaded successfully.
-                        </p>
+                    <div className="flex gap-3 relative">
+                      <div className="flex flex-col items-center shrink-0 w-6">
+                        <div className={`w-6 h-6 rounded-full flex items-center justify-center border ${
+                          isDark ? "bg-[#1e1e21] border-zinc-800 text-emerald-500" : "bg-white border-zinc-200 text-emerald-500"
+                        }`}>
+                          <CheckCircle2 className="h-3 w-3" />
+                        </div>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between">
+                          <span className={`font-mono text-[11px] font-semibold ${isDark ? "text-zinc-200" : "text-zinc-800"}`}>
+                            verify_app_build()
+                          </span>
+                          <span className={`text-[9px] font-mono ${isDark ? "text-zinc-500" : "text-zinc-400"}`}>Completed</span>
+                        </div>
+                        <div className={`p-2 rounded-lg font-mono text-[10px] mt-1.5 border leading-relaxed ${
+                          isDark ? "bg-[#0b0b0c] border-zinc-900 text-zinc-400" : "bg-zinc-100/50 border-zinc-150 text-zinc-600"
+                        }`}>
+                          <div className="flex justify-between">
+                            <span className={isDark ? "text-zinc-500" : "text-zinc-400"}>status:</span>
+                            <span className="text-emerald-500 font-bold bg-emerald-500/10 dark:bg-emerald-500/10 px-1 rounded">SUCCESS</span>
+                          </div>
+                          <div className="flex justify-between mt-0.5">
+                            <span className={isDark ? "text-zinc-500" : "text-zinc-400"}>preview_reload:</span>
+                            <span className="text-zinc-400 dark:text-zinc-500">HOT_RELOAD</span>
+                          </div>
+                        </div>
                       </div>
                     </div>
 
