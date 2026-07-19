@@ -59,6 +59,158 @@ import { PublicProjectView } from "./components/PublicProjectView";
 
 const notifySoundUrl = new URL("../Sound/notify.mp3", import.meta.url).href;
 
+interface TypewriterMessageProps {
+  content: string;
+  isLatest: boolean;
+  isGenerating: boolean;
+  msgId: string;
+  isSpeaking: boolean;
+  expandedThoughts: Record<string, boolean>;
+  setExpandedThoughts: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
+  parseMessageThinking: (content: string) => { thinking: string | null; actual: string; isThinking: boolean };
+  thinkingDuration?: number;
+}
+
+function TypewriterMessage({
+  content,
+  isLatest,
+  isGenerating,
+  msgId,
+  isSpeaking,
+  expandedThoughts,
+  setExpandedThoughts,
+  parseMessageThinking,
+  thinkingDuration
+}: TypewriterMessageProps) {
+  const [displayedContent, setDisplayedContent] = useState(isLatest ? "" : content);
+  const currentIdxRef = useRef(isLatest ? 0 : content.length);
+  const pauseCounterRef = useRef(0);
+
+  useEffect(() => {
+    if (!isLatest) {
+      setDisplayedContent(content);
+      currentIdxRef.current = content.length;
+      return;
+    }
+
+    let animationFrameId: number;
+
+    const tick = () => {
+      const targetLength = content.length;
+      const currentIdx = currentIdxRef.current;
+
+      if (currentIdx >= targetLength) {
+        if (!isGenerating) {
+          setDisplayedContent(content);
+          return;
+        }
+        animationFrameId = requestAnimationFrame(tick);
+        return;
+      }
+
+      // Dynamic typewriter speed based on content length
+      let step = 1;
+      if (targetLength > 2000) {
+        step = Math.max(12, Math.ceil(targetLength / 90));
+      } else if (targetLength > 800) {
+        step = Math.max(5, Math.ceil(targetLength / 120));
+      } else if (targetLength > 300) {
+        step = Math.max(2, Math.ceil(targetLength / 150));
+      } else {
+        step = 1;
+      }
+
+      // If we are actively streaming, make sure we catch up rapidly if lag is too big
+      const lag = targetLength - currentIdx;
+      if (isGenerating && lag > 150) {
+        step = Math.max(step, Math.ceil(lag / 8));
+      }
+
+      // Micro-pause at sentence endings (., ?, !) for natural pacing
+      const char = content[currentIdx - 1];
+      const nextChar = content[currentIdx];
+      if (step <= 3 && (char === "." || char === "?" || char === "!") && (nextChar === " " || nextChar === "\n")) {
+        if (pauseCounterRef.current < 8) {
+          pauseCounterRef.current++;
+          animationFrameId = requestAnimationFrame(tick);
+          return;
+        }
+        pauseCounterRef.current = 0;
+      }
+
+      const nextIdx = Math.min(targetLength, currentIdx + step);
+      currentIdxRef.current = nextIdx;
+      setDisplayedContent(content.substring(0, nextIdx));
+
+      animationFrameId = requestAnimationFrame(tick);
+    };
+
+    animationFrameId = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(animationFrameId);
+  }, [content, isLatest, isGenerating]);
+
+  useEffect(() => {
+    if (!isLatest) {
+      setDisplayedContent(content);
+    }
+  }, [content, isLatest]);
+
+  const { thinking, actual, isThinking } = parseMessageThinking(displayedContent);
+  const duration = thinkingDuration || 2;
+
+  return (
+    <div className="flex flex-col">
+      {thinking !== null && (
+        <div className="mb-3 font-sans select-none align-baseline flex flex-col items-start">
+          <button
+            onClick={() => setExpandedThoughts(prev => ({ ...prev, [msgId]: !prev[msgId] }))}
+            className="flex items-center gap-2 text-xs text-zinc-500 dark:text-zinc-400 hover:text-zinc-750 dark:hover:text-zinc-200 transition-colors font-medium bg-zinc-100 dark:bg-zinc-900/40 px-3 py-1.5 rounded-xl border border-zinc-200 dark:border-zinc-800/80 cursor-pointer"
+          >
+            <span className="animate-pulse shrink-0">💡</span>
+            <span>{isThinking ? "Thinking..." : `Thought for ${duration}s`}</span>
+            <ChevronDown className={`h-3 w-3 text-zinc-400 shrink-0 transition-transform duration-200 ${expandedThoughts[msgId] ? "rotate-180" : ""}`} />
+          </button>
+          
+          <AnimatePresence>
+            {expandedThoughts[msgId] && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: "auto", opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.2 }}
+                className="overflow-hidden w-full"
+              >
+                <div className="mt-2 ml-3.5 pl-3.5 border-l-2 border-zinc-200 dark:border-zinc-800 text-xs text-zinc-500 dark:text-zinc-500 font-mono leading-relaxed whitespace-pre-wrap py-1">
+                  {thinking || "Processing..."}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      )}
+
+      {actual ? (
+        <MarkdownRenderer content={actual} />
+      ) : isGenerating && isLatest && displayedContent === "" ? (
+        <div className="flex items-center gap-2 py-2">
+          <span className="h-1.5 w-1.5 rounded-full bg-zinc-500 animate-[bounce_1s_infinite_100ms]" />
+          <span className="h-1.5 w-1.5 rounded-full bg-zinc-500 animate-[bounce_1s_infinite_200ms]" />
+          <span className="h-1.5 w-1.5 rounded-full bg-zinc-500 animate-[bounce_1s_infinite_300ms]" />
+        </div>
+      ) : !thinking && !isThinking ? (
+        <div className="text-zinc-400 dark:text-zinc-500 italic text-xs mt-1.5 select-none font-sans flex items-center gap-1.5">
+          <span className="text-sm">⚠️</span>
+          <span>
+            {navigator.language?.toLowerCase()?.startsWith("id")
+              ? "Maaf, sistem tidak menghasilkan jawaban teks. Silakan coba kirim ulang atau ketik pertanyaan lain!"
+              : "Sorry, no text response was generated. Please try resending or rephrasing your message!"}
+          </span>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 export default function App() {
   const [expandedThoughts, setExpandedThoughts] = useState<Record<string, boolean>>({});
 
@@ -257,6 +409,22 @@ export default function App() {
     window.addEventListener("click", handleGlobalClick);
     return () => {
       window.removeEventListener("click", handleGlobalClick);
+    };
+  }, []);
+
+  const [viewportHeight, setViewportHeight] = useState<string>("100dvh");
+
+  useEffect(() => {
+    if (!window.visualViewport) return;
+    const handleResize = () => {
+      setViewportHeight(`${window.visualViewport.height}px`);
+    };
+    window.visualViewport.addEventListener("resize", handleResize);
+    window.visualViewport.addEventListener("scroll", handleResize);
+    handleResize();
+    return () => {
+      window.visualViewport?.removeEventListener("resize", handleResize);
+      window.visualViewport?.removeEventListener("scroll", handleResize);
     };
   }, []);
 
@@ -982,23 +1150,6 @@ export default function App() {
     }
   };
 
-  const handleContinueAsGuest = () => {
-    setUserId("guest_user");
-    setUserEmail("guest@exechat.local");
-    setUserPhoto(null);
-    setUserName("Guest");
-    setUserDisplayName("Guest");
-    setIsLoggedIn(true);
-    setCredits(99999);
-    setErrorText(null);
-    localStorage.setItem("exechat_logged_in", "true");
-    localStorage.setItem("exechat_username", "Guest");
-    localStorage.setItem("exechat_display_name", "Guest");
-    localStorage.setItem("exechat_user_id", "guest_user");
-    localStorage.setItem("exechat_email", "guest@exechat.local");
-    playNotifySound();
-  };
-
   const handleCompleteRegistrationWithChosenName = (finalChosenName: string) => {
     const finalName = finalChosenName.trim() || googleDefaultName || "User";
     setUserName(finalName);
@@ -1265,6 +1416,37 @@ export default function App() {
     abortControllerRef.current = controller;
 
     let connectionSucceeded = false;
+
+    const pendingTimeoutId = setTimeout(() => {
+      if (!connectionSucceeded && isGenerating) {
+        thinkingStartTimesRef.current[assistantMsgId] = Date.now();
+        activeAssistantMsgIdRef.current = assistantMsgId;
+        const assistantPlaceholder: Message = {
+          id: assistantMsgId,
+          role: "model",
+          content: "",
+          timestamp: Date.now(),
+          thinkingDuration: 1,
+        };
+
+        setSessions((prev) =>
+          prev.map((s) => {
+            if (s.id === targetSessionId) {
+              const alreadyAdded = s.messages.some((m) => m.id === assistantMsgId);
+              if (alreadyAdded) return s;
+              return {
+                ...s,
+                messages: s.messages.map((m) =>
+                  m.id === userMessage.id ? { ...m, isPending: false } : m
+                ).concat(assistantPlaceholder),
+              };
+            }
+            return s;
+          })
+        );
+      }
+    }, 4000);
+
     try {
       const response = await fetch("/api/chat/stream", {
         method: "POST",
@@ -1284,10 +1466,12 @@ export default function App() {
       });
 
       if (!response.ok) {
+        clearTimeout(pendingTimeoutId);
         throw new Error(`Failed to establish stream connection (status ${response.status})`);
       }
 
       connectionSucceeded = true;
+      clearTimeout(pendingTimeoutId);
 
       // Connection succeeded! Set the user message isPending to false, and add the assistant placeholder message
       thinkingStartTimesRef.current[assistantMsgId] = Date.now();
@@ -1303,11 +1487,12 @@ export default function App() {
       setSessions((prev) =>
         prev.map((s) => {
           if (s.id === targetSessionId) {
+            const alreadyAdded = s.messages.some((m) => m.id === assistantMsgId);
             return {
               ...s,
               messages: s.messages.map((m) =>
                 m.id === userMessage.id ? { ...m, isPending: false } : m
-              ).concat(assistantPlaceholder),
+              ).concat(alreadyAdded ? [] : [assistantPlaceholder]),
             };
           }
           return s;
@@ -1406,6 +1591,7 @@ export default function App() {
         }
       }
     } catch (err: any) {
+      clearTimeout(pendingTimeoutId);
       if (!connectionSucceeded) {
         // Automatically delete the failed user message from the session
         setSessions((prev) =>
@@ -2056,7 +2242,7 @@ export default function App() {
 
   if (authLoading) {
     return (
-      <div className="flex h-screen w-full flex-col items-center justify-center bg-zinc-950 font-sans text-zinc-100 antialiased">
+      <div style={{ height: viewportHeight }} className="flex w-full flex-col items-center justify-center bg-zinc-950 font-sans text-zinc-100 antialiased">
         <div className="relative flex flex-col items-center">
           <div className="mb-6 p-1 hover:scale-105 transition-transform">
             <img src="/exechat.png" alt="ExeChat Logo" className="h-16 w-16 object-contain" referrerPolicy="no-referrer" />
@@ -2070,7 +2256,7 @@ export default function App() {
 
   if (!isLoggedIn) {
     return (
-      <div className="flex h-screen w-full items-center justify-center bg-zinc-950 font-sans text-zinc-100 antialiased selection:bg-zinc-800 relative overflow-hidden">
+      <div style={{ height: viewportHeight }} className="flex w-full items-center justify-center bg-zinc-950 font-sans text-zinc-100 antialiased selection:bg-zinc-800 relative overflow-hidden">
         <div className="absolute inset-0 bg-radial-[circle_at_center,rgba(39,39,42,0.15),transparent_70%] pointer-events-none" />
 
         <motion.div
@@ -2117,23 +2303,6 @@ export default function App() {
               theme="filled_black"
               shape="pill"
             />
-            
-            <div className="flex items-center gap-2 w-full my-1">
-              <div className="h-[1px] bg-zinc-800 flex-1" />
-              <span className="text-[10px] uppercase tracking-wider text-zinc-600 font-semibold font-mono">or</span>
-              <div className="h-[1px] bg-zinc-800 flex-1" />
-            </div>
-
-            <button
-              onClick={handleContinueAsGuest}
-              className="w-full py-2.5 px-4 rounded-full border border-zinc-700 hover:border-zinc-500 bg-zinc-800/40 hover:bg-zinc-800/80 text-zinc-200 hover:text-white transition-all duration-200 text-sm font-semibold flex items-center justify-center gap-2 shadow-sm cursor-pointer"
-            >
-              <svg className="h-4 w-4 text-amber-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
-                <circle cx="12" cy="7" r="4" />
-              </svg>
-              <span>Continue as Guest</span>
-            </button>
           </div>
 
           <p className="mt-8 text-[11px] text-zinc-500 font-medium select-none">
@@ -2145,7 +2314,7 @@ export default function App() {
   }
 
   return (
-    <div className="flex h-screen h-[100dvh] w-full overflow-hidden bg-zinc-950 font-sans text-zinc-100 antialiased selection:bg-zinc-700/80">
+    <div style={{ height: viewportHeight }} className="flex w-full overflow-hidden bg-zinc-950 font-sans text-zinc-100 antialiased selection:bg-zinc-700/80">
       <input
         ref={fileInputRef}
         type="file"
@@ -2351,38 +2520,37 @@ export default function App() {
               <div className="max-w-3xl mx-auto h-full flex flex-col">
 
                 {!currentSession || currentSession.messages.length === 0 ? (
-                  <div className="flex-1 flex flex-col justify-start md:justify-center items-center pt-8 sm:pt-14 md:pt-0 pb-8 max-w-2xl mx-auto w-full px-2 text-center">
-                    <div className="text-center select-none mb-2.5 md:mb-5">
-                      <motion.div
-                        initial={{ scale: 0.93, opacity: 0 }}
-                        animate={{ scale: 1, opacity: 1 }}
-                        transition={{ duration: 0.6, ease: "easeOut" }}
-                        className="inline-flex items-center justify-center"
-                      >
-                        <img src="/exechat.png" alt="" className="h-14 w-14 md:h-18 md:w-18 object-contain" referrerPolicy="no-referrer" />
-                      </motion.div>
-                    </div>
+                  <div className="flex-1 flex flex-col justify-between md:justify-center items-center pt-4 sm:pt-6 md:pt-0 pb-4 max-w-2xl mx-auto w-full px-2 text-center">
+                    <div className="flex-1 flex flex-col justify-center items-center w-full min-h-[140px] md:flex-initial md:min-h-0 md:mb-5">
+                      <div className="text-center select-none mb-2.5 md:mb-5">
+                        <motion.div
+                          initial={{ scale: 0.93, opacity: 0 }}
+                          animate={{ scale: 1, opacity: 1 }}
+                          transition={{ duration: 0.6, ease: "easeOut" }}
+                          className="inline-flex items-center justify-center"
+                        >
+                          <img src="/exechat.png" alt="" className="h-14 w-14 md:h-18 md:w-18 object-contain" referrerPolicy="no-referrer" />
+                        </motion.div>
+                      </div>
 
-                    <motion.h2
-                      initial={{ opacity: 0, y: 8 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 0.1, duration: 0.4 }}
-                      className="font-display font-semibold text-2xl sm:text-3xl md:text-[42px] tracking-tight leading-tight mb-6 sm:mb-8 md:mb-10 bg-gradient-to-r from-[#59a6ff] via-[#c084fc] to-[#ff8da1] bg-clip-text text-transparent select-none"
-                    >
-                      {userDisplayName === "Guest" || userName === "Guest"
-                        ? `Hello Guest, ${welcomeGreeting}`
-                        : (userDisplayName || userName 
-                            ? `Hello ${userDisplayName || userName}, ${welcomeGreeting}` 
-                            : `Hello, ${welcomeGreeting.charAt(0).toUpperCase() + welcomeGreeting.slice(1)}`
-                          )
-                      }
-                    </motion.h2>
+                      <motion.h2
+                        initial={{ opacity: 0, y: 8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.1, duration: 0.4 }}
+                        className="font-display font-semibold text-2xl sm:text-3xl md:text-[42px] tracking-tight leading-tight bg-gradient-to-r from-[#59a6ff] via-[#c084fc] to-[#ff8da1] bg-clip-text text-transparent select-none"
+                      >
+                        {userDisplayName || userName 
+                          ? `Hello ${userDisplayName || userName}, ${welcomeGreeting}` 
+                          : `Hello, ${welcomeGreeting.charAt(0).toUpperCase() + welcomeGreeting.slice(1)}`
+                        }
+                      </motion.h2>
+                    </div>
 
                     <motion.div
                       initial={{ opacity: 0, y: 12 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: 0.2, duration: 0.4 }}
-                      className="w-full shiny-border-container rounded-[28px] md:rounded-[32px] relative z-10"
+                      className="w-full shiny-border-container rounded-[28px] md:rounded-[32px] relative z-10 mt-auto md:mt-0"
                     >
                       <div className={`rounded-[26px] md:rounded-[30px] p-4 sm:p-5 px-5 sm:px-6 transition-all duration-300 focus-within:shadow-md ${
                         isDark ? "bg-[#1e1f20]" : "bg-[#f0f4f9]"
@@ -2420,8 +2588,10 @@ export default function App() {
                             console.log("[Button] Upload clicked");
                             fileInputRef.current?.click();
                           }}
-                          className={`p-2.5 rounded-full transition-colors shrink-0 ${
-                            isDark ? "hover:bg-zinc-800/50 hover:text-amber-400 text-zinc-400" : "hover:bg-zinc-200 text-zinc-600 hover:text-[#1a73e8]"
+                          className={`h-10 w-10 rounded-full transition-all duration-200 shrink-0 flex items-center justify-center cursor-pointer ${
+                            isDark 
+                              ? "hover:bg-zinc-800/50 hover:text-amber-400 text-zinc-400" 
+                              : "hover:bg-zinc-200 text-zinc-600 hover:text-[#1a73e8]"
                           }`}
                           title="Attach File (Text, Code, Image, Audio, etc.)"
                         >
@@ -2440,7 +2610,7 @@ export default function App() {
                           }}
                           placeholder="Ask ExeChat anything..."
                           disabled={isGenerating}
-                          className={`flex-1 bg-transparent resize-none border-none outline-none focus:ring-0 text-[15px] sm:text-base md:text-base min-h-[64px] md:min-h-[80px] max-h-40 font-sans ${
+                          className={`flex-1 bg-transparent resize-none border-none outline-none focus:ring-0 text-[15px] sm:text-base md:text-base min-h-[44px] md:min-h-[50px] max-h-40 font-sans py-2.5 ${
                             isDark ? "text-zinc-250 placeholder-zinc-500" : "text-zinc-850 placeholder-zinc-400"
                           }`}
                           style={{ height: "auto" }}
@@ -2454,7 +2624,7 @@ export default function App() {
                           <button
                             type="button"
                             onClick={() => setShowModelModal(true)}
-                            className={`flex items-center gap-1.5 text-[10px] md:text-[11px] rounded-full py-1.5 px-3 max-w-[120px] sm:max-w-none truncate font-sans cursor-pointer focus:outline-none transition-all border ${
+                            className={`flex items-center gap-1.5 text-[10px] md:text-[11px] rounded-full py-1.5 px-3 max-w-[120px] sm:max-w-none truncate font-semibold font-sans cursor-pointer focus:outline-none transition-all border ${
                               isDark 
                                 ? "bg-zinc-950 hover:bg-zinc-900 text-zinc-400 border-zinc-900 hover:border-zinc-800" 
                                : "bg-white hover:bg-zinc-100 text-zinc-600 border-zinc-200 hover:border-zinc-350"
@@ -2469,7 +2639,7 @@ export default function App() {
                           <button
                             type="button"
                             onClick={() => setShowPresetModal(true)}
-                            className={`flex items-center gap-1.5 text-[10px] md:text-[11px] rounded-full py-1.5 px-3 max-w-[120px] sm:max-w-none truncate font-sans cursor-pointer focus:outline-none transition-all border ${
+                            className={`flex items-center gap-1.5 text-[10px] md:text-[11px] rounded-full py-1.5 px-3 max-w-[120px] sm:max-w-none truncate font-semibold font-sans cursor-pointer focus:outline-none transition-all border ${
                               isDark 
                                 ? "bg-zinc-950 hover:bg-zinc-900 text-zinc-400 border-zinc-900 hover:border-zinc-800" 
                                 : "bg-white hover:bg-zinc-100 text-zinc-600 border-zinc-200 hover:border-zinc-350"
@@ -2592,66 +2762,22 @@ export default function App() {
                                     <span className="h-1.5 w-1.5 rounded-full bg-zinc-500 animate-[bounce_1s_infinite_300ms]" />
                                   </div>
                                   <span className="text-xs text-zinc-500 font-medium font-sans">
-                                    AI is thinking...
+                                    Thinking...
                                   </span>
                                 </div>
                               ) : (
                                 <div className="text-zinc-800 dark:text-zinc-100 font-sans text-[15px] sm:text-[16px] md:text-[18px] leading-relaxed select-text">
-                                  {(() => {
-                                    const { thinking, actual, isThinking } = parseMessageThinking(msg.content);
-                                    const duration = msg.thinkingDuration || 2;
-                                    return (
-                                      <div className="flex flex-col">
-                                        {thinking !== null && (
-                                          <div className="mb-3 font-sans select-none align-baseline flex flex-col items-start">
-                                            <button
-                                              onClick={() => setExpandedThoughts(prev => ({ ...prev, [msg.id]: !prev[msg.id] }))}
-                                              className="flex items-center gap-2 text-xs text-zinc-500 dark:text-zinc-400 hover:text-zinc-750 dark:hover:text-zinc-200 transition-colors font-medium bg-zinc-100 dark:bg-zinc-900/40 px-3 py-1.5 rounded-xl border border-zinc-200 dark:border-zinc-800/80 cursor-pointer"
-                                            >
-                                              <span className="animate-pulse shrink-0">💡</span>
-                                              <span>{isThinking ? "Thinking..." : `Thought for ${duration}s`}</span>
-                                              <ChevronDown className={`h-3 w-3 text-zinc-400 shrink-0 transition-transform duration-200 ${expandedThoughts[msg.id] ? "rotate-180" : ""}`} />
-                                            </button>
-                                            
-                                            <AnimatePresence>
-                                              {expandedThoughts[msg.id] && (
-                                                <motion.div
-                                                  initial={{ height: 0, opacity: 0 }}
-                                                  animate={{ height: "auto", opacity: 1 }}
-                                                  exit={{ height: 0, opacity: 0 }}
-                                                  transition={{ duration: 0.2 }}
-                                                  className="overflow-hidden w-full"
-                                                >
-                                                  <div className="mt-2 ml-3.5 pl-3.5 border-l-2 border-zinc-200 dark:border-zinc-800 text-xs text-zinc-500 dark:text-zinc-500 font-mono leading-relaxed whitespace-pre-wrap py-1">
-                                                    {thinking || "Processing..."}
-                                                  </div>
-                                                </motion.div>
-                                              )}
-                                            </AnimatePresence>
-                                          </div>
-                                        )}
-
-                                        {actual ? (
-                                          <MarkdownRenderer content={actual} />
-                                        ) : isGenerating && index === currentSession.messages.length - 1 ? (
-                                          <div className="flex items-center gap-2 py-2">
-                                            <span className="h-1.5 w-1.5 rounded-full bg-zinc-500 animate-[bounce_1s_infinite_100ms]" />
-                                            <span className="h-1.5 w-1.5 rounded-full bg-zinc-500 animate-[bounce_1s_infinite_200ms]" />
-                                            <span className="h-1.5 w-1.5 rounded-full bg-zinc-500 animate-[bounce_1s_infinite_300ms]" />
-                                          </div>
-                                        ) : (
-                                          <div className="text-zinc-400 dark:text-zinc-500 italic text-xs mt-1.5 select-none font-sans flex items-center gap-1.5">
-                                            <span className="text-sm">⚠️</span>
-                                            <span>
-                                              {navigator.language?.toLowerCase()?.startsWith("id")
-                                                ? "Maaf, sistem tidak menghasilkan jawaban teks. Silakan coba kirim ulang atau ketik pertanyaan lain!"
-                                                : "Sorry, no text response was generated. Please try resending or rephrasing your message!"}
-                                            </span>
-                                          </div>
-                                        )}
-                                      </div>
-                                    );
-                                  })()}
+                                  <TypewriterMessage
+                                    content={msg.content}
+                                    isLatest={index === currentSession.messages.length - 1}
+                                    isGenerating={isGenerating}
+                                    msgId={msg.id}
+                                    isSpeaking={isSpeaking}
+                                    expandedThoughts={expandedThoughts}
+                                    setExpandedThoughts={setExpandedThoughts}
+                                    parseMessageThinking={parseMessageThinking}
+                                    thinkingDuration={msg.thinkingDuration}
+                                  />
 
                                   {isSpeaking && (
                                     <div className="inline-flex items-center gap-1.5 mt-2 px-2.5 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-500 text-[10px] font-mono animate-pulse">
@@ -2775,7 +2901,7 @@ export default function App() {
                     {isGenerating && currentSession.messages[currentSession.messages.length - 1]?.role === "model" && currentSession.messages[currentSession.messages.length - 1]?.content !== "" && (
                       <div className="flex items-center gap-2 text-zinc-500 pl-9 md:pl-12 py-1 text-[11px] md:text-xs select-none">
                         <span className="h-1.5 w-1.5 rounded-full bg-zinc-600 animate-pulse" />
-                        <span>AI is writing...</span>
+                        <span>Writing...</span>
                       </div>
                     )}
                   </div>
@@ -2813,7 +2939,7 @@ export default function App() {
                       <button
                         type="button"
                         onClick={() => setShowModelModal(true)}
-                        className={`border text-[10px] md:text-[11px] rounded-lg py-1 px-2.5 font-sans max-w-[125px] sm:max-w-none truncate cursor-pointer focus:outline-none transition-all shadow-sm flex items-center gap-1 ${
+                        className={`border text-[10px] md:text-[11px] rounded-lg py-1 px-2.5 font-semibold font-sans max-w-[125px] sm:max-w-none truncate cursor-pointer focus:outline-none transition-all shadow-sm flex items-center gap-1 ${
                           isDark 
                             ? "bg-zinc-900 hover:bg-zinc-900/80 text-zinc-300 border-zinc-850 hover:border-zinc-850" 
                             : "bg-zinc-50 hover:bg-zinc-100 text-zinc-700 border-zinc-200 hover:border-zinc-200"
@@ -2828,7 +2954,7 @@ export default function App() {
                       <button
                         type="button"
                         onClick={() => setShowPresetModal(true)}
-                        className={`border text-[10px] md:text-[11px] rounded-lg py-1 px-2.5 font-sans max-w-[125px] sm:max-w-none truncate cursor-pointer focus:outline-none transition-all shadow-sm flex items-center gap-1 ${
+                        className={`border text-[10px] md:text-[11px] rounded-lg py-1 px-2.5 font-semibold font-sans max-w-[125px] sm:max-w-none truncate cursor-pointer focus:outline-none transition-all shadow-sm flex items-center gap-1 ${
                           isDark 
                             ? "bg-zinc-900 hover:bg-zinc-900/80 text-zinc-300 border-zinc-850 hover:border-zinc-850" 
                             : "bg-zinc-50 hover:bg-zinc-100 text-zinc-700 border-zinc-200 hover:border-zinc-200"
@@ -2838,13 +2964,6 @@ export default function App() {
                         <span className="truncate">Topic: {activePreset.name}</span>
                         <ChevronDown className="h-2.5 w-2.5 text-zinc-500 shrink-0" />
                       </button>
-                    </div>
-
-                    {/* Character Counter Display */}
-                    <div className={`flex items-center gap-2 md:gap-3 font-mono text-[9px] md:text-[10px] select-none ${
-                      isDark ? "text-zinc-650" : "text-zinc-400"
-                    }`}>
-                      <span>{inputMessage.length} characters</span>
                     </div>
                   </div>
 
@@ -2881,14 +3000,14 @@ export default function App() {
                       </div>
                     )}
 
-                    <div className="flex items-end w-full gap-1">
+                    <div className="flex items-center w-full gap-1.5 md:gap-2">
                       {/* Upload button inside textbox - left side */}
                       <button
                         onClick={() => {
                           console.log("[Button] Upload clicked");
                           fileInputRef.current?.click();
                         }}
-                        className={`p-2.5 rounded-full hover:text-amber-400 transition-colors text-zinc-500 shrink-0 ${
+                        className={`h-9 w-9 md:h-10 md:w-10 rounded-full hover:text-amber-400 transition-all duration-200 text-zinc-500 shrink-0 flex items-center justify-center cursor-pointer ${
                           isDark ? "hover:bg-zinc-800" : "hover:bg-zinc-200"
                         }`}
                         title="Upload supporting file (Text, Code, Image, etc.)"
@@ -2909,18 +3028,18 @@ export default function App() {
                        }}
                        placeholder={
                          isGenerating
-                           ? "Please wait for the AI to finish responding..."
+                           ? "Generating response..."
                            : "Ask ExeChat anything..."
                        }
                        disabled={isGenerating}
-                       className={`flex-1 max-h-40 min-h-[38px] md:min-h-[44px] bg-transparent resize-none py-2.5 px-3 border-none outline-none focus:ring-0 text-[15px] sm:text-base md:text-base ${
+                       className={`flex-1 max-h-40 min-h-[36px] md:min-h-[40px] bg-transparent resize-none py-1.5 md:py-2 px-2 border-none outline-none focus:ring-0 text-[15px] sm:text-base md:text-base ${
                          isDark ? "text-zinc-200 placeholder-zinc-550" : "text-zinc-850 placeholder-zinc-400"
                        }`}
                        style={{ height: "auto" }}
                      />
 
                     {/* Abort button / Submit button */}
-                    <div className="flex items-center gap-1 pl-1.5 shrink-0 self-end mb-1">
+                    <div className="flex items-center shrink-0">
                       {isGenerating ? (
                         <button
                           onClick={handleStopGeneration}
@@ -2939,7 +3058,7 @@ export default function App() {
                                 ? "bg-zinc-100 hover:bg-zinc-200 text-zinc-950 cursor-pointer hover:scale-105" 
                                 : "bg-zinc-900 hover:bg-zinc-850 text-white cursor-pointer hover:scale-105"
                               : isDark 
-                                ? "bg-zinc-900 border border-zinc-850 text-zinc-600 cursor-not-allowed" 
+                                ? "bg-zinc-900 border border-zinc-850 text-zinc-650 cursor-not-allowed" 
                                 : "bg-zinc-100 border border-zinc-200 text-zinc-400 cursor-not-allowed"
                           }`}
                           title="Send Message"
@@ -3043,48 +3162,27 @@ export default function App() {
                               </div>
                             )}
                             <div>
-                              {isLoggedIn ? (
-                                <div className="space-y-1">
-                                  <div className={`flex items-center gap-2 font-bold text-base ${isDark ? "text-zinc-100" : "text-zinc-900"}`}>
-                                    <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-                                    <span>Connected via Google</span>
-                                  </div>
-                                  <p className={`text-xs ${isDark ? "text-zinc-400" : "text-zinc-550"}`}>{userEmail}</p>
+                              <div className="space-y-1">
+                                <div className={`flex items-center gap-2 font-bold text-base ${isDark ? "text-zinc-100" : "text-zinc-900"}`}>
+                                  <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                                  <span>Connected via Google</span>
                                 </div>
-                              ) : (
-                                <div className="space-y-1">
-                                  <div className={`flex items-center gap-2 font-bold text-base ${isDark ? "text-zinc-100" : "text-zinc-900"}`}>
-                                    <span className="h-2 w-2 rounded-full bg-amber-500 animate-pulse" />
-                                    <span>Free Guest Mode</span>
-                                  </div>
-                                  <p className={`text-xs ${isDark ? "text-zinc-400" : "text-zinc-550"}`}>Use Google sign-in for full assistant personalization.</p>
-                                </div>
-                              )}
+                                <p className={`text-xs ${isDark ? "text-zinc-400" : "text-zinc-550"}`}>{userEmail}</p>
+                              </div>
                             </div>
                           </div>
 
                           <div className="shrink-0 flex items-center gap-2">
-                            {isLoggedIn ? (
-                              <button
-                                onClick={handleLogout}
-                                className={`text-xs font-semibold py-2 px-5 rounded-xl border transition-all duration-200 cursor-pointer ${
-                                  isDark 
-                                    ? "bg-red-950/30 hover:bg-red-900/30 text-red-300 border-red-900/40" 
-                                    : "bg-red-50 hover:bg-red-100 text-red-600 border-red-200"
-                                }`}
-                              >
-                                Logout
-                              </button>
-                            ) : (
-                              <div className="w-full">
-                                <GoogleLogin
-                                  onSuccess={handleGoogleLoginSuccess}
-                                  onError={() => setErrorText("Google sign-in failed.")}
-                                  theme={isDark ? "filled_black" : "outline"}
-                                  shape="pill"
-                                />
-                              </div>
-                            )}
+                            <button
+                              onClick={handleLogout}
+                              className={`text-xs font-semibold py-2 px-5 rounded-xl border transition-all duration-200 cursor-pointer ${
+                                isDark 
+                                  ? "bg-red-950/30 hover:bg-red-900/30 text-red-300 border-red-900/40" 
+                                  : "bg-red-50 hover:bg-red-100 text-red-600 border-red-200"
+                              }`}
+                            >
+                              Logout
+                            </button>
                           </div>
                         </div>
                       </div>
