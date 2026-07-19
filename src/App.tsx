@@ -1807,16 +1807,7 @@ export default function App() {
       <div className="flex h-screen w-full flex-col items-center justify-center bg-zinc-950 font-sans text-zinc-100 antialiased">
         <div className="relative flex flex-col items-center">
           <div className="mb-6 p-1 hover:scale-105 transition-transform">
-            <svg className="h-16 w-16 animate-[spin_6s_linear_infinite]" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M12 3Q12 12 21 12Q12 12 12 21Q12 12 3 12Q12 12 12 3Z" fill="url(#loadingGrad)" />
-              <defs>
-                <linearGradient id="loadingGrad" x1="3" y1="3" x2="21" y2="21" gradientUnits="userSpaceOnUse">
-                  <stop offset="0%" stopColor="#59a6ff" />
-                  <stop offset="50%" stopColor="#c084fc" />
-                  <stop offset="100%" stopColor="#ff8da1" />
-                </linearGradient>
-              </defs>
-            </svg>
+            <img src="/exechat.png" alt="ExeChat Logo" className="h-16 w-16 object-contain" referrerPolicy="no-referrer" />
           </div>
           <h2 className="text-lg font-medium tracking-wide animate-pulse">Connecting to ExeChat...</h2>
           <p className="mt-2 text-xs text-zinc-500 font-mono">Verifying secure session...</p>
@@ -1837,10 +1828,8 @@ export default function App() {
           className="w-full max-w-[400px] rounded-2xl border border-zinc-800 bg-zinc-900/40 p-8 sm:p-10 shadow-xl z-10 mx-4 flex flex-col items-center text-center"
         >
           <div className="mb-6 select-none">
-            <div className="h-12 w-12 rounded-xl bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-200 shadow-md">
-              <svg className="h-6 w-6 text-zinc-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-              </svg>
+            <div className="h-12 w-12 rounded-xl bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-200 shadow-md overflow-hidden">
+              <img src="/exechat.png" alt="ExeChat Logo" className="h-8 w-8 object-contain" referrerPolicy="no-referrer" />
             </div>
           </div>
 
@@ -1908,17 +1897,7 @@ export default function App() {
               setCurrentSessionId(null);
               setShowSettings(false);
             }}>
-              <svg className="h-6.5 w-6.5 animate-[spin_10s_linear_infinite]" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M12 3Q12 12 21 12Q12 12 12 21Q12 12 3 12Q12 12 12 3Z" fill="url(#customGrad)" />
-                <circle cx="12" cy="12" r="2.5" fill="#ffffff" className="mix-blend-overlay" />
-                <defs>
-                  <linearGradient id="customGrad" x1="3" y1="3" x2="21" y2="21" gradientUnits="userSpaceOnUse">
-                    <stop offset="0%" stopColor="#59a6ff" />
-                    <stop offset="50%" stopColor="#c084fc" />
-                    <stop offset="100%" stopColor="#ff8da1" />
-                  </linearGradient>
-                </defs>
-              </svg>
+              <img src="/exechat.png" alt="ExeChat Logo" className="h-6.5 w-6.5 object-contain" referrerPolicy="no-referrer" />
             </div>
 
             <button
@@ -2109,21 +2088,9 @@ export default function App() {
                         initial={{ scale: 0.93, opacity: 0 }}
                         animate={{ scale: 1, opacity: 1 }}
                         transition={{ duration: 0.6, ease: "easeOut" }}
-                        className={`inline-flex h-11 w-11 md:h-14 md:w-14 rounded-2xl flex items-center justify-center shadow-lg border ${
-                          isDark ? "bg-[#1e1f20] border-zinc-800" : "bg-[#f0f4f9] border-zinc-200"
-                        }`}
+                        className="inline-flex items-center justify-center"
                       >
-                        <svg className="h-6 w-6 md:h-8 md:w-8 animate-[spin_10s_linear_infinite]" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                          <path d="M12 3Q12 12 21 12Q12 12 12 21Q12 12 3 12Q12 12 12 3Z" fill="url(#customGradWelcome)" />
-                          <circle cx="12" cy="12" r="2.5" fill="#ffffff" className="mix-blend-overlay" />
-                          <defs>
-                            <linearGradient id="customGradWelcome" x1="3" y1="3" x2="21" y2="21" gradientUnits="userSpaceOnUse">
-                              <stop offset="0%" stopColor="#59a6ff" />
-                              <stop offset="50%" stopColor="#c084fc" />
-                              <stop offset="100%" stopColor="#ff8da1" />
-                            </linearGradient>
-                          </defs>
-                        </svg>
+                        <img src="/exechat.png" alt="ExeChat Logo" className="h-14 w-14 md:h-18 md:w-18 object-contain" referrerPolicy="no-referrer" />
                       </motion.div>
                     </div>
 
