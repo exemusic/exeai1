@@ -300,7 +300,8 @@ export default function App() {
     notifyAudioRef.current.preload = "auto";
   }, []);
 
-  const playNotifySound = () => {
+  const playNotifySound = (isChatSent = false) => {
+    if (!isChatSent) return;
     if (!notifyAudioRef.current) return;
     notifyAudioRef.current.currentTime = 0;
     notifyAudioRef.current.play().catch(() => {
@@ -952,7 +953,7 @@ export default function App() {
       textContent: selectedFile.textContent,
     } : null;
 
-    playNotifySound();
+    playNotifySound(true);
     setInputMessage("");
     setSelectedFile(null); 
 
@@ -1024,6 +1025,7 @@ export default function App() {
     const controller = new AbortController();
     abortControllerRef.current = controller;
 
+    let connectionSucceeded = false;
     try {
       const response = await fetch("/api/chat/stream", {
         method: "POST",
@@ -1045,6 +1047,8 @@ export default function App() {
       if (!response.ok) {
         throw new Error(`Failed to establish stream connection (status ${response.status})`);
       }
+
+      connectionSucceeded = true;
 
       // Connection succeeded! Set the user message isPending to false, and add the assistant placeholder message
       thinkingStartTimesRef.current[assistantMsgId] = Date.now();
@@ -1161,6 +1165,21 @@ export default function App() {
         }
       }
     } catch (err: any) {
+      if (!connectionSucceeded) {
+        // Automatically delete the failed user message from the session
+        setSessions((prev) =>
+          prev.map((s) => {
+            if (s.id === targetSessionId) {
+              return {
+                ...s,
+                messages: s.messages.filter((m) => m.id !== userMessage.id),
+              };
+            }
+            return s;
+          })
+        );
+      }
+
       if (err.name === "AbortError") {
         console.log("Stream generation aborted by user.");
       } else {
@@ -2425,7 +2444,7 @@ export default function App() {
                       );
                     })}
 
-                    {isGenerating && currentSession.messages[currentSession.messages.length - 1]?.content !== "" && (
+                    {isGenerating && currentSession.messages[currentSession.messages.length - 1]?.role === "model" && currentSession.messages[currentSession.messages.length - 1]?.content !== "" && (
                       <div className="flex items-center gap-2 text-zinc-500 pl-9 md:pl-12 py-1 text-[11px] md:text-xs select-none">
                         <span className="h-1.5 w-1.5 rounded-full bg-zinc-600 animate-pulse" />
                         <span>AI is writing...</span>
