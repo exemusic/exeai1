@@ -985,25 +985,6 @@ export default function App() {
     );
 
     const assistantMsgId = "msg_" + Date.now() + "_assistant";
-    thinkingStartTimesRef.current[assistantMsgId] = Date.now();
-    const assistantPlaceholder: Message = {
-      id: assistantMsgId,
-      role: "model",
-      content: "",
-      timestamp: Date.now(),
-    };
-
-    setSessions((prev) =>
-      prev.map((s) => {
-        if (s.id === targetSessionId) {
-          return {
-            ...s,
-            messages: [...s.messages, assistantPlaceholder],
-          };
-        }
-        return s;
-      })
-    );
 
     setIsGenerating(true);
     scrollToBottom("smooth");
@@ -1064,6 +1045,29 @@ export default function App() {
       if (!response.ok) {
         throw new Error(`Failed to establish stream connection (status ${response.status})`);
       }
+
+      // Connection succeeded! Set the user message isPending to false, and add the assistant placeholder message
+      thinkingStartTimesRef.current[assistantMsgId] = Date.now();
+      const assistantPlaceholder: Message = {
+        id: assistantMsgId,
+        role: "model",
+        content: "",
+        timestamp: Date.now(),
+      };
+
+      setSessions((prev) =>
+        prev.map((s) => {
+          if (s.id === targetSessionId) {
+            return {
+              ...s,
+              messages: s.messages.map((m) =>
+                m.id === userMessage.id ? { ...m, isPending: false } : m
+              ).concat(assistantPlaceholder),
+            };
+          }
+          return s;
+        })
+      );
 
       const reader = response.body?.getReader();
       const decoder = new TextDecoder("utf-8");
