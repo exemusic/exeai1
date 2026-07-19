@@ -2111,7 +2111,7 @@ export default function App() {
   }
 
   return (
-    <div className="flex h-screen w-full overflow-hidden bg-zinc-950 font-sans text-zinc-100 antialiased selection:bg-zinc-700/80">
+    <div className="flex h-screen h-[100dvh] w-full overflow-hidden bg-zinc-950 font-sans text-zinc-100 antialiased selection:bg-zinc-700/80">
       <input
         ref={fileInputRef}
         type="file"
@@ -2317,8 +2317,8 @@ export default function App() {
               <div className="max-w-3xl mx-auto h-full flex flex-col">
 
                 {!currentSession || currentSession.messages.length === 0 ? (
-                  <div className="flex-1 flex flex-col justify-center items-center py-8 md:py-14 max-w-2xl mx-auto w-full px-2 text-center">
-                    <div className="text-center select-none mb-3 md:mb-5">
+                  <div className="flex-1 flex flex-col justify-start md:justify-center items-center pt-8 sm:pt-14 md:pt-0 pb-8 max-w-2xl mx-auto w-full px-2 text-center">
+                    <div className="text-center select-none mb-2.5 md:mb-5">
                       <motion.div
                         initial={{ scale: 0.93, opacity: 0 }}
                         animate={{ scale: 1, opacity: 1 }}
@@ -2333,7 +2333,7 @@ export default function App() {
                       initial={{ opacity: 0, y: 8 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: 0.1, duration: 0.4 }}
-                      className="font-display font-semibold text-3xl sm:text-4xl md:text-[42px] tracking-tight leading-tight mb-8 bg-gradient-to-r from-[#59a6ff] via-[#c084fc] to-[#ff8da1] bg-clip-text text-transparent select-none"
+                      className="font-display font-semibold text-2xl sm:text-3xl md:text-[42px] tracking-tight leading-tight mb-6 sm:mb-8 md:mb-10 bg-gradient-to-r from-[#59a6ff] via-[#c084fc] to-[#ff8da1] bg-clip-text text-transparent select-none"
                     >
                       {userDisplayName === "Guest" || userName === "Guest"
                         ? `Hello Guest, ${welcomeGreeting}`
@@ -2348,14 +2348,14 @@ export default function App() {
                       initial={{ opacity: 0, y: 12 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: 0.2, duration: 0.4 }}
-                      className="w-full shiny-border-container rounded-2xl relative z-10"
+                      className="w-full shiny-border-container rounded-[28px] md:rounded-[32px] relative z-10"
                     >
-                      <div className={`rounded-[calc(1rem-1.5px)] p-3 md:p-4 transition-all duration-300 focus-within:shadow-md ${
+                      <div className={`rounded-[26px] md:rounded-[30px] p-4 sm:p-5 px-5 sm:px-6 transition-all duration-300 focus-within:shadow-md ${
                         isDark ? "bg-[#1e1f20]" : "bg-[#f0f4f9]"
                       }`}>
 
                       {selectedFile && (
-                        <div className={`mb-3.5 p-2 px-3 rounded-xl border flex items-center gap-2.5 text-xs animate-fadeIn ${
+                        <div className={`mb-3.5 p-2 px-3 rounded-2xl border flex items-center gap-2.5 text-xs animate-fadeIn ${
                           isDark ? "bg-zinc-950 border-zinc-850 text-zinc-300" : "bg-white border-zinc-200 text-zinc-700"
                         }`}>
                           <Paperclip className="h-3.5 w-3.5 text-amber-500 animate-bounce" />
@@ -2380,18 +2380,18 @@ export default function App() {
                         </div>
                       )}
 
-                      <div className="flex items-end gap-2">
+                      <div className="flex items-end gap-2.5">
                         <button
                           onClick={() => {
                             console.log("[Button] Upload clicked");
                             fileInputRef.current?.click();
                           }}
-                          className={`p-2 md:p-2.5 rounded-lg md:rounded-xl transition-colors shrink-0 -ml-1 ${
+                          className={`p-2.5 rounded-full transition-colors shrink-0 ${
                             isDark ? "hover:bg-zinc-800/50 hover:text-amber-400 text-zinc-400" : "hover:bg-zinc-200 text-zinc-600 hover:text-[#1a73e8]"
                           }`}
                           title="Attach File (Text, Code, Image, Audio, etc.)"
                         >
-                          <Plus className="h-4.5 w-4.5 stroke-[2]" />
+                          <Plus className="h-5 w-5 stroke-[2]" />
                         </button>
 
                         <textarea
@@ -2406,21 +2406,21 @@ export default function App() {
                           }}
                           placeholder="Ask ExeChat anything..."
                           disabled={isGenerating}
-                          className={`flex-1 bg-transparent resize-none border-none outline-none focus:ring-0 text-xs md:text-sm min-h-[64px] md:min-h-[90px] max-h-40 font-sans ${
-                            isDark ? "text-zinc-200 placeholder-zinc-500" : "text-zinc-800 placeholder-zinc-400"
+                          className={`flex-1 bg-transparent resize-none border-none outline-none focus:ring-0 text-[15px] sm:text-base md:text-base min-h-[64px] md:min-h-[80px] max-h-40 font-sans ${
+                            isDark ? "text-zinc-250 placeholder-zinc-500" : "text-zinc-850 placeholder-zinc-400"
                           }`}
                           style={{ height: "auto" }}
                         />
                       </div>
 
-                      <div className={`flex items-center justify-between mt-2.5 pt-2.5 border-t ${
-                        isDark ? "border-zinc-950" : "border-zinc-200"
+                      <div className={`flex items-center justify-between mt-3 pt-3 border-t ${
+                        isDark ? "border-zinc-900" : "border-zinc-200"
                       }`}>
                         <div className="flex flex-wrap items-center gap-1.5 md:gap-2">
                           <button
                             type="button"
                             onClick={() => setShowModelModal(true)}
-                            className={`flex items-center gap-1.5 text-[10px] md:text-[11px] rounded-lg py-1.5 px-1.5 md:px-2.5 max-w-[120px] sm:max-w-none truncate font-sans cursor-pointer focus:outline-none transition-all border ${
+                            className={`flex items-center gap-1.5 text-[10px] md:text-[11px] rounded-full py-1.5 px-3 max-w-[120px] sm:max-w-none truncate font-sans cursor-pointer focus:outline-none transition-all border ${
                               isDark 
                                 ? "bg-zinc-950 hover:bg-zinc-900 text-zinc-400 border-zinc-900 hover:border-zinc-800" 
                                : "bg-white hover:bg-zinc-100 text-zinc-600 border-zinc-200 hover:border-zinc-350"
@@ -2435,7 +2435,7 @@ export default function App() {
                           <button
                             type="button"
                             onClick={() => setShowPresetModal(true)}
-                            className={`flex items-center gap-1.5 text-[10px] md:text-[11px] rounded-lg py-1.5 px-1.5 md:px-2.5 max-w-[120px] sm:max-w-none truncate font-sans cursor-pointer focus:outline-none transition-all border ${
+                            className={`flex items-center gap-1.5 text-[10px] md:text-[11px] rounded-full py-1.5 px-3 max-w-[120px] sm:max-w-none truncate font-sans cursor-pointer focus:outline-none transition-all border ${
                               isDark 
                                 ? "bg-zinc-950 hover:bg-zinc-900 text-zinc-400 border-zinc-900 hover:border-zinc-800" 
                                 : "bg-white hover:bg-zinc-100 text-zinc-600 border-zinc-200 hover:border-zinc-350"
@@ -2451,7 +2451,7 @@ export default function App() {
                         <button
                           onClick={() => handleSendMessage()}
                           disabled={!inputMessage.trim() || isGenerating}
-                          className={`p-1.5 md:p-2 rounded-lg md:rounded-xl transition-all duration-200 flex items-center justify-center shadow-md ${
+                          className={`h-9 w-9 rounded-full transition-all duration-200 flex items-center justify-center shadow-md ${
                             inputMessage.trim()
                               ? (isDark 
                                   ? "bg-white hover:bg-zinc-200 text-zinc-950 cursor-pointer hover:scale-105" 
@@ -2815,14 +2815,14 @@ export default function App() {
                   </div>
 
                   {/* Input block */}
-                  <div className={`relative rounded-xl md:rounded-2xl border p-1.5 md:p-2 transition-all duration-300 flex flex-col ${
+                  <div className={`relative rounded-[26px] md:rounded-[30px] border p-2 px-3 md:px-4 transition-all duration-300 flex flex-col ${
                     isDark 
                       ? "border-zinc-900 bg-zinc-900/20 focus-within:border-zinc-800 focus-within:bg-zinc-900/40" 
                       : "border-zinc-200 bg-zinc-50/50 focus-within:border-zinc-300 focus-within:bg-zinc-100/50"
                   }`}>
                     {/* Selected File Preview inside input block */}
                     {selectedFile && (
-                      <div className={`mx-1 mb-2.5 p-2 px-3 rounded-xl border flex items-center gap-2.5 text-xs animate-fadeIn ${
+                      <div className={`mx-1 mb-2.5 p-2 px-3 rounded-2xl border flex items-center gap-2.5 text-xs animate-fadeIn ${
                         isDark ? "bg-zinc-950 border-zinc-850 text-zinc-300" : "bg-zinc-100 border-zinc-250/60 text-zinc-700"
                       }`}>
                         <Paperclip className="h-3.5 w-3.5 text-amber-500 animate-bounce" />
@@ -2847,19 +2847,19 @@ export default function App() {
                       </div>
                     )}
 
-                    <div className="flex items-end w-full">
+                    <div className="flex items-end w-full gap-1">
                       {/* Upload button inside textbox - left side */}
                       <button
                         onClick={() => {
                           console.log("[Button] Upload clicked");
                           fileInputRef.current?.click();
                         }}
-                        className={`p-2 md:p-2.5 rounded-lg md:rounded-xl hover:text-amber-400 transition-colors text-zinc-500 shrink-0 ${
+                        className={`p-2.5 rounded-full hover:text-amber-400 transition-colors text-zinc-500 shrink-0 ${
                           isDark ? "hover:bg-zinc-800" : "hover:bg-zinc-200"
                         }`}
                         title="Upload supporting file (Text, Code, Image, etc.)"
                       >
-                        <Plus className="h-4 w-4 md:h-5 md:w-5 stroke-[2]" />
+                        <Plus className="h-4.5 w-4.5 md:h-5 md:w-5 stroke-[2]" />
                       </button>
 
                      <textarea
@@ -2879,18 +2879,18 @@ export default function App() {
                            : "Ask ExeChat anything..."
                        }
                        disabled={isGenerating}
-                       className={`flex-1 max-h-40 min-h-[38px] md:min-h-[44px] bg-transparent resize-none py-2 px-2.5 border-none outline-none focus:ring-0 text-xs md:text-sm ${
+                       className={`flex-1 max-h-40 min-h-[38px] md:min-h-[44px] bg-transparent resize-none py-2.5 px-3 border-none outline-none focus:ring-0 text-[15px] sm:text-base md:text-base ${
                          isDark ? "text-zinc-200 placeholder-zinc-550" : "text-zinc-850 placeholder-zinc-400"
                        }`}
                        style={{ height: "auto" }}
                      />
 
                     {/* Abort button / Submit button */}
-                    <div className="flex items-center gap-1 pl-1.5 shrink-0">
+                    <div className="flex items-center gap-1 pl-1.5 shrink-0 self-end mb-1">
                       {isGenerating ? (
                         <button
                           onClick={handleStopGeneration}
-                          className="p-2 md:p-2.5 rounded-lg md:rounded-xl bg-red-950/40 border border-red-900/30 hover:border-red-900 hover:bg-red-950/60 text-red-400 transition-all duration-200 flex items-center justify-center cursor-pointer shadow-md"
+                          className="h-9 w-9 md:h-10 md:w-10 rounded-full bg-red-950/40 border border-red-900/30 hover:border-red-900 hover:bg-red-950/60 text-red-400 transition-all duration-200 flex items-center justify-center cursor-pointer shadow-md"
                           title="Stop generating"
                         >
                           <X className="h-3.5 w-3.5 md:h-4.5 md:w-4.5 stroke-[2.5]" />
@@ -2899,7 +2899,7 @@ export default function App() {
                         <button
                           onClick={() => handleSendMessage()}
                           disabled={!inputMessage.trim()}
-                          className={`p-2 md:p-2.5 rounded-lg md:rounded-xl transition-all duration-200 flex items-center justify-center shadow-md ${
+                          className={`h-9 w-9 md:h-10 md:w-10 rounded-full transition-all duration-200 flex items-center justify-center shadow-md ${
                             inputMessage.trim()
                               ? isDark 
                                 ? "bg-zinc-100 hover:bg-zinc-200 text-zinc-950 cursor-pointer hover:scale-105" 
@@ -2910,7 +2910,7 @@ export default function App() {
                           }`}
                           title="Send Message"
                         >
-                          <Send className="h-3.5 w-3.5 md:h-4.5 md:w-4.5 stroke-[2.5]" />
+                          <Send className="h-3.5 w-3.5 md:h-4 md:w-4 stroke-[2.5]" />
                         </button>
                       )}
                     </div>
