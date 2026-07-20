@@ -1387,17 +1387,16 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
                 `Here is the entire list of files in my workspace with their current code:\n\n` +
                 JSON.stringify(files, null, 2) + "\n\n" +
                 `IMPORTANT (AI BEHAVIOR & STRUCTURE INSTRUCTIONS):\n` +
-                `1. Provide a clear explanation of: which files you edited, what those files are for, why these changes are good/useful, and explain the implementation concisely and neatly.\n` +
+                `1. Provide a clear, friendly, and natural explanation of your changes in the SAME language as the User Instructions (e.g., if the user asks in Indonesian, reply/explain in Indonesian; if English, use English). Act as an elite senior developer on Google AI Studio - warm, professional, clear, and highly helpful, avoiding stiff or artificial formatting.\n` +
                 `2. Your primary focus is: SELECTING/ADJUSTING/TIDYING files, FIXING BUGS, EDITING files, and VERIFYING to ensure there is no wrong code.\n` +
                 `3. VERY IMPORTANT: You must follow user commands precisely. DO NOT add other features, components, buttons, or logic that were not requested or asked by the user!\n` +
-                `4. Provide a concise and neat explanation outside the JSON code block in English.\n` +
-                `5. Then, provide a \`\`\`json code block containing the array of ONLY updated files. DO NOT include files that were not edited at all.\n` +
+                `4. Provide your explanation outside the JSON code block naturally. You do not need to use rigid templates like "### Explanation of Changes". Feel free to explain the logic and benefits comprehensively in your own style.\n` +
+                `5. Provide a \`\`\`json code block containing the array of ONLY updated files. DO NOT include files that were not edited at all.\n` +
                 `6. Write the NEW file content completely in the "content" field. NEVER shorten file content with ellipsis, comments like "// remaining code", or "/* ... */" because that will break the user's program.\n` +
                 `7. To be safe from JSON parsing limits, try to escape double quotes (\`\"\`) in your code, or use single quotes (\`'\`) or backticks (\`\` \` \`\`) inside the code string.\n` +
                 `8. Do not corrupt or delete important files. Edit index.html or app.js as needed, or create new files if required.\n\n` +
-                `Example format of the response you MUST follow:\n` +
-                `### Explanation of Changes\n` +
-                `- **[Edited File]**: [Explanation of what this file is for and why this structure/change is good...]\n\n` +
+                `Example format of the response to follow:\n` +
+                `[Your beautiful, natural, and comprehensive explanation of changes in the user's language]\n\n` +
                 `\`\`\`json\n` +
                 `[\n` +
                 `  { "path": "index.html", "content": "...complete new code..." }\n` +
@@ -1569,9 +1568,7 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
           msg.id === assistantMsgId 
             ? { 
                 ...msg, 
-                content: thinkHeader + (displayableText ? displayableText.trim() : "I have updated your code files as requested.") + "\n\n" + 
-                         `**Updated files:**\n` + 
-                         editedFiles.map(f => `• \`${f.path}\``).join("\n"), 
+                content: thinkHeader + (displayableText ? displayableText.trim() : "I have updated your code files as requested."), 
                 filesSnapshot: oldFiles,
                 thinkingDuration: finalDur,
                 modelId: selectedModel,
