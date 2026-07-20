@@ -569,8 +569,8 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
         const startTime = thinkingStartTimesRef.current[activeId];
         if (!startTime) return;
         
-        // Calculate dynamic elapsed time
-        const elapsed = Math.max(1, Math.round((Date.now() - startTime) / 1000));
+        // Calculate dynamic elapsed time with decimal precision
+        const elapsed = Math.max(0.1, Number(((Date.now() - startTime) / 1000).toFixed(1)));
         
         setChatHistory(prev =>
           prev.map((m) => {
@@ -583,9 +583,9 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
                 updatedContent.includes("Reviewing project")
               ) {
                 if (elapsed >= 5) {
-                  updatedContent = `<think>Analyzing codebase requirements (deep thinking process active... ${elapsed}s)</think>`;
+                  updatedContent = `<think>Analyzing codebase requirements (deep thinking process active... ${elapsed.toFixed(1)}s)</think>`;
                 } else {
-                  updatedContent = `<think>Reviewing project context and prompt... (${elapsed}s)</think>`;
+                  updatedContent = `<think>Reviewing project context and prompt... (${elapsed.toFixed(1)}s)</think>`;
                 }
               }
               return { ...m, thinkingDuration: elapsed, content: updatedContent };
@@ -593,7 +593,7 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
             return m;
           })
         );
-      }, 500); // Check every 500ms
+      }, 100); // Check every 100ms for high responsiveness
     } else {
       activeAssistantMsgIdRef.current = null;
     }
@@ -1436,7 +1436,7 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
                   typewriterTargetRef.current = fullText;
                   
                   const startTime = thinkingStartTimesRef.current[assistantMsgId];
-                  const dur = startTime ? Math.max(1, Math.round((Date.now() - startTime) / 1000)) : 1;
+                  const dur = startTime ? Math.max(0.1, Number(((Date.now() - startTime) / 1000).toFixed(1))) : 0.1;
 
                   // Run dynamic typewriter
                   if (!typewriterIntervalIdRef.current) {
@@ -1539,13 +1539,20 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
         refreshPreview(mergedFiles);
         
         const startTime = thinkingStartTimesRef.current[assistantMsgId];
-        const finalDur = startTime ? Math.max(1, Math.round((Date.now() - startTime) / 1000)) : 3;
+        const finalDur = startTime ? Math.max(0.1, Number(((Date.now() - startTime) / 1000).toFixed(1))) : 0.1;
+
+        // Keep the original <think>...</think> block so the thought history is never deleted/removed
+        let thinkHeader = "";
+        const thinkMatch = fullText.match(/<think>([\s\S]*?)<\/think>/i);
+        if (thinkMatch) {
+          thinkHeader = thinkMatch[0] + "\n\n";
+        }
 
         setChatHistory(prev => prev.map(msg => 
           msg.id === assistantMsgId 
             ? { 
                 ...msg, 
-                content: (displayableText ? displayableText.trim() : "I have updated your code files as requested.") + "\n\n" + 
+                content: thinkHeader + (displayableText ? displayableText.trim() : "I have updated your code files as requested.") + "\n\n" + 
                          `**Updated files:**\n` + 
                          editedFiles.map(f => `• \`${f.path}\``).join("\n"), 
                 filesSnapshot: oldFiles,
@@ -1559,7 +1566,7 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
         triggerStatus("Your workspace was successfully updated!", "success");
       } else {
         const startTime = thinkingStartTimesRef.current[assistantMsgId];
-        const finalDur = startTime ? Math.max(1, Math.round((Date.now() - startTime) / 1000)) : 3;
+        const finalDur = startTime ? Math.max(0.1, Number(((Date.now() - startTime) / 1000).toFixed(1))) : 0.1;
 
         setChatHistory(prev => prev.map(msg => 
           msg.id === assistantMsgId 
@@ -1917,27 +1924,27 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
           if (thinking !== null || isThinking) {
             actionSteps.push({
               type: "thought",
-              text: isThinking ? "Thinking Process..." : `Thought for ${msgDuration} seconds`,
+              text: isThinking ? "Thinking Process..." : `Thought for ${typeof msgDuration === "number" ? msgDuration.toFixed(1) : msgDuration} seconds`,
               content: thinking,
               isThinking: isThinking
             });
           }
 
-          // 2. Read Step (if we have edited files)
+          // 2. Read & Edit Steps (dynamic 1-by-1 for each updated file!)
           if (updatedFiles.length > 0) {
-            actionSteps.push({
-              type: "read",
-              text: "Read file",
-              subtext: "Read 1 file:",
-              file: primaryFile
-            });
-
-            // 3. Edit Step
-            actionSteps.push({
-              type: "edit",
-              text: "Edit file",
-              subtext: `Edited ${updatedFiles.length} ${updatedFiles.length > 1 ? "files" : "file"}:`,
-              file: primaryFile
+            updatedFiles.forEach((file) => {
+              actionSteps.push({
+                type: "read",
+                text: "Read file",
+                subtext: "Read file:",
+                file: file
+              });
+              actionSteps.push({
+                type: "edit",
+                text: "Edit file",
+                subtext: "Edited file:",
+                file: file
+              });
             });
 
             // 4. Verify Step
@@ -2154,8 +2161,8 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
     <div className={`fixed inset-0 z-50 flex flex-col backdrop-blur-xl ${isDark ? "bg-zinc-950 text-zinc-100 font-sans" : "bg-zinc-50 text-zinc-900 font-sans"}`}>
       
       {!isFullscreen && (
-        <div className={`px-5 py-3 flex items-center justify-between border-b ${isDark ? "border-zinc-850 bg-zinc-950" : "border-zinc-200 bg-white"} shrink-0`}>
-          <div className="flex items-center gap-3">
+        <div className={`px-5 py-2.5 flex items-center justify-between border-b ${isDark ? "border-zinc-950/40 bg-zinc-950" : "border-zinc-100 bg-white"} shrink-0`}>
+          <div className="flex items-center gap-2.5">
             <button
               onClick={() => {
                 if (window.location.pathname.startsWith("/project/")) {
@@ -2163,22 +2170,17 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
                 }
                 onClose();
               }}
-              className={`px-3 py-1.5 rounded-xl text-xs font-normal flex items-center gap-1.5 border transition-all ${
+              className={`px-3 py-1.5 rounded-xl text-xs font-normal flex items-center gap-1.5 border transition-all cursor-pointer ${
                 isDark 
-                  ? "bg-zinc-900 border-zinc-800 text-zinc-300 hover:bg-zinc-800" 
-                  : "bg-white border-zinc-200 text-zinc-600 hover:bg-zinc-100"
+                  ? "bg-zinc-900/60 border-transparent text-zinc-300 hover:bg-zinc-800" 
+                  : "bg-white border-zinc-100 text-zinc-600 hover:bg-zinc-100"
               }`}
             >
-              <ArrowLeft className="h-4 w-4 text-zinc-400" />
-              <span>Back to start</span>
+              <X className="h-4 w-4 text-zinc-400" />
+              <span>Close</span>
             </button>
-          </div>
 
-          <div className="flex items-center gap-3">
-            <span className="font-sans font-extrabold text-sm tracking-widest text-amber-400 uppercase shrink-0 hidden sm:block">
-              EXECODE
-            </span>
-            <div className="h-4 w-px bg-zinc-800/60 mx-1 hidden sm:block" />
+            <div className="h-4 w-px bg-zinc-900 mx-0.5 hidden sm:block" />
             
             {/* Top Header Model Switcher (Google AI Studio style) */}
             <div className="relative">
@@ -2186,8 +2188,8 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
                 onClick={() => setShowModelDropdown(!showModelDropdown)}
                 className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 border transition-all cursor-pointer ${
                   isDark
-                    ? "bg-zinc-900 border-zinc-800 text-zinc-200 hover:bg-zinc-800"
-                    : "bg-white border-zinc-200 text-zinc-700 hover:bg-zinc-100"
+                    ? "bg-zinc-900/60 border-transparent text-zinc-200 hover:bg-zinc-800"
+                    : "bg-white border-zinc-100 text-zinc-700 hover:bg-zinc-100"
                 }`}
                 title="Select active AI model"
               >
@@ -2197,10 +2199,10 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
               </button>
 
               {showModelDropdown && (
-                <div className={`absolute top-full left-1/2 -translate-x-1/2 mt-1.5 z-50 w-64 rounded-xl border p-1 shadow-2xl max-h-64 overflow-y-auto ${
-                  isDark ? "bg-zinc-900 border-zinc-800 text-zinc-100" : "bg-white border-zinc-200 text-zinc-800"
+                <div className={`absolute top-full left-0 mt-1.5 z-50 w-64 rounded-xl border p-1 shadow-2xl max-h-64 overflow-y-auto ${
+                  isDark ? "bg-zinc-900 border-zinc-950/60 text-zinc-100" : "bg-white border-zinc-150 text-zinc-800"
                 }`}>
-                  <div className={`px-2.5 py-1 mb-1 border-b ${isDark ? "border-zinc-800/20" : "border-zinc-100"}`}>
+                  <div className={`px-2.5 py-1 mb-1 border-b ${isDark ? "border-zinc-800/25" : "border-zinc-100"}`}>
                     <span className="text-[9px] font-bold uppercase tracking-wider text-zinc-500">Select AI Model</span>
                   </div>
                   <div className="space-y-0.5">
@@ -2215,7 +2217,7 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
                             setShowModelDropdown(false);
                             triggerStatus(`AI Model changed to '${m.name}'`, "success");
                           }}
-                          className={`w-full text-left px-2.5 py-1.5 rounded-lg text-[11px] flex flex-col gap-0.5 transition-all ${
+                          className={`w-full text-left px-2.5 py-1.5 rounded-lg text-[11px] flex flex-col gap-0.5 transition-all cursor-pointer ${
                             isSel
                               ? "bg-amber-500/10 text-amber-400 border border-amber-500/15"
                               : isDark
@@ -2226,7 +2228,7 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
                           <div className="flex items-center justify-between w-full">
                             <span className={`font-semibold ${isSel ? "text-amber-400" : isDark ? "text-zinc-300" : "text-zinc-700"}`}>{m.name}</span>
                             <span className={`text-[8px] px-1 rounded border ${
-                              isDark ? "bg-zinc-950 text-zinc-500 border-zinc-800" : "bg-zinc-50 text-zinc-500 border-zinc-200"
+                              isDark ? "bg-zinc-950 text-zinc-500 border-transparent" : "bg-zinc-50 text-zinc-500 border-zinc-150"
                             }`}>{m.badge}</span>
                           </div>
                           <span className={`text-[9.5px] line-clamp-1 ${isDark ? "text-zinc-400" : "text-zinc-500"}`}>{m.description}</span>
@@ -2239,10 +2241,72 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
             </div>
           </div>
 
+          {/* Centered Segmented controls Preview vs Code */}
+          <div className="flex items-center gap-1.5">
+            <div className={`flex items-center p-1 rounded-xl border ${isDark ? "bg-zinc-900/60 border-transparent" : "bg-zinc-100 border-zinc-150"}`}>
+              <button
+                onClick={() => {
+                  setActiveRightTab("preview");
+                  refreshPreview();
+                }}
+                className={`px-4 py-1.5 rounded-lg text-xs font-normal flex items-center gap-1.5 transition-all cursor-pointer ${
+                  activeRightTab === "preview" 
+                    ? "bg-amber-500 text-white font-medium shadow-sm" 
+                    : isDark ? "text-zinc-400 hover:text-zinc-200" : "text-zinc-500 hover:text-zinc-900"
+                }`}
+              >
+                <span className="h-1.5 w-1.5 bg-current rounded-full" />
+                <span>Preview</span>
+              </button>
+              <button
+                onClick={() => setActiveRightTab("code")}
+                className={`px-4 py-1.5 rounded-lg text-xs font-normal transition-all cursor-pointer ${
+                  activeRightTab === "code" 
+                    ? "bg-amber-500 text-white font-medium shadow-sm" 
+                    : isDark ? "text-zinc-400 hover:text-zinc-200" : "text-zinc-500 hover:text-zinc-900"
+                }`}
+              >
+                Code
+              </button>
+            </div>
+          </div>
+
           <div className="flex items-center gap-2">
+            {/* Device selector and reload button in header */}
+            {activeRightTab === "preview" && (
+              <div className={`flex items-center gap-0.5 p-1 rounded-xl border ${isDark ? "bg-zinc-900/60 border-transparent" : "bg-zinc-100 border-zinc-150"}`}>
+                <button
+                  onClick={() => setDeviceMode("desktop")}
+                  className={`p-1.5 rounded-md transition-all cursor-pointer ${deviceMode === "desktop" ? "bg-amber-500/10 text-amber-500" : isDark ? "text-zinc-400 hover:text-zinc-200" : "text-zinc-500 hover:text-zinc-800"}`}
+                  title="Desktop Preview"
+                >
+                  <Monitor className="h-3.5 w-3.5" />
+                </button>
+                <button
+                  onClick={() => setDeviceMode("mobile")}
+                  className={`p-1.5 rounded-md transition-all cursor-pointer ${deviceMode === "mobile" ? "bg-amber-500/10 text-amber-500" : isDark ? "text-zinc-400 hover:text-zinc-200" : "text-zinc-500 hover:text-zinc-800"}`}
+                  title="Mobile Preview"
+                >
+                  <Smartphone className="h-3.5 w-3.5" />
+                </button>
+                <div className={`h-4 w-px mx-1 ${isDark ? "bg-zinc-800/40" : "bg-zinc-200"}`} />
+                <button
+                  onClick={() => {
+                    refreshPreview();
+                    setPreviewKey(prev => prev + 1);
+                    triggerStatus("Preview updated!", "success");
+                  }}
+                  className="p-1.5 text-zinc-400 hover:text-zinc-200 transition-colors cursor-pointer"
+                  title="Reload Preview"
+                >
+                  <RefreshCw className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            )}
+
             <button
               onClick={handleUploadToSupabase}
-              className="px-3 py-1.5 rounded-xl text-xs font-normal bg-amber-500 hover:bg-amber-450 text-white flex items-center gap-1.5 transition-all shadow-md active:scale-95 cursor-pointer"
+              className="px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-amber-500 hover:bg-amber-450 text-white flex items-center gap-1.5 transition-all shadow-md active:scale-95 cursor-pointer"
               title="Save Project to Cloud"
             >
               <Upload className="h-3.5 w-3.5" />
@@ -2251,10 +2315,10 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
 
             <button
               onClick={() => setIsFullscreen(!isFullscreen)}
-              className={`p-1.5 rounded-xl border transition-all ${
+              className={`p-1.5 rounded-xl border transition-all cursor-pointer ${
                 isDark 
-                  ? "bg-zinc-900 border-zinc-800 text-zinc-300 hover:bg-zinc-800" 
-                  : "bg-white border-zinc-200 text-zinc-600 hover:bg-zinc-100"
+                  ? "bg-zinc-900/60 border-transparent text-zinc-300 hover:bg-zinc-800" 
+                  : "bg-white border-zinc-150 text-zinc-600 hover:bg-zinc-100"
               }`}
               title={isFullscreen ? "Show Chat Panel" : "Hide Chat Panel (Fullscreen)"}
             >
@@ -2271,41 +2335,12 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
           className={`${
             isFullscreen 
               ? "hidden" 
-              : `w-full h-1/2 md:h-full border-b md:border-b-0 md:border-r flex flex-col shrink-0 transition-colors duration-200 ${
-                  isDark ? "border-zinc-850 bg-[#121214]" : "border-zinc-200 bg-[#fafafa]"
+              : `w-full h-1/2 md:h-full flex flex-col shrink-0 transition-colors duration-200 ${
+                  isDark ? "border-r border-zinc-950 bg-[#121214]" : "border-r border-zinc-100 bg-[#fafafa]"
                 }`
           }`}
         >
-          <div className={`p-4 border-b flex items-center justify-between transition-colors duration-200 ${
-            isDark ? "border-zinc-850 bg-zinc-950/40" : "border-zinc-200 bg-white"
-          }`}>
-            <div className="flex items-center gap-2">
-              <Sparkles className="h-4 w-4 text-amber-500" />
-              <span className={`text-xs font-semibold tracking-tight ${isDark ? "text-zinc-200" : "text-zinc-800"}`}>{aiName}</span>
-            </div>
-            
-            <button
-              onClick={handleClearChat}
-              className={`p-1 rounded-lg text-zinc-400 hover:text-rose-500 transition-all cursor-pointer ${
-                isDark ? "hover:bg-zinc-900" : "hover:bg-zinc-150"
-              }`}
-              title="Clear Chat History"
-            >
-              <Trash2 className="h-4 w-4" />
-            </button>
-          </div>
-
-          <div className={`px-4 py-2 border-b text-[10px] text-zinc-500 flex items-center justify-between font-mono shrink-0 transition-colors duration-200 ${
-            isDark ? "border-zinc-850/50 bg-zinc-950/20" : "border-zinc-200 bg-zinc-100/50"
-          }`}>
-            <span>{MODEL_OPTIONS.find(m => m.id === selectedModel)?.name || "AI Assistant"} • Ready</span>
-            <span className="text-emerald-500 flex items-center gap-1">
-              <span className="h-1 w-1 bg-emerald-500 rounded-full animate-ping" />
-              Connected
-            </span>
-          </div>
-
-          <div className="flex-1 overflow-y-auto p-4 space-y-4 flex flex-col">
+          <div className="flex-1 overflow-y-auto p-4 pt-6 space-y-4 flex flex-col">
             {chatHistory.map((message) => {
               const isUsr = message.role === "user";
               return (
@@ -2500,90 +2535,6 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
         {/* PANEL KANAN: WORKSPACE INTERACTIVE / CODE EDITOR PANE */}
         <div className={`flex-1 flex flex-col min-w-0 relative ${isDark ? "bg-zinc-950 text-zinc-100" : "bg-white text-zinc-800"}`}>
           
-          {/* Segmented controls Preview vs Code vs Split */}
-          {!isFullscreen && (
-            <div className={`p-3 border-b flex items-center justify-between shrink-0 ${isDark ? "border-zinc-850 bg-zinc-950" : "border-zinc-200 bg-zinc-50"}`}>
-              <div className={`flex items-center p-1 rounded-xl border ${isDark ? "bg-zinc-900 border-zinc-850" : "bg-zinc-100 border-zinc-200"}`}>
-                <button
-                  onClick={() => {
-                    setActiveRightTab("preview");
-                    refreshPreview();
-                  }}
-                  className={`px-3.5 py-1.5 rounded-lg text-xs font-normal flex items-center gap-1.5 transition-all ${
-                    activeRightTab === "preview" 
-                      ? "bg-amber-500 text-white font-medium shadow-sm" 
-                      : isDark ? "text-zinc-400 hover:text-zinc-200" : "text-zinc-500 hover:text-zinc-900"
-                  }`}
-                >
-                  <span className="h-1.5 w-1.5 bg-current rounded-full" />
-                  <span>Preview</span>
-                </button>
-                <button
-                  onClick={() => setActiveRightTab("code")}
-                  className={`px-3.5 py-1.5 rounded-lg text-xs font-normal transition-all ${
-                    activeRightTab === "code" 
-                      ? "bg-amber-500 text-white font-medium shadow-sm" 
-                      : isDark ? "text-zinc-400 hover:text-zinc-200" : "text-zinc-500 hover:text-zinc-900"
-                  }`}
-                >
-                  Code
-                </button>
-                <button
-                  onClick={() => {
-                    setActiveRightTab("split");
-                    refreshPreview();
-                  }}
-                  className={`px-3.5 py-1.5 rounded-lg text-xs font-normal transition-all ${
-                    activeRightTab === "split" 
-                      ? "bg-amber-500 text-white font-medium shadow-sm" 
-                      : isDark ? "text-zinc-400 hover:text-zinc-200" : "text-zinc-500 hover:text-zinc-900"
-                  }`}
-                >
-                  Split View
-                </button>
-              </div>
-
-              {/* Simulated Address path, refresh & reload controls */}
-              <div className="hidden">
-                <span className="text-zinc-600">/</span>
-                <span className="truncate text-zinc-400">{projectName.toLowerCase().replace(/\s+/g, "-")}</span>
-              </div>
-
-              <div className={`flex items-center gap-1 p-1 rounded-lg border ${isDark ? "bg-zinc-900/60 border-zinc-850" : "bg-zinc-100 border-zinc-200"}`}>
-                {activeRightTab === "preview" && (
-                  <>
-                    <button
-                      onClick={() => setDeviceMode("desktop")}
-                      className={`p-1.5 rounded-md transition-all ${deviceMode === "desktop" ? "bg-amber-500/10 text-amber-500" : isDark ? "text-zinc-400 hover:text-zinc-200" : "text-zinc-500 hover:text-zinc-800"}`}
-                      title="Pratinjau Desktop"
-                    >
-                      <Monitor className="h-3.5 w-3.5" />
-                    </button>
-                    <button
-                      onClick={() => setDeviceMode("mobile")}
-                      className={`p-1.5 rounded-md transition-all ${deviceMode === "mobile" ? "bg-amber-500/10 text-amber-500" : isDark ? "text-zinc-400 hover:text-zinc-200" : "text-zinc-500 hover:text-zinc-800"}`}
-                      title="Pratinjau Smartphone"
-                    >
-                      <Smartphone className="h-3.5 w-3.5" />
-                    </button>
-                    <div className={`h-4 w-px mx-1 ${isDark ? "bg-zinc-800" : "bg-zinc-300"}`} />
-                  </>
-                )}
-                <button
-                  onClick={() => {
-                    refreshPreview();
-                    setPreviewKey(prev => prev + 1);
-                    triggerStatus("Preview successfully updated with the latest code changes!", "success");
-                  }}
-                  className="p-1.5 text-zinc-400 hover:text-zinc-200 transition-colors"
-                  title="Reload Preview"
-                >
-                  <RefreshCw className="h-3.5 w-3.5" />
-                </button>
-              </div>
-            </div>
-          )}
-
           {/* Tab Content 1: Preview mode active */}
           {activeRightTab === "preview" && (
             <div className="flex-1 flex flex-col min-h-0">
@@ -2743,8 +2694,8 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
             <div className="flex-1 flex overflow-hidden min-h-0">
               
               {!isFullscreen && (
-                <div className={`w-56 border-r flex flex-col shrink-0 transition-colors duration-200 ${isDark ? "border-zinc-850 bg-zinc-950/60" : "border-zinc-200 bg-zinc-50"}`}>
-                  <div className={`p-3 border-b flex items-center justify-between transition-colors duration-200 ${isDark ? "border-zinc-850 bg-zinc-950/25" : "border-zinc-200 bg-zinc-100/50"}`}>
+                <div className={`w-56 border-r flex flex-col shrink-0 transition-colors duration-200 ${isDark ? "border-zinc-950/40 bg-zinc-950/60" : "border-zinc-100/50 bg-zinc-50"}`}>
+                  <div className={`p-3 border-b flex items-center justify-between transition-colors duration-200 ${isDark ? "border-zinc-950/20 bg-zinc-950/25" : "border-zinc-100 bg-zinc-100/50"}`}>
                     <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">File List</span>
                     <div className="flex items-center gap-1.5">
                       <input
@@ -2850,7 +2801,7 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
 
               <div className="flex-1 flex flex-col min-w-0">
                 {isFullscreen ? (
-                  <div className={`px-4 py-2 border-b flex items-center justify-between shrink-0 transition-colors duration-200 ${isDark ? "border-zinc-900 bg-zinc-950" : "border-zinc-200 bg-white"}`}>
+                  <div className={`px-4 py-2 border-b flex items-center justify-between shrink-0 transition-colors duration-200 ${isDark ? "border-zinc-950/40 bg-zinc-950" : "border-zinc-100 bg-white"}`}>
                     <div className="flex items-center gap-2">
                       <span className="text-[11px] font-bold font-mono px-2 py-0.5 rounded bg-amber-500/10 text-amber-500 border border-amber-500/20 animate-pulse">
                         {activeFilePath}
@@ -2866,7 +2817,7 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
                     </button>
                   </div>
                 ) : (
-                  <div className={`px-4 py-2 border-b flex items-center justify-between shrink-0 transition-colors duration-200 ${isDark ? "border-zinc-850 bg-zinc-950" : "border-zinc-200 bg-white"}`}>
+                  <div className={`px-4 py-2 border-b flex items-center justify-between shrink-0 transition-colors duration-200 ${isDark ? "border-zinc-950/45 bg-zinc-950" : "border-zinc-100 bg-white"}`}>
                     <div className="flex items-center gap-2">
                       <span className="text-[11px] font-bold font-mono px-2 py-0.5 rounded bg-zinc-500/10 text-amber-500 border border-amber-500/20">
                         {activeFilePath}
@@ -2880,8 +2831,8 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
                             onClick={handleUndoEdit}
                             className={`text-[10px] font-mono font-bold px-2.5 py-1 rounded-lg border transition-all cursor-pointer flex items-center gap-1 shadow-sm active:scale-95 ${
                               isDark 
-                                ? "bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800" 
-                                : "bg-white border-zinc-200 text-zinc-600 hover:text-zinc-850 hover:bg-zinc-50"
+                                ? "bg-zinc-900 border-zinc-950/60 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800" 
+                                : "bg-white border-zinc-100 text-zinc-600 hover:text-zinc-850 hover:bg-zinc-50"
                             }`}
                             title="Undo changes to backup"
                           >
@@ -2919,7 +2870,7 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
                   <div 
                     ref={lineNumbersScrollRef}
                     className={`w-12 select-none text-right pr-3 pt-4 text-sm font-mono border-r transition-colors duration-200 overflow-y-hidden shrink-0 ${
-                      isDark ? "border-zinc-850 bg-zinc-950 text-zinc-600" : "border-zinc-200 bg-zinc-50/50 text-zinc-400"
+                      isDark ? "border-zinc-950/20 bg-zinc-950 text-zinc-600" : "border-zinc-100 bg-zinc-50/50 text-zinc-400"
                     }`}
                   >
                     {Array.from({ length: Math.max(activeFile.content.split("\n").length, 30) }).map((_, i) => (
@@ -2963,8 +2914,8 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
               <div className="flex-1 flex overflow-hidden min-h-0">
                 {/* File List */}
                 {!isFullscreen && (
-                  <div className={`w-44 border-r flex flex-col shrink-0 transition-colors duration-200 ${isDark ? "border-zinc-850 bg-zinc-950/60" : "border-zinc-200 bg-zinc-50"}`}>
-                    <div className={`p-2.5 border-b flex items-center justify-between transition-colors duration-200 ${isDark ? "border-zinc-850 bg-zinc-950/25" : "border-zinc-200 bg-zinc-100/50"}`}>
+                  <div className={`w-44 border-r flex flex-col shrink-0 transition-colors duration-200 ${isDark ? "border-zinc-950/40 bg-zinc-950/60" : "border-zinc-100/50 bg-zinc-50"}`}>
+                    <div className={`p-2.5 border-b flex items-center justify-between transition-colors duration-200 ${isDark ? "border-zinc-950/20 bg-zinc-950/25" : "border-zinc-100 bg-zinc-100/50"}`}>
                       <span className="text-[9px] font-bold uppercase tracking-wider text-zinc-500">Files</span>
                       <div className="flex items-center gap-1">
                         <input
@@ -2992,7 +2943,7 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
                     </div>
 
                     {showNewFileInput && (
-                      <div className={`p-2 border-b flex flex-col gap-1.5 transition-colors duration-200 ${isDark ? "border-zinc-850 bg-amber-500/5" : "border-zinc-200 bg-amber-500/5"}`}>
+                      <div className={`p-2 border-b flex flex-col gap-1.5 transition-colors duration-200 ${isDark ? "border-zinc-950/20 bg-amber-500/5" : "border-zinc-100 bg-amber-500/5"}`}>
                         <input
                           type="text"
                           value={newFileName}
@@ -3051,7 +3002,7 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
 
                 {/* Code Editor */}
                 <div className="flex-1 flex flex-col min-w-0">
-                  <div className={`px-4 py-2 border-b flex items-center justify-between shrink-0 transition-colors duration-200 ${isDark ? "border-zinc-850 bg-zinc-950" : "border-zinc-200 bg-white"}`}>
+                  <div className={`px-4 py-2 border-b flex items-center justify-between shrink-0 transition-colors duration-200 ${isDark ? "border-zinc-950/45 bg-zinc-950" : "border-zinc-100 bg-white"}`}>
                     <span className="text-[11px] font-bold font-mono px-2 py-0.5 rounded bg-zinc-500/10 text-amber-500 border border-amber-500/20">
                       {activeFilePath}
                     </span>
@@ -3061,7 +3012,7 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
                           <button
                             onClick={handleUndoEdit}
                             className={`text-[10px] font-mono font-bold px-2.5 py-1 rounded-lg border transition-all cursor-pointer flex items-center gap-1 ${
-                              isDark ? "bg-zinc-900 border-zinc-800 text-zinc-400 hover:bg-zinc-800" : "bg-white border-zinc-200 text-zinc-600 hover:bg-zinc-50"
+                              isDark ? "bg-zinc-900 border-zinc-950/60 text-zinc-400 hover:bg-zinc-800" : "bg-white border-zinc-100 text-zinc-600 hover:bg-zinc-50"
                             }`}
                           >
                             <span>Undo</span>
@@ -3089,7 +3040,7 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
                     <div 
                       ref={lineNumbersScrollRef}
                       className={`w-12 select-none text-right pr-3 pt-4 text-sm font-mono border-r transition-colors duration-200 overflow-y-hidden shrink-0 ${
-                        isDark ? "border-zinc-850 bg-zinc-950 text-zinc-600" : "border-zinc-200 bg-zinc-50/50 text-zinc-400"
+                        isDark ? "border-zinc-950/20 bg-zinc-950 text-zinc-600" : "border-zinc-100 bg-zinc-50/50 text-zinc-400"
                       }`}
                     >
                       {Array.from({ length: Math.max(activeFile.content.split("\n").length, 30) }).map((_, i) => (
@@ -3135,10 +3086,10 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
               {/* Right Side: Live Preview (takes previewWidth px) */}
               <div 
                 style={{ width: `${previewWidth}px` }}
-                className="h-full shrink-0 flex flex-col relative border-l border-zinc-800/25 bg-[#0d0d10] min-w-[280px]"
+                className="h-full shrink-0 flex flex-col relative border-l border-zinc-950/20 bg-[#0d0d10] min-w-[280px]"
               >
                 <div className="flex-1 flex items-center justify-center p-4 overflow-hidden relative">
-                  <div className="w-full h-full rounded-xl bg-slate-950 border border-zinc-850 shadow-2xl overflow-hidden flex flex-col">
+                  <div className="w-full h-full rounded-xl bg-slate-950 border border-zinc-950/40 shadow-2xl overflow-hidden flex flex-col">
                     <iframe
                       key={previewKey}
                       src={getCombinedPreviewBlob()}

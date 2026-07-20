@@ -167,7 +167,16 @@ function TypewriterMessage({
             className="flex items-center gap-2 text-xs text-zinc-500 dark:text-zinc-400 hover:text-zinc-750 dark:hover:text-zinc-200 transition-colors font-medium bg-zinc-100 dark:bg-zinc-900/40 px-3 py-1.5 rounded-xl border border-zinc-200 dark:border-zinc-800/80 cursor-pointer"
           >
             <span className="animate-pulse shrink-0">💡</span>
-            <span>{isThinking ? "Thinking..." : `Thought for ${duration}s`}</span>
+            <span className="flex items-center gap-1">
+              {isThinking ? "Thinking" : `Thought for ${typeof duration === "number" ? duration.toFixed(1) : duration}s`}
+              {isThinking && (
+                <span className="flex items-center gap-0.5 ml-0.5">
+                  <span className="h-1 w-1 rounded-full bg-zinc-400 dark:bg-zinc-500 animate-[bounce_1s_infinite_100ms]" />
+                  <span className="h-1 w-1 rounded-full bg-zinc-400 dark:bg-zinc-500 animate-[bounce_1s_infinite_200ms]" />
+                  <span className="h-1 w-1 rounded-full bg-zinc-400 dark:bg-zinc-500 animate-[bounce_1s_infinite_300ms]" />
+                </span>
+              )}
+            </span>
             <ChevronDown className={`h-3 w-3 text-zinc-400 shrink-0 transition-transform duration-200 ${expandedThoughts[msgId] ? "rotate-180" : ""}`} />
           </button>
           
@@ -775,8 +784,8 @@ export default function App() {
         const startTime = thinkingStartTimesRef.current[activeId];
         if (!startTime) return;
         
-        // Calculate dynamic elapsed time
-        const elapsed = Math.max(1, Math.round((Date.now() - startTime) / 1000));
+        // Calculate dynamic elapsed time with decimal precision
+        const elapsed = Math.max(0.1, Number(((Date.now() - startTime) / 1000).toFixed(1)));
         
         setSessions((prev) =>
           prev.map((s) => {
@@ -792,7 +801,7 @@ export default function App() {
             return s;
           })
         );
-      }, 500); // Check every 500ms for high responsiveness
+      }, 100); // Check every 100ms for high responsiveness
     } else {
       activeAssistantMsgIdRef.current = null;
     }
@@ -1444,15 +1453,15 @@ export default function App() {
     let connectionSucceeded = false;
 
     const pendingTimeoutId = setTimeout(() => {
-      if (!connectionSucceeded && isGenerating) {
+      if (!connectionSucceeded && !controller.signal.aborted) {
         thinkingStartTimesRef.current[assistantMsgId] = Date.now();
         activeAssistantMsgIdRef.current = assistantMsgId;
         const assistantPlaceholder: Message = {
           id: assistantMsgId,
           role: "model",
-          content: "",
+          content: "<think>Thinking...</think>",
           timestamp: Date.now(),
-          thinkingDuration: 1,
+          thinkingDuration: 0.1,
         };
 
         setSessions((prev) =>
@@ -1507,7 +1516,7 @@ export default function App() {
         role: "model",
         content: "",
         timestamp: Date.now(),
-        thinkingDuration: 1,
+        thinkingDuration: 0.1,
       };
 
       setSessions((prev) =>
@@ -1565,11 +1574,12 @@ export default function App() {
                       ...s,
                       messages: s.messages.map((m) => {
                         if (m.id === assistantMsgId) {
-                          const newContent = m.content + parsed.text;
+                          const baseContent = m.content === "<think>Thinking...</think>" ? "" : m.content;
+                          const newContent = baseContent + parsed.text;
                           let thinkingDuration = m.thinkingDuration;
                           const startTime = thinkingStartTimesRef.current[assistantMsgId];
-                          if (startTime && m.content.startsWith("<think>") && !m.content.includes("</think>") && newContent.includes("</think>")) {
-                            thinkingDuration = Math.max(1, Math.round((Date.now() - startTime) / 1000));
+                          if (startTime && baseContent.startsWith("<think>") && !baseContent.includes("</think>") && newContent.includes("</think>")) {
+                            thinkingDuration = Math.max(0.1, Number(((Date.now() - startTime) / 1000).toFixed(1)));
                           }
                           return {
                             ...m,
@@ -1992,6 +2002,7 @@ export default function App() {
     <div className={`flex flex-col h-full w-full ${curTheme.sidebarBg} ${isDark ? "text-zinc-150" : "text-zinc-800"} select-none`}>
       <div className={`p-5 border-b ${curTheme.border} flex items-center justify-between shrink-0`}>
         <div className="flex items-center gap-3">
+          <img src="/exechat.png" alt="ExeChat Logo" className="h-5 w-5 object-contain" referrerPolicy="no-referrer" />
           <div>
             <h1 className={`font-display font-bold text-base tracking-tight flex items-center gap-1.5 ${isDark ? "text-zinc-100" : "text-zinc-900"}`}>
               ExeChat
@@ -2287,8 +2298,41 @@ export default function App() {
         </AnimatePresence>
       </div>
 
-      <div className={`p-4 border-t ${curTheme.border} ${curTheme.sectionBg} text-[11px] space-y-2.5 shrink-0`}>
-        {!isLoggedIn && (
+      <div className={`p-4 border-t ${curTheme.border} ${curTheme.sectionBg} shrink-0`}>
+        {isLoggedIn ? (
+          <div className="flex items-center justify-between w-full">
+            <div className="flex items-center gap-2.5 min-w-0">
+              {userPhoto ? (
+                <img
+                  src={userPhoto}
+                  alt="Profile"
+                  referrerPolicy="no-referrer"
+                  className="h-8 w-8 rounded-full object-cover border border-zinc-800 shadow-md"
+                />
+              ) : (
+                <div className="h-8 w-8 rounded-full bg-gradient-to-tr from-[#59a6ff] to-[#c084fc] flex items-center justify-center text-xs font-bold text-white shadow-md border border-white/20">
+                  {(userDisplayName || userName || "U").charAt(0).toUpperCase()}
+                </div>
+              )}
+              <span className={`text-sm font-semibold truncate ${isDark ? "text-zinc-100" : "text-zinc-800"}`}>
+                {userDisplayName || userName || "User"}
+              </span>
+            </div>
+
+            <button
+              onClick={() => {
+                setShowSettings(!showSettings);
+                setShowExeCode(false);
+              }}
+              className={`p-1.5 rounded-lg transition-all duration-200 cursor-pointer ${
+                isDark ? "text-zinc-400 hover:text-white hover:bg-zinc-800/50" : "text-zinc-600 hover:text-zinc-900 hover:bg-zinc-200/50"
+              }`}
+              title="Settings"
+            >
+              <Settings className="h-4.5 w-4.5" />
+            </button>
+          </div>
+        ) : (
           <button
             onClick={handleGoogleLoginClick}
             className="w-full text-center text-[10px] text-zinc-400 hover:text-zinc-200 bg-zinc-900/10 border border-dashed border-zinc-800 hover:border-zinc-700 rounded-xl py-1.5 transition-all font-sans"
@@ -2296,10 +2340,6 @@ export default function App() {
             Sign in with Google
           </button>
         )}
-
-        <div className="text-center text-zinc-600 text-[10px] select-none pt-0.5">
-          © 2026 ExeChat
-        </div>
       </div>
     </div>
   );
@@ -2409,6 +2449,11 @@ export default function App() {
             <div className="flex flex-col items-center justify-between py-6 w-full h-full">
               {/* Top Section */}
               <div className="flex flex-col items-center gap-6 w-full">
+                {/* ExeChat Logo at the very top */}
+                <div className="p-1 hover:scale-105 transition-transform shrink-0 select-none">
+                  <img src="/exechat.png" alt="ExeChat Logo" className="h-6 w-6 object-contain" referrerPolicy="no-referrer" />
+                </div>
+
                 {/* Menu Button to open */}
                 <button
                   onClick={() => setIsDesktopSidebarOpen(true)}
@@ -2434,6 +2479,19 @@ export default function App() {
                   title="New Chat"
                 >
                   <Plus className="h-5 w-5 stroke-[2]" />
+                </button>
+
+                {/* Search Icon Button */}
+                <button
+                  onClick={() => {
+                    setIsDesktopSidebarOpen(true);
+                  }}
+                  className={`p-2 rounded-xl hover:bg-zinc-550/10 transition-all duration-200 cursor-pointer ${
+                    isDark ? "text-zinc-400 hover:text-white" : "text-zinc-600 hover:text-zinc-900"
+                  }`}
+                  title="Search Conversations"
+                >
+                  <Search className="h-5 w-5" />
                 </button>
               </div>
 
@@ -2572,7 +2630,7 @@ export default function App() {
         <main className={`flex-1 h-full flex ${curTheme.mainBg} relative overflow-hidden`}>
 
           <div className="flex-1 h-full flex flex-col min-w-0">
-            <div className={`h-14 md:h-16 px-3.5 md:px-6 border-b md:border-b-0 ${curTheme.border} ${curTheme.sectionBg} flex items-center justify-between z-10 shrink-0`}>
+            <div className={`h-14 px-3.5 border-b ${curTheme.border} ${curTheme.sectionBg} md:h-auto md:px-0 md:border-none md:bg-transparent md:absolute md:top-5 md:right-6 md:z-20 flex items-center justify-between md:justify-end shrink-0`}>
               <div className="min-w-0 flex items-center gap-2 md:gap-3">
                 <button
                   onClick={() => setIsMobileSidebarOpen(true)}
@@ -3351,8 +3409,8 @@ export default function App() {
                         {/* SUBPAGE: AKUN */}
                         {mobileSettingsPage === "akun" && (
                           <div className="space-y-6 animate-fadeIn">
-                            <div className={`rounded-2xl p-5 border ${isDark ? "bg-zinc-900/20 border-zinc-850" : "bg-white border-zinc-200"}`}>
-                              <h3 className="text-xs font-bold font-mono text-zinc-550 uppercase tracking-wider mb-3">Membership status</h3>
+                            <div className={`rounded-2xl p-5 border ${isDark ? "bg-zinc-900/10 border-transparent shadow-none" : "bg-white border-zinc-200"}`}>
+                              <h3 className="text-xs md:text-sm font-bold uppercase tracking-wider text-zinc-500 mb-3">Membership status</h3>
                               <div className="flex items-center gap-3">
                                 {userPhoto ? (
                                   <img src={userPhoto} referrerPolicy="no-referrer" alt="Profile" className="h-12 w-12 rounded-full border border-zinc-500/20" />
@@ -3364,35 +3422,35 @@ export default function App() {
                                 <div className="flex-1 min-w-0">
                                   <div className="flex items-center gap-1.5">
                                     <span className="h-2 w-2 rounded-full bg-emerald-500" />
-                                    <span className="text-xs font-bold text-zinc-800 dark:text-zinc-200">Connected via Google</span>
+                                    <span className="text-sm font-bold text-zinc-800 dark:text-zinc-200">Connected via Google</span>
                                   </div>
-                                  <p className="text-xs text-zinc-500 truncate mt-0.5">{userEmail || "Offline mode"}</p>
+                                  <p className="text-xs md:text-sm text-zinc-500 truncate mt-0.5">{userEmail || "Offline mode"}</p>
                                 </div>
                                 <button
                                   onClick={handleLogout}
-                                  className="text-xs font-bold py-1.5 px-3 rounded-lg border border-red-900/20 text-red-500 bg-red-500/5 hover:bg-red-500/10"
+                                  className="text-xs md:text-sm font-bold py-1.5 px-3 rounded-lg border border-red-900/20 text-red-500 bg-red-500/5 hover:bg-red-500/10"
                                 >
                                   Logout
                                 </button>
                               </div>
                             </div>
 
-                            <div className={`rounded-2xl p-5 border ${isDark ? "bg-zinc-900/20 border-zinc-850" : "bg-white border-zinc-200"}`}>
-                              <h3 className="text-xs font-bold font-mono text-zinc-550 uppercase tracking-wider mb-1">Nickname settings</h3>
-                              <p className="text-xs text-zinc-500 leading-relaxed mb-4">Set your nickname that the AI assistant will use to greet you.</p>
+                            <div className={`rounded-2xl p-5 border ${isDark ? "bg-zinc-900/10 border-transparent shadow-none" : "bg-white border-zinc-200"}`}>
+                              <h3 className="text-xs md:text-sm font-bold uppercase tracking-wider text-zinc-500 mb-1">Nickname settings</h3>
+                              <p className="text-xs md:text-sm text-zinc-500 leading-relaxed mb-4">Set your nickname that the AI assistant will use to greet you.</p>
                               
                               <div className="space-y-3">
                                 <input
                                   value={userName}
                                   onChange={(e) => setUserName(e.target.value)}
                                   placeholder="Enter nickname..."
-                                  className={`w-full rounded-xl px-4 py-3 text-xs focus:outline-none border ${
-                                    isDark ? "bg-zinc-950 border-zinc-850 text-zinc-100" : "bg-zinc-50 border-zinc-200"
+                                  className={`w-full rounded-xl px-4 py-3 text-sm md:text-base focus:outline-none border ${
+                                    isDark ? "bg-zinc-950 border-zinc-900 text-zinc-100" : "bg-zinc-50 border-zinc-200"
                                   }`}
                                 />
                                 <button
                                   onClick={handleSaveUsername}
-                                  className="w-full py-3 rounded-xl text-xs font-bold bg-amber-500 text-zinc-950"
+                                  className="w-full py-3.5 rounded-xl text-sm font-bold bg-amber-500 text-zinc-950"
                                 >
                                   Save Nickname
                                 </button>
@@ -3408,7 +3466,7 @@ export default function App() {
                         {mobileSettingsPage === "model" && (
                           <div className="space-y-6 animate-fadeIn">
                             <div className="space-y-3">
-                              <h3 className="text-xs font-bold font-mono text-zinc-550 uppercase tracking-wider">AI Engines</h3>
+                              <h3 className="text-xs md:text-sm font-bold uppercase tracking-wider text-zinc-500">AI Engines</h3>
                               <div className="space-y-2.5">
                                 {MODEL_OPTIONS.map((m) => {
                                   const isSelected = currentSession ? currentSession.model === m.id : selectedModelId === m.id;
@@ -3426,14 +3484,14 @@ export default function App() {
                                       className={`p-4 rounded-xl border cursor-pointer transition-colors ${
                                         isSelected 
                                           ? isDark ? "bg-zinc-900 border-amber-500/40 text-zinc-100" : "bg-blue-50/70 border-blue-500 text-zinc-900"
-                                          : isDark ? "border-zinc-850 bg-zinc-950/20 text-zinc-400" : "border-zinc-200 bg-white text-zinc-600"
+                                          : isDark ? "border-transparent bg-zinc-900/10 text-zinc-400" : "border-zinc-200 bg-white text-zinc-600"
                                       }`}
                                     >
                                       <div className="flex items-center justify-between mb-1">
-                                        <span className="text-xs font-bold">{m.name}</span>
-                                        {isSelected && <span className="text-[9px] px-2 py-0.5 rounded-full font-mono font-bold bg-amber-500/10 text-amber-400 border border-amber-500/25">Active</span>}
+                                        <span className="text-sm font-bold">{m.name}</span>
+                                        {isSelected && <span className="text-[10px] px-2 py-0.5 rounded-full font-mono font-bold bg-amber-500/10 text-amber-400 border border-amber-500/25">Active</span>}
                                       </div>
-                                      <p className="text-[11px] leading-relaxed text-zinc-550">{m.description}</p>
+                                      <p className="text-xs md:text-sm leading-relaxed text-zinc-500">{m.description}</p>
                                     </div>
                                   );
                                 })}
@@ -3441,7 +3499,7 @@ export default function App() {
                             </div>
 
                             <div className="space-y-3">
-                              <h3 className="text-xs font-bold font-mono text-zinc-550 uppercase tracking-wider">Cognitive Topics</h3>
+                              <h3 className="text-xs md:text-sm font-bold uppercase tracking-wider text-zinc-500">Cognitive Topics</h3>
                               <div className="space-y-2.5">
                                 {SYSTEM_PRESETS.map((preset) => {
                                   const isSelected = currentSession ? currentSession.systemInstructionId === preset.id : selectedPresetId === preset.id;
@@ -3459,7 +3517,7 @@ export default function App() {
                                       className={`p-4 rounded-xl border cursor-pointer transition-colors ${
                                         isSelected 
                                           ? isDark ? "bg-zinc-900 border-amber-500/40" : "bg-blue-50/70 border-blue-500"
-                                          : isDark ? "border-zinc-850 bg-zinc-950/20" : "border-zinc-200 bg-white"
+                                          : isDark ? "border-transparent bg-zinc-900/10" : "border-zinc-200 bg-white"
                                       }`}
                                     >
                                       <div className="flex items-center gap-2 mb-1.5">
@@ -3481,7 +3539,7 @@ export default function App() {
                         {mobileSettingsPage === "tampilan" && (
                           <div className="space-y-6 animate-fadeIn">
                             <div className="space-y-3">
-                              <h3 className="text-xs font-bold font-mono text-zinc-550 uppercase tracking-wider">Theme</h3>
+                              <h3 className="text-xs md:text-sm font-bold uppercase tracking-wider text-zinc-500">Theme</h3>
                               <div className="space-y-2">
                                 {[
                                   { id: "system", name: "System Preset", icon: Laptop },
@@ -3500,12 +3558,12 @@ export default function App() {
                                       className={`p-4 rounded-xl border flex items-center justify-between cursor-pointer ${
                                         isSelected 
                                           ? isDark ? "bg-zinc-900 border-amber-500/40 text-zinc-100" : "bg-blue-50/75 border-blue-500 text-zinc-900"
-                                          : isDark ? "border-zinc-850 bg-zinc-950/20 text-zinc-450" : "border-zinc-200 bg-white text-zinc-650"
+                                          : isDark ? "border-transparent bg-zinc-900/10 text-zinc-300" : "border-zinc-200 bg-white text-zinc-650"
                                       }`}
                                     >
                                       <div className="flex items-center gap-2.5">
                                         <IconComp className="h-4 w-4 text-zinc-500" />
-                                        <span className="text-xs font-semibold">{t.name}</span>
+                                        <span className="text-sm font-semibold">{t.name}</span>
                                       </div>
                                       {isSelected && <span className="h-2 w-2 rounded-full bg-amber-500" />}
                                     </div>
@@ -3514,9 +3572,9 @@ export default function App() {
                               </div>
                             </div>
 
-                            <div className={`rounded-2xl p-5 border ${isDark ? "bg-zinc-900/20 border-zinc-850" : "bg-white border-zinc-200"}`}>
-                              <h3 className="text-xs font-bold font-mono text-zinc-550 uppercase tracking-wider mb-2.5">Sound feedback</h3>
-                              <p className="text-xs leading-relaxed text-zinc-500">ExeChat plays a subtle sound when generating responses is complete.</p>
+                            <div className={`rounded-2xl p-5 border ${isDark ? "bg-zinc-900/10 border-transparent shadow-none" : "bg-white border-zinc-200"}`}>
+                              <h3 className="text-xs md:text-sm font-bold uppercase tracking-wider text-zinc-500 mb-2.5">Sound feedback</h3>
+                              <p className="text-xs md:text-sm leading-relaxed text-zinc-500">ExeChat plays a subtle sound when generating responses is complete.</p>
                             </div>
                           </div>
                         )}
@@ -3524,12 +3582,12 @@ export default function App() {
                         {/* SUBPAGE: INGATAN */}
                         {mobileSettingsPage === "ingatan" && (
                           <div className="space-y-6 animate-fadeIn">
-                            <div className={`rounded-2xl p-5 border ${isDark ? "bg-zinc-900/20 border-zinc-850" : "bg-white border-zinc-200"}`}>
+                            <div className={`rounded-2xl p-5 border ${isDark ? "bg-zinc-900/10 border-transparent shadow-none" : "bg-white border-zinc-200"}`}>
                               <div className="flex items-center gap-2 mb-2">
                                 <Brain className="h-5 w-5 text-amber-500" />
-                                <h3 className="text-xs font-bold font-mono text-zinc-550 uppercase tracking-wider">AI Memory Limits (Max 5)</h3>
+                                <h3 className="text-xs md:text-sm font-bold uppercase tracking-wider text-zinc-500">AI Memory Limits (Max 5)</h3>
                               </div>
-                              <p className="text-xs text-zinc-500 leading-relaxed mb-4">Saved background information gets added contextually to help customize the responses.</p>
+                              <p className="text-xs md:text-sm text-zinc-500 leading-relaxed mb-4">Saved background information gets added contextually to help customize the responses.</p>
                               
                               <div className="flex gap-2">
                                 <input
@@ -3538,8 +3596,8 @@ export default function App() {
                                   onChange={(e) => setMemoryInput(e.target.value)}
                                   placeholder={memories.length >= 5 ? "Limit reached" : "Enter personal preference..."}
                                   disabled={memories.length >= 5}
-                                  className={`flex-1 rounded-xl px-3 py-2.5 text-xs focus:outline-none border ${
-                                    isDark ? "bg-zinc-950 border-zinc-850 text-zinc-150" : "bg-white border-zinc-200 text-zinc-900"
+                                  className={`flex-1 rounded-xl px-4 py-3 text-sm md:text-base focus:outline-none border ${
+                                    isDark ? "bg-zinc-950 border-zinc-900 text-zinc-150" : "bg-white border-zinc-200 text-zinc-900"
                                   }`}
                                 />
                                 <button
@@ -3551,7 +3609,7 @@ export default function App() {
                                     }
                                   }}
                                   disabled={!memoryInput.trim() || memories.length >= 5}
-                                  className="px-4 py-2.5 rounded-xl text-xs font-bold bg-amber-500 text-zinc-950 disabled:opacity-40"
+                                  className="px-5 py-3 rounded-xl text-sm font-bold bg-amber-500 text-zinc-950 disabled:opacity-40"
                                 >
                                   Add
                                 </button>
@@ -3559,10 +3617,10 @@ export default function App() {
 
                               <div className="space-y-2 mt-4 pt-4 border-t border-zinc-500/10">
                                 {memories.length === 0 ? (
-                                  <div className="text-center py-5 text-xs text-zinc-500 italic">No saved memories yet.</div>
+                                  <div className="text-center py-5 text-sm text-zinc-500 italic">No saved memories yet.</div>
                                 ) : (
                                   memories.map((mem, idx) => (
-                                    <div key={idx} className="flex items-center justify-between gap-3 p-3 rounded-xl bg-zinc-500/5 border border-zinc-500/10 text-xs">
+                                    <div key={idx} className="flex items-center justify-between gap-3 p-3 rounded-xl bg-zinc-500/5 border border-zinc-500/10 text-sm">
                                       <span className="truncate flex-1 font-medium text-zinc-800 dark:text-zinc-300">{mem}</span>
                                       <button
                                         onClick={() => {
@@ -3588,19 +3646,8 @@ export default function App() {
                 {/* 2. DESKTOP VIEW (PREMIUM DUAL COLUMN PANELS WITH SPACIOUS TYPOGRAPHY) */}
                 <div className="hidden md:flex flex-row h-full w-full overflow-hidden">
                   {/* Left categories sidebar panel */}
-                  <div className={`w-80 shrink-0 border-r ${curTheme.border} ${isDark ? "bg-zinc-900/60" : "bg-zinc-100/50"} flex flex-col justify-between p-6`}>
+                  <div className={`w-80 shrink-0 ${isDark ? "border-transparent bg-zinc-950" : `border-r ${curTheme.border} bg-zinc-100/50`} flex flex-col justify-between p-6`}>
                     <div className="space-y-8">
-                      {/* Brand info */}
-                      <div className="flex items-center gap-3.5 px-2">
-                        <div className="p-2.5 rounded-2xl bg-gradient-to-tr from-[#59a6ff] to-[#c084fc] text-white shadow-md">
-                          <Settings className="h-5.5 w-5.5 animate-spin-slow" />
-                        </div>
-                        <div>
-                          <h2 className="text-lg font-display font-bold text-zinc-900 dark:text-zinc-100 tracking-tight">ExeChat Configuration</h2>
-                          <p className="text-[11px] text-zinc-500 font-medium uppercase tracking-widest font-sans mt-0.5">Control Center</p>
-                        </div>
-                      </div>
-
                       {/* Navigation categories */}
                       <nav className="space-y-2">
                         {[
@@ -3618,17 +3665,17 @@ export default function App() {
                               className={`w-full flex items-center gap-4 p-4 rounded-2xl border text-left transition-all duration-300 cursor-pointer ${
                                 isActive
                                   ? isDark
-                                    ? "bg-zinc-900 border-zinc-750 text-white shadow-xl ring-1 ring-amber-500/10"
+                                    ? "bg-zinc-900 border-transparent text-white shadow-xl ring-1 ring-amber-500/10"
                                     : "bg-white border-zinc-250 text-zinc-900 shadow-md ring-1 ring-blue-500/10"
                                   : isDark
-                                    ? "border-transparent text-zinc-400 hover:bg-zinc-850/50 hover:text-zinc-200"
+                                    ? "border-transparent text-zinc-400 hover:bg-zinc-950/40 hover:text-zinc-200"
                                     : "border-transparent text-zinc-600 hover:bg-zinc-150/50 hover:text-zinc-900"
                               }`}
                             >
                               <div className={`p-2.5 rounded-xl border transition-colors ${
                                 isActive 
-                                  ? isDark ? "bg-zinc-950 border-zinc-850 text-amber-400" : "bg-zinc-100 border-blue-250 text-[#1a73e8]" 
-                                  : isDark ? "bg-zinc-900 border-zinc-800 text-zinc-500" : "bg-white border-zinc-200 text-zinc-500"
+                                  ? isDark ? "bg-zinc-950 border-transparent text-amber-400" : "bg-zinc-100 border-blue-250 text-[#1a73e8]" 
+                                  : isDark ? "bg-zinc-900 border-transparent text-zinc-500" : "bg-white border-zinc-200 text-zinc-500"
                               }`}>
                                 <IconComp className="h-5 w-5" />
                               </div>
@@ -3645,10 +3692,10 @@ export default function App() {
                     {/* Exit button at bottom of sidebar */}
                     <button
                       onClick={() => setShowSettings(false)}
-                      className="w-full flex items-center justify-center gap-2 p-3.5 rounded-2xl font-bold text-sm border transition-all duration-300 hover:scale-[1.02] cursor-pointer bg-zinc-900 hover:bg-zinc-850 text-white border-zinc-850 dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 dark:border-transparent"
+                      className="w-full flex items-center justify-center gap-2 p-3.5 rounded-2xl font-bold text-sm border transition-all duration-300 hover:scale-[1.02] cursor-pointer bg-zinc-900 hover:bg-zinc-850 text-white border-transparent dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 dark:border-transparent"
                     >
                       <X className="h-4 w-4 stroke-[2.5]" />
-                      <span>Back to Workspace</span>
+                      <span>Close</span>
                     </button>
                   </div>
 
@@ -3663,13 +3710,13 @@ export default function App() {
                             <p className="text-sm text-zinc-500 mt-1 font-medium">Verify login authenticity status and customize greeting nicknames.</p>
                           </div>
 
-                          <div className={`rounded-3xl p-6 md:p-8 border ${isDark ? "bg-zinc-900/10 border-zinc-850" : "bg-white border-zinc-200/80 shadow-md"}`}>
+                          <div className={`rounded-3xl p-6 md:p-8 border ${isDark ? "bg-zinc-900/10 border-transparent shadow-none" : "bg-white border-zinc-200/80 shadow-md"}`}>
                             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6">
                               <div className="flex items-center gap-4">
                                 {userPhoto ? (
                                   <img src={userPhoto} referrerPolicy="no-referrer" alt="Profile" className="h-16 w-16 rounded-full border border-zinc-500/20 shadow-md" />
                                 ) : (
-                                  <div className="h-16 w-16 rounded-full border flex items-center justify-center bg-zinc-900 border-zinc-800 text-zinc-400 shadow-md">
+                                  <div className="h-16 w-16 rounded-full border flex items-center justify-center bg-zinc-900 border-transparent text-zinc-400 shadow-md">
                                     <User className="h-8 w-8" />
                                   </div>
                                 )}
@@ -3690,7 +3737,7 @@ export default function App() {
                             </div>
                           </div>
 
-                          <div className={`rounded-3xl p-6 md:p-8 border space-y-6 ${isDark ? "bg-zinc-900/10 border-zinc-850" : "bg-white border-zinc-200/80 shadow-md"}`}>
+                          <div className={`rounded-3xl p-6 md:p-8 border space-y-6 ${isDark ? "bg-zinc-900/10 border-transparent shadow-none" : "bg-white border-zinc-200/80 shadow-md"}`}>
                             <div>
                               <h4 className="text-base font-bold text-zinc-800 dark:text-zinc-200">Personalize AI Nickname Greetings</h4>
                               <p className="text-xs text-zinc-500 mt-1 font-medium">Set a unique name the assistant will use during private chat dialogs.</p>
@@ -3703,7 +3750,7 @@ export default function App() {
                                   onChange={(e) => setUserName(e.target.value)}
                                   placeholder="Enter custom name..."
                                   className={`flex-1 rounded-2xl px-4 py-3.5 text-sm focus:outline-none border ${
-                                    isDark ? "bg-zinc-950 border-zinc-850 text-zinc-100" : "bg-zinc-50 border-zinc-200"
+                                    isDark ? "bg-zinc-950 border-zinc-900 text-zinc-100" : "bg-zinc-50 border-zinc-200"
                                   }`}
                                 />
                                 <button
@@ -3750,10 +3797,10 @@ export default function App() {
                                     className={`p-6 rounded-3xl border cursor-pointer transition-all duration-300 flex flex-col justify-between ${
                                       isSelected
                                         ? isDark
-                                          ? "bg-zinc-900 border-zinc-750 shadow-xl ring-2 ring-amber-500/10 text-zinc-100"
+                                          ? "bg-zinc-900 border-transparent shadow-xl ring-2 ring-amber-500/10 text-zinc-100"
                                           : "bg-blue-50/75 border-[#1a73e8] shadow-md ring-2 ring-blue-500/10 text-zinc-900"
                                         : isDark
-                                          ? "border-zinc-850 bg-zinc-950/20 text-zinc-400 hover:border-zinc-700 hover:bg-zinc-950/40"
+                                          ? "border-transparent bg-zinc-900/10 text-zinc-400 hover:border-zinc-700 hover:bg-zinc-900/30"
                                           : "border-zinc-200 bg-white text-zinc-600 hover:border-zinc-350 hover:bg-zinc-50/50"
                                     }`}
                                   >
@@ -3793,10 +3840,10 @@ export default function App() {
                                     className={`p-6 rounded-3xl border cursor-pointer transition-all duration-300 ${
                                       isSelected
                                         ? isDark
-                                          ? "bg-zinc-900 border-zinc-750 shadow-xl ring-2 ring-amber-500/10"
+                                          ? "bg-zinc-900 border-transparent shadow-xl ring-2 ring-amber-500/10"
                                           : "bg-blue-50/75 border-[#1a73e8] shadow-md ring-2 ring-blue-500/10"
                                         : isDark
-                                          ? "border-zinc-850 bg-zinc-950/20 hover:border-zinc-700 hover:bg-zinc-950/40"
+                                          ? "border-transparent bg-zinc-900/10 hover:border-zinc-700 hover:bg-zinc-900/30"
                                           : "border-zinc-200 bg-white hover:border-zinc-350 hover:bg-zinc-50/50"
                                     }`}
                                   >
@@ -3826,33 +3873,33 @@ export default function App() {
                             <p className="text-sm text-zinc-500 mt-1 font-medium">Customize the layout presentation, system colors, and sound effects.</p>
                           </div>
 
-                          <div className={`rounded-3xl p-6 md:p-8 border space-y-6 ${isDark ? "bg-zinc-900/10 border-zinc-850" : "bg-white border-zinc-200/80 shadow-md"}`}>
-                            <h4 className="text-sm font-bold text-zinc-550 uppercase font-mono tracking-wider">Select Style theme</h4>
-                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                              {[
-                                { id: "system", name: "System Sync", desc: "Follow OS configurations", icon: Laptop },
-                                { id: "dark", name: "Slate Dark", desc: "Eye-saving deep slate", icon: Moon },
-                                { id: "light", name: "Pure Light", desc: "High contrast paper white", icon: Sun },
-                              ].map((t) => {
-                                const isSelected = themeMode === t.id;
-                                const IconComp = t.icon;
-                                return (
-                                  <div
-                                    key={t.id}
-                                    onClick={() => {
-                                      setThemeMode(t.id as any);
-                                      playNotifySound();
-                                    }}
-                                    className={`p-5 rounded-2xl border cursor-pointer transition-all duration-300 flex flex-col justify-between items-start text-left ${
-                                      isSelected
-                                        ? isDark
-                                          ? "bg-zinc-900 border-amber-500/40 shadow-md text-white"
-                                          : "bg-blue-50/75 border-[#1a73e8] shadow shadow-blue-500/5 text-zinc-900"
-                                        : isDark
-                                          ? "border-zinc-850 bg-zinc-950/20 text-zinc-400 hover:border-zinc-700 hover:bg-zinc-950/40"
-                                          : "border-zinc-200 bg-white text-zinc-650 hover:border-zinc-350 hover:bg-zinc-50"
-                                    }`}
-                                  >
+                           <div className={`rounded-3xl p-6 md:p-8 border space-y-6 ${isDark ? "bg-zinc-900/10 border-transparent shadow-none" : "bg-white border-zinc-200/80 shadow-md"}`}>
+                             <h4 className="text-sm font-bold text-zinc-550 uppercase font-mono tracking-wider">Select Style theme</h4>
+                             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                               {[
+                                 { id: "system", name: "System Sync", desc: "Follow OS configurations", icon: Laptop },
+                                 { id: "dark", name: "Slate Dark", desc: "Eye-saving deep slate", icon: Moon },
+                                 { id: "light", name: "Pure Light", desc: "High contrast paper white", icon: Sun },
+                               ].map((t) => {
+                                 const isSelected = themeMode === t.id;
+                                 const IconComp = t.icon;
+                                 return (
+                                   <div
+                                     key={t.id}
+                                     onClick={() => {
+                                       setThemeMode(t.id as any);
+                                       playNotifySound();
+                                     }}
+                                     className={`p-5 rounded-2xl border cursor-pointer transition-all duration-300 flex flex-col justify-between items-start text-left ${
+                                       isSelected
+                                         ? isDark
+                                           ? "bg-zinc-900 border-amber-500/40 shadow-md text-white"
+                                           : "bg-blue-50/75 border-[#1a73e8] shadow shadow-blue-500/5 text-zinc-900"
+                                         : isDark
+                                           ? "border-transparent bg-zinc-900/10 text-zinc-400 hover:border-zinc-700 hover:bg-zinc-900/30"
+                                           : "border-zinc-200 bg-white text-zinc-650 hover:border-zinc-350 hover:bg-zinc-50"
+                                     }`}
+                                   >
                                     <div className="flex items-center gap-3 mb-3">
                                       <div className={`p-2 rounded-lg border ${isSelected ? "text-amber-400 border-amber-500/25" : "text-zinc-500 border-zinc-800"}`}>
                                         <IconComp className="h-4.5 w-4.5" />
@@ -3866,9 +3913,9 @@ export default function App() {
                             </div>
                           </div>
 
-                          <div className={`rounded-3xl p-6 md:p-8 border space-y-4 ${isDark ? "bg-zinc-900/10 border-zinc-850" : "bg-white border-zinc-200/80 shadow-md"}`}>
+                          <div className={`rounded-3xl p-6 md:p-8 border space-y-4 ${isDark ? "bg-zinc-900/10 border-transparent shadow-none" : "bg-white border-zinc-200/80 shadow-md"}`}>
                             <h4 className="text-base font-bold text-zinc-800 dark:text-zinc-200">Acoustic Audio Feedback</h4>
-                            <p className="text-xs text-zinc-500 leading-relaxed font-medium">ExeChat will play a peaceful, gentle notify sound when generation is complete. This helps with multitasking or screen-off interactive prompts.</p>
+                            <p className="text-xs md:text-sm text-zinc-500 leading-relaxed font-medium">ExeChat will play a peaceful, gentle notify sound when generation is complete. This helps with multitasking or screen-off interactive prompts.</p>
                           </div>
                         </div>
                       )}
@@ -3881,7 +3928,7 @@ export default function App() {
                             <p className="text-sm text-zinc-500 mt-1 font-medium">Give ExeChat persistent background facts (like occupation, coding preference, language) to remember permanently.</p>
                           </div>
 
-                          <div className={`rounded-3xl p-6 md:p-8 border space-y-6 ${isDark ? "bg-zinc-900/10 border-zinc-850" : "bg-white border-zinc-200/80 shadow-md"}`}>
+                          <div className={`rounded-3xl p-6 md:p-8 border space-y-6 ${isDark ? "bg-zinc-900/10 border-transparent shadow-none" : "bg-white border-zinc-200/80 shadow-md"}`}>
                             <div className="flex items-center gap-3">
                               <Brain className="h-6 w-6 text-amber-500 animate-pulse" />
                               <h4 className="text-base font-bold text-zinc-800 dark:text-zinc-200">Inject custom memory preference (Max 5)</h4>
@@ -3895,7 +3942,7 @@ export default function App() {
                                 placeholder={memories.length >= 5 ? "Maximum limit of 5 preferences reached" : "Example: I prefer codes written in React TSX style..."}
                                 disabled={memories.length >= 5}
                                 className={`flex-1 rounded-2xl px-4 py-3.5 text-sm focus:outline-none border ${
-                                  isDark ? "bg-zinc-950 border-zinc-850 text-zinc-100" : "bg-zinc-50 border-zinc-200"
+                                  isDark ? "bg-zinc-950 border-zinc-900 text-zinc-100" : "bg-zinc-50 border-zinc-200"
                                 }`}
                               />
                               <button
