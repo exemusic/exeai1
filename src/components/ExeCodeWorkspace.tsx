@@ -277,6 +277,7 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
   const typewriterTargetRef = useRef<string>("");
   const typewriterCurrentRef = useRef<string>("");
   const typewriterIntervalIdRef = useRef<any>(null);
+  const typewriterDurationRef = useRef<number>(0.1);
   const isAIEditingActiveRef = useRef<boolean>(false);
 
   // Initialize backup when entering edit mode or changing file
@@ -1449,6 +1450,8 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
                     dur = finalThinkingDurationsRef.current[assistantMsgId];
                   }
 
+                  typewriterDurationRef.current = dur;
+
                   // Run dynamic typewriter
                   if (!typewriterIntervalIdRef.current) {
                     const runTypewriter = () => {
@@ -1485,7 +1488,7 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
                             ? { 
                                 ...msg, 
                                 content: current,
-                                thinkingDuration: dur,
+                                thinkingDuration: typewriterDurationRef.current,
                                 modelId: selectedModel
                               } 
                             : msg
@@ -1941,7 +1944,7 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
           if (thinking !== null || isThinking) {
             actionSteps.push({
               type: "thought",
-              text: isThinking ? "Thinking Process..." : `Thought for ${typeof msgDuration === "number" ? msgDuration.toFixed(1) : msgDuration} seconds`,
+              text: isThinking ? `Thinking Process (${typeof msgDuration === "number" ? msgDuration.toFixed(1) : msgDuration}s)...` : `Thought for ${typeof msgDuration === "number" ? msgDuration.toFixed(1) : msgDuration} seconds`,
               content: thinking,
               isThinking: isThinking
             });

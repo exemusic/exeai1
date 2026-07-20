@@ -20,6 +20,17 @@ app.get("/favicon.png", (req, res) => {
   res.sendFile(path.join(process.cwd(), "favicon.png"));
 });
 
+// Serve favicon.ico requests with the PNG favicon to avoid index.html fallback
+app.get("/favicon.ico", (req, res) => {
+  res.type("image/png");
+  res.sendFile(path.join(process.cwd(), "favicon.png"));
+});
+
+// Serve apple-touch-icon.png requests
+app.get("/apple-touch-icon.png", (req, res) => {
+  res.sendFile(path.join(process.cwd(), "favicon.png"));
+});
+
 function getCreditCost(text: string): number {
   const len = (text || "").trim().length;
   if (len < 20) return 1;

@@ -170,7 +170,7 @@ function TypewriterMessage({
           >
             <span className="animate-pulse shrink-0">💡</span>
             <span className="flex items-center gap-1">
-              {isThinking ? "Thinking" : `Thought for ${typeof duration === "number" ? duration.toFixed(1) : duration}s`}
+              {isThinking ? `Thinking (${typeof duration === "number" ? duration.toFixed(1) : duration}s)` : `Thought for ${typeof duration === "number" ? duration.toFixed(1) : duration}s`}
               {isThinking && (
                 <span className="flex items-center gap-0.5 ml-0.5">
                   <span className="h-1 w-1 rounded-full bg-zinc-400 dark:bg-zinc-500 animate-[bounce_1s_infinite_100ms]" />
@@ -1591,8 +1591,12 @@ export default function App() {
                           const newContent = baseContent + parsed.text;
                           let thinkingDuration = m.thinkingDuration;
                           const startTime = thinkingStartTimesRef.current[assistantMsgId];
-                          if (startTime && baseContent.startsWith("<think>") && !baseContent.includes("</think>") && newContent.includes("</think>")) {
-                            thinkingDuration = Math.max(0.1, Number(((Date.now() - startTime) / 1000).toFixed(1)));
+                          if (startTime) {
+                            if (!newContent.includes("</think>")) {
+                              thinkingDuration = Math.max(0.1, Number(((Date.now() - startTime) / 1000).toFixed(1)));
+                            } else if (!baseContent.includes("</think>") && newContent.includes("</think>")) {
+                              thinkingDuration = Math.max(0.1, Number(((Date.now() - startTime) / 1000).toFixed(1)));
+                            }
                           }
                           return {
                             ...m,
@@ -1881,7 +1885,16 @@ export default function App() {
                     if (s.id === currentSessionId) {
                       const updatedMsgs = s.messages.map((m) => {
                         if (m.id === assistantMsgId) {
-                          return { ...m, content: accumulatedText };
+                          let thinkingDuration = m.thinkingDuration;
+                          const startTime = thinkingStartTimesRef.current[assistantMsgId];
+                          if (startTime) {
+                            if (!accumulatedText.includes("</think>")) {
+                              thinkingDuration = Math.max(0.1, Number(((Date.now() - startTime) / 1000).toFixed(1)));
+                            } else if (!m.content?.includes("</think>") && accumulatedText.includes("</think>")) {
+                              thinkingDuration = Math.max(0.1, Number(((Date.now() - startTime) / 1000).toFixed(1)));
+                            }
+                          }
+                          return { ...m, content: accumulatedText, thinkingDuration };
                         }
                         return m;
                       });
@@ -2029,25 +2042,20 @@ export default function App() {
         </div>
 
         <div className="flex items-center gap-1.5">
-          <button
-            onClick={() => {
-              setShowSettings(!showSettings);
-              if (isMobile) setIsMobileSidebarOpen(false);
-            }}
-            className={`p-1.5 rounded-lg border transition-all duration-200 ${
-              showSettings
-                ? isDark ? "bg-zinc-800 border-zinc-700 text-zinc-150" : "bg-zinc-200 border-zinc-300 text-zinc-900"
-                : isDark ? "border-transparent text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50" : "border-transparent text-zinc-650 hover:text-zinc-900 hover:bg-zinc-200/50"
-            }`}
-            title="Mode Settings"
-          >
-            <Settings className="h-4 w-4" />
-          </button>
-
-          {!isMobile && (
+          {isMobile ? (
+            <button
+              onClick={() => setIsMobileSidebarOpen(false)}
+              className={`p-1.5 rounded-lg border border-transparent transition-all duration-200 cursor-pointer ${
+                isDark ? "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50" : "text-zinc-650 hover:text-zinc-900 hover:bg-zinc-200/50"
+              }`}
+              title="Close Sidebar"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          ) : (
             <button
               onClick={() => setIsDesktopSidebarOpen(false)}
-              className={`p-1.5 rounded-lg border transition-all duration-200 cursor-pointer ${
+              className={`p-1.5 rounded-lg border border-transparent transition-all duration-200 cursor-pointer ${
                 isDark ? "border-transparent text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50" : "border-transparent text-zinc-650 hover:text-zinc-900 hover:bg-zinc-200/50"
               }`}
               title="Close Chat History"
@@ -2341,9 +2349,12 @@ export default function App() {
               onClick={() => {
                 setShowSettings(!showSettings);
                 setShowExeCode(false);
+                if (isMobile) {
+                  setIsMobileSidebarOpen(false);
+                }
               }}
               className={`p-1.5 rounded-lg transition-all duration-200 cursor-pointer ${
-                isDark ? "text-zinc-400 hover:text-white hover:bg-zinc-800/50" : "text-zinc-600 hover:text-zinc-900 hover:bg-zinc-200/50"
+                isDark ? "text-zinc-400 hover:text-white hover:bg-zinc-800/50" : "text-zinc-650 hover:text-zinc-900 hover:bg-zinc-200/50"
               }`}
               title="Settings"
             >
@@ -2351,12 +2362,29 @@ export default function App() {
             </button>
           </div>
         ) : (
-          <button
-            onClick={handleGoogleLoginClick}
-            className="w-full text-center text-[10px] text-zinc-400 hover:text-zinc-200 bg-zinc-900/10 border border-dashed border-zinc-800 hover:border-zinc-700 rounded-xl py-1.5 transition-all font-sans"
-          >
-            Sign in with Google
-          </button>
+          <div className="flex items-center justify-between w-full gap-2">
+            <button
+              onClick={handleGoogleLoginClick}
+              className="flex-1 text-center text-[10px] text-zinc-400 hover:text-zinc-200 bg-zinc-900/10 border border-dashed border-zinc-800 hover:border-zinc-700 rounded-xl py-2 transition-all font-sans"
+            >
+              Sign in with Google
+            </button>
+            <button
+              onClick={() => {
+                setShowSettings(!showSettings);
+                setShowExeCode(false);
+                if (isMobile) {
+                  setIsMobileSidebarOpen(false);
+                }
+              }}
+              className={`p-1.5 rounded-lg transition-all duration-200 cursor-pointer shrink-0 ${
+                isDark ? "text-zinc-400 hover:text-white hover:bg-zinc-800/50" : "text-zinc-650 hover:text-zinc-900 hover:bg-zinc-200/50"
+              }`}
+              title="Settings"
+            >
+              <Settings className="h-4.5 w-4.5" />
+            </button>
+          </div>
         )}
       </div>
     </div>
@@ -2998,7 +3026,7 @@ export default function App() {
                               )
                             )}
 
-                            {!isUser && msg.content !== "" && (
+                            {!isUser && msg.content !== "" && !(isGenerating && index === currentSession.messages.length - 1) && (
                               <div className="flex items-center gap-1 sm:gap-2 mt-3 select-none text-zinc-400 dark:text-zinc-500">
                                 <button
                                   onClick={() => {
