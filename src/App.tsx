@@ -1463,7 +1463,7 @@ export default function App() {
         const assistantPlaceholder: Message = {
           id: assistantMsgId,
           role: "model",
-          content: "<think>Thinking...</think>",
+          content: "<think>Thinking...",
           timestamp: Date.now(),
           thinkingDuration: 0.1,
         };
@@ -1583,7 +1583,7 @@ export default function App() {
                       ...s,
                       messages: s.messages.map((m) => {
                         if (m.id === assistantMsgId) {
-                          const baseContent = m.content === "<think>Thinking...</think>" ? "" : m.content;
+                          const baseContent = (m.content === "<think>Thinking...</think>" || m.content === "<think>Thinking...") ? "" : m.content;
                           const newContent = baseContent + parsed.text;
                           let thinkingDuration = m.thinkingDuration;
                           const startTime = thinkingStartTimesRef.current[assistantMsgId];

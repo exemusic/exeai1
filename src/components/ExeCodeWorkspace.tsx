@@ -588,9 +588,9 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
                 updatedContent.includes("Reviewing project")
               ) {
                 if (elapsed >= 5) {
-                  updatedContent = `<think>Analyzing codebase requirements (deep thinking process active... ${elapsed.toFixed(1)}s)</think>`;
+                  updatedContent = `<think>Analyzing codebase requirements (deep thinking process active... ${elapsed.toFixed(1)}s)`;
                 } else {
-                  updatedContent = `<think>Reviewing project context and prompt... (${elapsed.toFixed(1)}s)</think>`;
+                  updatedContent = `<think>Reviewing project context and prompt... (${elapsed.toFixed(1)}s)`;
                 }
               }
               return { ...m, thinkingDuration: elapsed, content: updatedContent };
@@ -1365,7 +1365,7 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
     const tempAssistantMsg: ChatMessage = {
       id: assistantMsgId,
       role: "assistant",
-      content: "<think>Reviewing project context and prompt... (1s)</think>",
+      content: "<think>Reviewing project context and prompt... (1s)",
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       modelId: selectedModel,
       thinkingDuration: 1,
