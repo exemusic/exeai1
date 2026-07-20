@@ -101,3 +101,71 @@ export const SUGGESTED_PROMPTS = [
     text: "Explain with a simple analogy why failing to perform cleanup on event listeners or subscriptions can lead to memory leaks in a React application."
   }
 ];
+
+export interface TemperaturePreset {
+  id: string;
+  name: string;
+  range: string;
+  defaultValue: number;
+  description: string;
+}
+
+export const GEMMA_TEMP_PRESETS: TemperaturePreset[] = [
+  {
+    id: "coding-besar",
+    name: "Coding besar (ribuan baris, full project)",
+    range: "0.15–0.25",
+    defaultValue: 0.20,
+    description: "Sangat konsisten untuk restrukturisasi kode skala besar dan project-wide."
+  },
+  {
+    id: "coding-sedang",
+    name: "Coding sedang (fitur baru, API, komponen)",
+    range: "0.25–0.35",
+    defaultValue: 0.30,
+    description: "Keseimbangan ideal antara kepatuhan struktur dan fleksibilitas logika baru."
+  },
+  {
+    id: "coding-kecil",
+    name: "Coding kecil (fungsi, bug fix)",
+    range: "0.3–0.4",
+    defaultValue: 0.35,
+    description: "Presisi tinggi dengan sedikit ruang kreatif untuk penyelesaian masalah ringkas."
+  },
+  {
+    id: "debug-error",
+    name: "Debug error",
+    range: "0.2–0.3",
+    defaultValue: 0.25,
+    description: "Fokus maksimal pada analisis tumpukan kesalahan (stack trace) dan kecocokan sintaks."
+  },
+  {
+    id: "penjelasan-coding",
+    name: "Penjelasan coding",
+    range: "0.4–0.5",
+    defaultValue: 0.45,
+    description: "Penjelasan ramah, deskriptif, dan mudah dipahami dengan analogi terstruktur."
+  },
+  {
+    id: "chat-umum",
+    name: "Chat umum",
+    range: "0.6–0.7",
+    defaultValue: 0.65,
+    description: "Obrolan santai sehari-hari dengan nada yang hidup, hangat, dan interaktif."
+  },
+  {
+    id: "brainstorming",
+    name: "Brainstorming ide",
+    range: "0.7–0.8",
+    defaultValue: 0.75,
+    description: "Mendorong pemikiran out-of-the-box dan opsi konseptual yang inovatif."
+  },
+  {
+    id: "kreatif",
+    name: "Cerita, puisi, roleplay",
+    range: "0.8–1.0",
+    defaultValue: 0.90,
+    description: "Tingkat kreativitas tertinggi untuk penulisan naratif, sastra, dan penokohan karakter mendalam."
+  }
+];
+

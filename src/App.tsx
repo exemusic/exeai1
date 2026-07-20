@@ -53,7 +53,7 @@ import { Message, ChatSession, SystemPreset, ModelOption } from "./types";
 import { MarkdownRenderer } from "./components/MarkdownRenderer";
 import { GoogleOAuthProvider, GoogleLogin } from "@react-oauth/google";
 import { jwtDecode } from "jwt-decode";
-import { MODEL_OPTIONS, SYSTEM_PRESETS, SUGGESTED_PROMPTS } from "./presets";
+import { MODEL_OPTIONS, SYSTEM_PRESETS, SUGGESTED_PROMPTS, GEMMA_TEMP_PRESETS } from "./presets";
 import { ExeCodeWorkspace } from "./components/ExeCodeWorkspace";
 import { PublicProjectView } from "./components/PublicProjectView";
 
@@ -3646,6 +3646,89 @@ export default function App() {
                               </div>
                             </div>
 
+                            {/* TEMPERATURE SETTINGS FOR GEMMA-4 MOBILE */}
+                            {((currentSession ? currentSession.model : selectedModelId) === "gemma-4-31b") && (
+                              <div className={`p-4 rounded-xl border space-y-4 ${isDark ? "bg-zinc-900/40 border-zinc-800" : "bg-white border-zinc-200 shadow-sm"}`}>
+                                <div className="flex items-center justify-between gap-2">
+                                  <div className="flex items-center gap-2">
+                                    <Sliders className="h-4 w-4 text-amber-500" />
+                                    <h4 className="text-xs font-bold uppercase tracking-wider text-zinc-500">Preset Temperature</h4>
+                                  </div>
+                                  <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-zinc-950 border border-zinc-800 text-amber-400">
+                                    {activeTemp.toFixed(2)}
+                                  </span>
+                                </div>
+
+                                <div className="space-y-1">
+                                  <input 
+                                    type="range" 
+                                    min="0.10" 
+                                    max="1.00" 
+                                    step="0.05"
+                                    value={activeTemp}
+                                    onChange={(e) => {
+                                      const val = parseFloat(e.target.value);
+                                      if (currentSession) {
+                                        setSessions((prev) => prev.map((s) => s.id === currentSessionId ? { ...s, temperature: val } : s));
+                                      } else {
+                                        setTemperature(val);
+                                      }
+                                    }}
+                                    className="w-full h-1.5 bg-zinc-850 dark:bg-zinc-950 rounded-lg appearance-none cursor-pointer accent-amber-500"
+                                  />
+                                  <div className="flex justify-between text-[8px] text-zinc-550 font-mono">
+                                    <span>Konsisten (0.10)</span>
+                                    <span>Kreatif (1.00)</span>
+                                  </div>
+                                </div>
+
+                                <div className="space-y-2">
+                                  <h5 className="text-[10px] font-bold text-zinc-550 uppercase font-mono tracking-wider">Optimized Presets (gemma-4)</h5>
+                                  <div className="space-y-2 max-h-[180px] overflow-y-auto pr-1">
+                                    {GEMMA_TEMP_PRESETS.map((p) => {
+                                      const [minStr, maxStr] = p.range.split("–");
+                                      const minVal = parseFloat(minStr);
+                                      const maxVal = parseFloat(maxStr);
+                                      const isMatched = activeTemp >= minVal && activeTemp <= maxVal;
+                                      
+                                      return (
+                                        <div
+                                          key={p.id}
+                                          onClick={() => {
+                                            if (currentSession) {
+                                              setSessions((prev) => prev.map((s) => s.id === currentSessionId ? { ...s, temperature: p.defaultValue } : s));
+                                            } else {
+                                              setTemperature(p.defaultValue);
+                                            }
+                                            playNotifySound();
+                                          }}
+                                          className={`p-3 rounded-xl border cursor-pointer transition-colors text-left ${
+                                            isMatched
+                                              ? isDark
+                                                ? "bg-amber-500/10 border-amber-500/40 text-zinc-150"
+                                                : "bg-blue-50/70 border-blue-500 text-zinc-900"
+                                              : isDark
+                                                ? "border-transparent bg-zinc-900/10 text-zinc-400 hover:bg-zinc-900/20"
+                                                : "border-zinc-200 bg-white text-zinc-650 hover:border-zinc-300"
+                                          }`}
+                                        >
+                                          <div className="flex items-center justify-between gap-1 mb-1">
+                                            <span className="text-xs font-bold leading-tight">{p.name}</span>
+                                            <span className={`text-[9px] font-mono font-bold px-1 py-0.5 rounded ${
+                                              isMatched ? "bg-amber-500/25 text-amber-400" : "bg-zinc-500/10 text-zinc-500"
+                                            }`}>
+                                              {p.range}
+                                            </span>
+                                          </div>
+                                          <p className="text-[10px] text-zinc-500 leading-normal">{p.description}</p>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+
                             <div className="space-y-3">
                               <h3 className="text-xs md:text-sm font-bold uppercase tracking-wider text-zinc-500">Cognitive Topics</h3>
                               <div className="space-y-2.5">
@@ -3949,7 +4032,7 @@ export default function App() {
                                           : "bg-blue-50/75 border-[#1a73e8] shadow-md ring-2 ring-blue-500/10 text-zinc-900"
                                         : isDark
                                           ? "border-transparent bg-zinc-900/10 text-zinc-400 hover:border-zinc-700 hover:bg-zinc-900/30"
-                                          : "border-zinc-200 bg-white text-zinc-600 hover:border-zinc-350 hover:bg-zinc-50/50"
+                                          : "border-zinc-200 bg-white text-zinc-650 hover:border-zinc-350 hover:bg-zinc-50/50"
                                     }`}
                                   >
                                     <div>
@@ -3968,6 +4051,98 @@ export default function App() {
                               })}
                             </div>
                           </div>
+
+                          {/* TEMPERATURE PRESETS FOR GEMMA-4 */}
+                          {((currentSession ? currentSession.model : selectedModelId) === "gemma-4-31b") && (
+                            <div className={`p-6 md:p-8 rounded-3xl border space-y-6 ${isDark ? "bg-zinc-900/40 border-zinc-800" : "bg-white border-zinc-200 shadow-sm"}`}>
+                              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                                <div>
+                                  <h4 className="text-base font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
+                                    <Sliders className="h-5 w-5 text-amber-500" />
+                                    Preset Temperature (Suhu Kreativitas)
+                                  </h4>
+                                  <p className="text-xs text-zinc-550 mt-1 font-medium">Suhu mempengaruhi tingkat kreativitas dan konsistensi jawaban model Gemma-4.</p>
+                                </div>
+                                <div className="flex items-center gap-3 self-start sm:self-center">
+                                  <span className="text-xs font-mono font-bold px-3 py-1.5 rounded-xl bg-zinc-950 border border-zinc-800 text-amber-400 shadow-inner">
+                                    Active Temp: {activeTemp.toFixed(2)}
+                                  </span>
+                                </div>
+                              </div>
+
+                              <div className="space-y-2">
+                                <input 
+                                  type="range" 
+                                  min="0.10" 
+                                  max="1.00" 
+                                  step="0.05"
+                                  value={activeTemp}
+                                  onChange={(e) => {
+                                    const val = parseFloat(e.target.value);
+                                    if (currentSession) {
+                                      setSessions((prev) => prev.map((s) => s.id === currentSessionId ? { ...s, temperature: val } : s));
+                                    } else {
+                                      setTemperature(val);
+                                    }
+                                  }}
+                                  className="w-full h-2 bg-zinc-850 dark:bg-zinc-950 rounded-lg appearance-none cursor-pointer accent-amber-500"
+                                />
+                                <div className="flex justify-between text-[10px] text-zinc-550 font-mono font-bold px-1">
+                                  <span>Konsisten (0.10)</span>
+                                  <span>Kreatif (1.00)</span>
+                                </div>
+                              </div>
+
+                              <div className="space-y-3">
+                                <h5 className="text-xs font-bold text-zinc-550 uppercase font-mono tracking-wider">Optimized Presets untuk exeai-e5:5:9</h5>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                  {GEMMA_TEMP_PRESETS.map((p) => {
+                                    const [minStr, maxStr] = p.range.split("–");
+                                    const minVal = parseFloat(minStr);
+                                    const maxVal = parseFloat(maxStr);
+                                    const isMatched = activeTemp >= minVal && activeTemp <= maxVal;
+                                    
+                                    return (
+                                      <div
+                                        key={p.id}
+                                        onClick={() => {
+                                          if (currentSession) {
+                                            setSessions((prev) => prev.map((s) => s.id === currentSessionId ? { ...s, temperature: p.defaultValue } : s));
+                                          } else {
+                                            setTemperature(p.defaultValue);
+                                          }
+                                          playNotifySound();
+                                        }}
+                                        className={`p-4 rounded-2xl border cursor-pointer transition-all duration-300 flex flex-col justify-between text-left ${
+                                          isMatched
+                                            ? isDark
+                                              ? "bg-amber-500/10 border-amber-500/50 shadow-md shadow-amber-500/5 text-zinc-100"
+                                              : "bg-blue-50/80 border-blue-500/80 shadow-sm text-zinc-900"
+                                            : isDark
+                                              ? "border-transparent bg-zinc-900/20 text-zinc-400 hover:bg-zinc-900/40 hover:border-zinc-800"
+                                              : "border-zinc-200 bg-zinc-50/50 text-zinc-650 hover:bg-zinc-50 hover:border-zinc-300"
+                                        }`}
+                                      >
+                                        <div>
+                                          <div className="flex items-center justify-between mb-1.5 gap-2">
+                                            <span className="text-xs font-bold leading-tight">{p.name}</span>
+                                            <span className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded ${
+                                              isMatched 
+                                                ? "bg-amber-500/20 text-amber-400" 
+                                                : "bg-zinc-500/10 text-zinc-500"
+                                            }`}>
+                                              {p.range}
+                                            </span>
+                                          </div>
+                                          <p className="text-[11px] leading-relaxed text-zinc-500">{p.description}</p>
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            </div>
+                          )}
 
                           <div className="space-y-4">
                             <h4 className="text-sm font-bold text-zinc-550 uppercase font-mono tracking-wider">Specialized Cognitive Presets</h4>
