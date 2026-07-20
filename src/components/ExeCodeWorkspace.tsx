@@ -1936,17 +1936,17 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
     return (
       <div className="flex flex-col gap-2.5 w-full max-w-full overflow-hidden text-xs">
         {/* Dynamic Action History Timeline logs */}
-        {msg && (updatedFiles.length > 0 || thinking !== null || isThinking) && (() => {
+        {msg && (updatedFiles.length > 0 || (thinking !== null && !isThinking)) && (() => {
           const primaryFile = updatedFiles[0] || "src/components/ExeCodeWorkspace.tsx";
           const actionSteps: any[] = [];
 
-          // 1. Thought Step (if we have thinking text or if we are currently thinking)
-          if (thinking !== null || isThinking) {
+          // 1. Thought Step (if we have thinking text and are NOT actively thinking anymore)
+          if (thinking !== null && !isThinking) {
             actionSteps.push({
               type: "thought",
-              text: isThinking ? `Thinking Process (${typeof msgDuration === "number" ? msgDuration.toFixed(1) : msgDuration}s)...` : `Thought for ${typeof msgDuration === "number" ? msgDuration.toFixed(1) : msgDuration} seconds`,
+              text: `Thought for ${typeof msgDuration === "number" ? msgDuration.toFixed(1) : msgDuration} seconds`,
               content: thinking,
-              isThinking: isThinking
+              isThinking: false
             });
           }
 
@@ -2445,18 +2445,41 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
                 </div>
               );
             })}
-            {isAIEditing && (
-              <div className="flex items-center gap-2 py-3 px-1.5 select-none animate-pulse">
-                <div className="flex gap-1 items-center">
-                  <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-[bounce_1s_infinite_100ms]" />
-                  <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-[bounce_1s_infinite_200ms]" />
-                  <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-[bounce_1s_infinite_300ms]" />
+            {isAIEditing && (() => {
+              const latestMsg = chatHistory[chatHistory.length - 1];
+              const { isThinking } = latestMsg ? parseMessageThinking(latestMsg.content || "") : { isThinking: false };
+              const isStillThinking = latestMsg ? (latestMsg.content === "" || isThinking) : false;
+
+              if (isStillThinking) {
+                const elapsed = typeof latestMsg?.thinkingDuration === "number"
+                  ? latestMsg.thinkingDuration.toFixed(1)
+                  : "0.1";
+                return (
+                  <div className="flex items-center gap-2 py-3 px-1.5 select-none font-sans">
+                    <span className="relative flex h-2 w-2">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
+                    </span>
+                    <span className="text-xs text-amber-600 dark:text-amber-450 font-medium animate-pulse">
+                      Thinking ({elapsed}s)...
+                    </span>
+                  </div>
+                );
+              }
+
+              return (
+                <div className="flex items-center gap-2 py-3 px-1.5 select-none animate-pulse">
+                  <div className="flex gap-1 items-center">
+                    <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-[bounce_1s_infinite_100ms]" />
+                    <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-[bounce_1s_infinite_200ms]" />
+                    <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-[bounce_1s_infinite_300ms]" />
+                  </div>
+                  <span className="text-xs text-zinc-500 font-medium font-sans">
+                    Applying code modifications...
+                  </span>
                 </div>
-                <span className="text-xs text-zinc-500 font-medium font-sans">
-                  Applying code modifications...
-                </span>
-              </div>
-            )}
+              );
+            })()}
             <div ref={messagesEndRef} />
           </div>
 

@@ -162,7 +162,7 @@ function TypewriterMessage({
 
   return (
     <div className="flex flex-col">
-      {thinking !== null && (
+      {thinking !== null && !isThinking && (
         <div className="mb-3 font-sans select-none align-baseline flex flex-col items-start">
           <button
             onClick={() => setExpandedThoughts(prev => ({ ...prev, [msgId]: !prev[msgId] }))}
@@ -170,14 +170,7 @@ function TypewriterMessage({
           >
             <span className="animate-pulse shrink-0">💡</span>
             <span className="flex items-center gap-1">
-              {isThinking ? `Thinking (${typeof duration === "number" ? duration.toFixed(1) : duration}s)` : `Thought for ${typeof duration === "number" ? duration.toFixed(1) : duration}s`}
-              {isThinking && (
-                <span className="flex items-center gap-0.5 ml-0.5">
-                  <span className="h-1 w-1 rounded-full bg-zinc-400 dark:bg-zinc-500 animate-[bounce_1s_infinite_100ms]" />
-                  <span className="h-1 w-1 rounded-full bg-zinc-400 dark:bg-zinc-500 animate-[bounce_1s_infinite_200ms]" />
-                  <span className="h-1 w-1 rounded-full bg-zinc-400 dark:bg-zinc-500 animate-[bounce_1s_infinite_300ms]" />
-                </span>
-              )}
+              {`Thought for ${typeof duration === "number" ? duration.toFixed(1) : duration}s`}
             </span>
             <ChevronDown className={`h-3 w-3 text-zinc-400 shrink-0 transition-transform duration-200 ${expandedThoughts[msgId] ? "rotate-180" : ""}`} />
           </button>
@@ -1418,6 +1411,9 @@ export default function App() {
 
     const assistantMsgId = "msg_" + Date.now() + "_assistant";
 
+    thinkingStartTimesRef.current[assistantMsgId] = Date.now();
+    activeAssistantMsgIdRef.current = assistantMsgId;
+
     setIsGenerating(true);
     scrollToBottom("smooth");
 
@@ -1462,7 +1458,7 @@ export default function App() {
 
     const pendingTimeoutId = setTimeout(() => {
       if (!connectionSucceeded && !controller.signal.aborted) {
-        thinkingStartTimesRef.current[assistantMsgId] = Date.now();
+        thinkingStartTimesRef.current[assistantMsgId] = thinkingStartTimesRef.current[assistantMsgId] || Date.now();
         activeAssistantMsgIdRef.current = assistantMsgId;
         const assistantPlaceholder: Message = {
           id: assistantMsgId,
@@ -1517,7 +1513,7 @@ export default function App() {
       clearTimeout(pendingTimeoutId);
 
       // Connection succeeded! Set the user message isPending to false, and add the assistant placeholder message
-      thinkingStartTimesRef.current[assistantMsgId] = Date.now();
+      thinkingStartTimesRef.current[assistantMsgId] = thinkingStartTimesRef.current[assistantMsgId] || Date.now();
       activeAssistantMsgIdRef.current = assistantMsgId;
       const assistantPlaceholder: Message = {
         id: assistantMsgId,
@@ -3135,12 +3131,34 @@ export default function App() {
                       );
                     })}
 
-                    {isGenerating && currentSession.messages[currentSession.messages.length - 1]?.role === "model" && currentSession.messages[currentSession.messages.length - 1]?.content !== "" && (
-                      <div className="flex items-center gap-2 text-zinc-500 pl-9 md:pl-12 py-1 text-[11px] md:text-xs select-none">
-                        <span className="h-1.5 w-1.5 rounded-full bg-zinc-600 animate-pulse" />
-                        <span>Writing...</span>
-                      </div>
-                    )}
+                    {(() => {
+                      if (!isGenerating) return null;
+                      const latestMsg = currentSession.messages[currentSession.messages.length - 1];
+                      if (!latestMsg || latestMsg.role !== "model") return null;
+
+                      const { isThinking } = parseMessageThinking(latestMsg.content || "");
+                      const isStillThinking = latestMsg.content === "" || isThinking;
+
+                      if (isStillThinking) {
+                        const elapsed = typeof latestMsg.thinkingDuration === "number" 
+                          ? latestMsg.thinkingDuration.toFixed(1) 
+                          : "0.1";
+
+                        return (
+                          <div className="flex items-center gap-2 text-zinc-500 pl-9 md:pl-12 py-1.5 text-[11px] md:text-xs select-none font-sans">
+                            <span className="relative flex h-2 w-2">
+                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                              <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
+                            </span>
+                            <span className="font-medium animate-pulse text-amber-600 dark:text-amber-450">
+                              Thinking ({elapsed}s)...
+                            </span>
+                          </div>
+                        );
+                      }
+
+                      return null;
+                    })()}
                   </div>
                 )}
 
