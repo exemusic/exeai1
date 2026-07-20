@@ -2446,11 +2446,19 @@ export default function App() {
         className="flex w-full flex-col items-center justify-center bg-zinc-950 font-sans text-zinc-100 antialiased"
       >
         <div className="relative flex flex-col items-center">
-          <div className="mb-6">
-            <svg className="animate-spin h-8 w-8 text-zinc-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-            </svg>
+          <div className="relative mb-6 flex items-center justify-center">
+            {/* Ambient pulse effect behind the logo */}
+            <div className="absolute h-20 w-20 rounded-full bg-indigo-500/10 animate-ping [animation-duration:3s]" />
+            <div className="p-3.5 bg-zinc-900 border border-zinc-800 rounded-2xl shadow-xl relative z-10 flex items-center justify-center">
+              <ExeChatLogo className="h-10 w-10 animate-pulse" size={40} />
+            </div>
+            {/* Spinning mini indicator loader */}
+            <div className="absolute -bottom-1 -right-1 bg-zinc-950 p-1 rounded-full border border-zinc-800 z-20">
+              <svg className="animate-spin h-3.5 w-3.5 text-indigo-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+            </div>
           </div>
           <h2 className="text-lg font-medium tracking-wide animate-pulse">Connecting to ExeChat...</h2>
           <p className="mt-2 text-xs text-zinc-500 font-mono">Verifying secure session...</p>
@@ -2500,6 +2508,13 @@ export default function App() {
           }}
           className="w-full max-w-[400px] rounded-2xl border border-zinc-800 bg-zinc-900/40 p-8 sm:p-10 shadow-xl z-10 mx-4 flex flex-col items-center text-center"
         >
+          <div className="mb-6 select-none flex justify-center">
+            <div className="h-16 w-16 rounded-2xl bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-200 shadow-md relative overflow-hidden group">
+              <div className="absolute inset-0 bg-gradient-to-tr from-indigo-500/10 to-emerald-500/10 opacity-50" />
+              <ExeChatLogo className="h-10 w-10 relative z-10 transition-transform duration-300 group-hover:scale-105" size={40} />
+            </div>
+          </div>
+
           <div className="mb-8 select-none">
             <h2 className="text-xl font-semibold tracking-tight text-white">
               Welcome
