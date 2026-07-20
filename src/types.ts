@@ -12,6 +12,7 @@ export interface Message {
     size: number;
     mime?: string;
     textContent?: string;
+    base64?: string;
   } | null;
 }
 

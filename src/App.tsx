@@ -46,7 +46,8 @@ import {
   LogOut,
   Globe,
   Trophy,
-  Pencil
+  Pencil,
+  Maximize2
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { Message, ChatSession, SystemPreset, ModelOption } from "./types";
@@ -580,7 +581,10 @@ export default function App() {
     size: number;
     mime?: string;
     textContent?: string;
+    base64?: string;
   } | null>(null);
+
+  const [expandedImage, setExpandedImage] = useState<string | null>(null);
 
   const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
   const [openMenuSessionId, setOpenMenuSessionId] = useState<string | null>(null);
@@ -703,6 +707,49 @@ export default function App() {
     });
   };
 
+  const compressImage = (file: File, maxW: number = 1024, maxH: number = 1024, quality: number = 0.75): Promise<{ base64: string; size: number }> => {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          let width = img.width;
+          let height = img.height;
+          if (width > maxW || height > maxH) {
+            if (width > height) {
+              height = Math.round((height * maxW) / width);
+              width = maxW;
+            } else {
+              width = Math.round((width * maxH) / height);
+              height = maxH;
+            }
+          }
+          const canvas = document.createElement("canvas");
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext("2d");
+          if (ctx) {
+            ctx.drawImage(img, 0, 0, width, height);
+            const base64 = canvas.toDataURL("image/jpeg", quality);
+            const stringLength = base64.length - "data:image/jpeg;base64,".length;
+            const sizeInBytes = Math.ceil((stringLength * 3) / 4);
+            resolve({ base64, size: sizeInBytes });
+          } else {
+            resolve({ base64: e.target?.result as string, size: file.size });
+          }
+        };
+        img.onerror = () => {
+          resolve({ base64: e.target?.result as string, size: file.size });
+        };
+        img.src = e.target?.result as string;
+      };
+      reader.onerror = () => {
+        resolve({ base64: "", size: 0 });
+      };
+      reader.readAsDataURL(file);
+    });
+  };
+
   const handleFileSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
     console.log("[File] Handler triggered, files count:", e.target.files ? e.target.files.length : 0);
     const file = e.target.files?.[0];
@@ -763,6 +810,32 @@ export default function App() {
         });
       };
       reader.readAsText(file);
+    } else if (file.type.startsWith("image/")) {
+      console.log("[File] Compressing image before upload...");
+      compressImage(file).then(({ base64, size }) => {
+        console.log("[File] Image compressed from", file.size, "bytes to", size, "bytes");
+        setSelectedFile({
+          name: file.name.replace(/\.[^/.]+$/, "") + ".jpg",
+          url,
+          size: size,
+          mime: "image/jpeg",
+          base64: base64,
+        });
+      }).catch((err) => {
+        console.error("[File] Error compressing image, falling back to original:", err);
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          const base64Data = event.target?.result as string;
+          setSelectedFile({
+            name: file.name,
+            url,
+            size: file.size,
+            mime: file.type || undefined,
+            base64: base64Data,
+          });
+        };
+        reader.readAsDataURL(file);
+      });
     } else {
       setSelectedFile({
         name: file.name,
@@ -918,14 +991,31 @@ export default function App() {
     const savedLoggedIn = localStorage.getItem("exechat_logged_in") === "true";
     const savedUserId = localStorage.getItem("exechat_user_id");
 
-    if (savedLoggedIn && savedUserId && !savedUserId.startsWith("guest_")) {
-      setUserId(savedUserId);
-      setUserEmail(localStorage.getItem("exechat_email") || "");
-      setUserName(localStorage.getItem("exechat_username") || "");
-      setUserDisplayName(localStorage.getItem("exechat_display_name") || "");
-      setUserPhoto(localStorage.getItem("exechat_user_photo") || null);
-      setCredits(99999); 
-      setIsLoggedIn(true);
+    if (savedLoggedIn && savedUserId) {
+      const isGuest = savedUserId.startsWith("guest_");
+      if (isGuest) {
+        localStorage.removeItem("exechat_logged_in");
+        localStorage.removeItem("exechat_email");
+        localStorage.removeItem("exechat_user_id");
+        localStorage.removeItem("exechat_username");
+        localStorage.removeItem("exechat_display_name");
+        localStorage.removeItem("exechat_user_photo");
+        setIsLoggedIn(false);
+        setUserId(null);
+        setUserEmail(null);
+        setUserName("");
+        setUserDisplayName("");
+        setUserPhoto(null);
+        setCredits(0);
+      } else {
+        setUserId(savedUserId);
+        setUserEmail(localStorage.getItem("exechat_email") || "");
+        setUserName(localStorage.getItem("exechat_username") || "");
+        setUserDisplayName(localStorage.getItem("exechat_display_name") || "");
+        setUserPhoto(localStorage.getItem("exechat_user_photo") || null);
+        setCredits(99999); 
+        setIsLoggedIn(true);
+      }
     } else {
 
       setIsLoggedIn(false);
@@ -1147,7 +1237,7 @@ export default function App() {
     return "New Discussion";
   };
 
-   const handleGoogleLoginSuccess = (credentialResponse: any) => {
+  const handleGoogleLoginSuccess = (credentialResponse: any) => {
     if (!credentialResponse || !credentialResponse.credential) {
       setErrorText("Google sign-in failed: No credential returned.");
       return;
@@ -1196,6 +1286,29 @@ export default function App() {
       console.error("Google login decode error:", error);
       setErrorText(error?.message || "Google sign-in failed.");
     }
+  };
+
+  const handleGuestLogin = () => {
+    const randomSuffix = Math.random().toString(36).substring(2, 7).toUpperCase();
+    const guestId = "guest_" + Math.random().toString(36).substring(2, 15);
+    const guestName = "Guest_" + randomSuffix;
+
+    setUserId(guestId);
+    setUserEmail("guest@exechat.local");
+    setUserName(guestName);
+    setUserDisplayName(guestName);
+    setUserPhoto(null);
+    setCredits(100); // 100 credits for guest mode
+    setErrorText(null);
+    setIsLoggedIn(true);
+    playNotifySound();
+
+    localStorage.setItem("exechat_logged_in", "true");
+    localStorage.setItem("exechat_email", "guest@exechat.local");
+    localStorage.setItem("exechat_user_id", guestId);
+    localStorage.setItem("exechat_user_photo", "");
+    localStorage.setItem("exechat_username", guestName);
+    localStorage.setItem("exechat_display_name", guestName);
   };
 
   const handleCompleteRegistrationWithChosenName = (finalChosenName: string) => {
@@ -1387,6 +1500,7 @@ export default function App() {
       size: selectedFile.size,
       mime: selectedFile.mime,
       textContent: selectedFile.textContent,
+      base64: selectedFile.base64,
     } : null;
 
     playNotifySound(false);
@@ -1452,6 +1566,14 @@ export default function App() {
       return {
         role: m.role,
         content: content,
+        attachment: m.attachment ? {
+          type: m.attachment.type,
+          name: m.attachment.name,
+          mime: m.attachment.mime,
+          size: m.attachment.size,
+          base64: m.id === userMessage.id ? m.attachment.base64 : undefined,
+          textContent: m.attachment.textContent,
+        } : undefined,
       };
     });
 
@@ -1819,6 +1941,14 @@ export default function App() {
       return {
         role: m.role,
         content: content,
+        attachment: m.attachment ? {
+          type: m.attachment.type,
+          name: m.attachment.name,
+          mime: m.attachment.mime,
+          size: m.attachment.size,
+          base64: m.id === userMessage.id ? m.attachment.base64 : undefined,
+          textContent: m.attachment.textContent,
+        } : undefined,
       };
     });
 
@@ -2504,7 +2634,7 @@ export default function App() {
             </motion.div>
           )}
 
-          <div className="w-full flex flex-col items-center justify-center p-6 rounded-xl border border-zinc-800 bg-zinc-900/20 backdrop-blur-sm gap-3">
+          <div className="w-full flex flex-col items-center justify-center p-6 rounded-xl border border-zinc-800 bg-zinc-900/20 backdrop-blur-sm gap-4">
             <GoogleLogin
               onSuccess={handleGoogleLoginSuccess}
               onError={() => setErrorText("Google sign-in failed. Please try again.")}
@@ -3015,7 +3145,18 @@ export default function App() {
                                        isDark ? "bg-zinc-900 border-zinc-800" : "bg-white border-zinc-200"
                                      }`}>
                                        {msg.attachment.type === "image" ? (
-                                         <Sparkles className="h-4 w-4" />
+                                         <div 
+                                           onClick={() => setExpandedImage(msg.attachment!.base64 || msg.attachment!.url)}
+                                           className="relative h-10 w-10 -m-1 rounded overflow-hidden cursor-pointer hover:opacity-85 active:scale-95 transition-all shadow-sm shrink-0 group"
+                                           title="Klik untuk memperbesar"
+                                         >
+                                           <img 
+                                             src={msg.attachment.base64 || msg.attachment.url} 
+                                             alt={msg.attachment.name} 
+                                             className="h-full w-full object-cover"
+                                             referrerPolicy="no-referrer"
+                                           />
+                                         </div>
                                        ) : msg.attachment.type === "audio" ? (
                                          <Volume2 className="h-4 w-4" />
                                        ) : (
@@ -4922,6 +5063,45 @@ export default function App() {
               </motion.div>
             )}
           </AnimatePresence>
+
+          {/* Expanded Image Modal */}
+          <AnimatePresence>
+            {expandedImage && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onClick={() => setExpandedImage(null)}
+                className="fixed inset-0 z-[9999] flex items-center justify-center p-4 md:p-8 bg-black/85 backdrop-blur-sm cursor-zoom-out"
+              >
+                <motion.div
+                  initial={{ scale: 0.95, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  exit={{ scale: 0.95, opacity: 0 }}
+                  transition={{ type: "spring", damping: 25, stiffness: 350 }}
+                  onClick={(e) => e.stopPropagation()}
+                  className="relative max-w-5xl max-h-[90vh] rounded-2xl overflow-hidden bg-zinc-950/40 border border-zinc-800/80 shadow-2xl flex flex-col cursor-default"
+                >
+                  <div className="absolute top-4 right-4 z-50">
+                    <button
+                      onClick={() => setExpandedImage(null)}
+                      className="p-2 rounded-full bg-zinc-900/80 hover:bg-zinc-800/90 border border-zinc-800 text-zinc-300 hover:text-white transition-all cursor-pointer shadow-md"
+                      title="Tutup"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                  <img
+                    src={expandedImage}
+                    alt="Expanded preview"
+                    className="object-contain max-h-[85vh] w-auto h-auto rounded-xl mx-auto"
+                    referrerPolicy="no-referrer"
+                  />
+                </motion.div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
         </main>
       </div>
     </div>

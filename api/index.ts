@@ -8,7 +8,8 @@ dotenv.config();
 
 const app = express();
 
-app.use(express.json());
+app.use(express.json({ limit: "50mb" }));
+app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
 // Endpoint to serve custom exechat logo directly from workspace root
 app.get("/exechat.png", (req, res) => {
@@ -212,32 +213,104 @@ async function runGeminiModel(
   contents: any[],
   config: any,
   useSearch: boolean,
-  res: any
+  res: any,
+  stripFirstThinkTag: boolean = false,
+  onConnect?: (duration: number) => void
 ): Promise<boolean> {
   const finalConfig = { ...config };
   delete finalConfig.tools;
 
+  const startTime = Date.now();
   try {
     const responseStream = await ai.models.generateContentStream({
       model: modelName,
       contents: contents,
       config: finalConfig
     });
+
+    let isFirstChunk = true;
     for await (const chunk of responseStream) {
-      const text = chunk.text;
+      if (isFirstChunk) {
+        isFirstChunk = false;
+        const duration = Date.now() - startTime;
+        if (onConnect) {
+          onConnect(duration);
+        }
+      }
+      let text = chunk.text;
       if (text) {
+        if (stripFirstThinkTag) {
+          // Clean up the initial <think> tag if it is present in the beginning of the text
+          const hasThink = text.match(/^[\s\n]*<think>[\s\n]*/i);
+          if (hasThink) {
+            text = text.replace(/^[\s\n]*<think>[\s\n]*/i, "");
+            stripFirstThinkTag = false; // Turned off since we've stripped it
+          }
+        }
         res.write(`data: ${JSON.stringify({ text })}\n\n`);
       }
     }
     return true;
   } catch (err: any) {
     const errString = String(err.message || JSON.stringify(err));
-    console.error(`Gemini model ${modelName} failed with error:`, errString);
+    console.warn(`Gemini model ${modelName} failed with error:`, errString);
     throw err;
   }
 }
 
-async function streamGemini(messages: any[], systemInstruction: string, temperature: number, webSearchEnabled: boolean, res: any) {
+function parseBase64(dataUrl: string) {
+  if (!dataUrl) return null;
+  const matches = dataUrl.match(/^data:([a-zA-Z0-9]+\/[a-zA-Z0-9-.+]+);base64,(.+)$/);
+  if (!matches) return null;
+  return {
+    mimeType: matches[1],
+    data: matches[2]
+  };
+}
+
+async function analyzeImageWithGemini(base64DataUrl: string): Promise<string> {
+  const geminiKey = process.env.GEMINI_API_KEY || process.env.GEMINI2_API_KEY || process.env.GEMINI_API_KEY2 || process.env.GEMINI_API_KEY_2 || process.env.BACKUP_GEMINI_API_KEY;
+  if (!geminiKey) {
+    return "[Gagal menganalisis gambar: API Key tidak terkonfigurasi]";
+  }
+  const parsed = parseBase64(base64DataUrl);
+  if (!parsed) {
+    return "[Gagal menganalisis gambar: Format Base64 tidak valid]";
+  }
+  try {
+    const ai = new GoogleGenAI({ apiKey: geminiKey });
+    const response = await ai.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: [
+        {
+          role: "user",
+          parts: [
+            { text: "Berikan deskripsi detail tentang gambar ini untuk asisten AI teks. Jelaskan semua objek, teks, warna, tata letak, dan konteks penting yang ada di gambar secara mendalam agar asisten teks dapat memahaminya seperti melihat langsung." },
+            {
+              inlineData: {
+                mimeType: parsed.mimeType,
+                data: parsed.data
+              }
+            }
+          ]
+        }
+      ]
+    });
+    return response.text || "[Gambar terlampir kosong atau tidak terbaca]";
+  } catch (err: any) {
+    console.warn("Error analyzing image with Gemini:", err);
+    return `[Gagal menganalisis gambar: ${err.message || err}]`;
+  }
+}
+
+async function streamGemini(
+  messages: any[],
+  systemInstruction: string,
+  temperature: number,
+  webSearchEnabled: boolean,
+  res: any,
+  redirectedForImage: boolean = false
+) {
   const geminiKey = process.env.GEMINI_API_KEY;
   const geminiKey2 = process.env.GEMINI2_API_KEY || process.env.GEMINI_API_KEY2 || process.env.GEMINI_API_KEY_2 || process.env.BACKUP_GEMINI_API_KEY;
 
@@ -255,20 +328,43 @@ async function streamGemini(messages: any[], systemInstruction: string, temperat
     keysToTry.push({ key: geminiKey2, name: "Backup" });
   }
 
-  const contents = messages.map((m: any) => ({
-    role: m.role === "model" || m.role === "assistant" ? "model" : "user",
-    parts: [{ text: m.content }]
-  }));
+  const contents = messages.map((m: any) => {
+    const parts: any[] = [{ text: m.content }];
+    if (m.attachment && m.attachment.type === "image" && m.attachment.base64) {
+      const parsed = parseBase64(m.attachment.base64);
+      if (parsed) {
+        parts.push({
+          inlineData: {
+            mimeType: parsed.mimeType,
+            data: parsed.data
+          }
+        });
+      }
+    }
+    return {
+      role: m.role === "model" || m.role === "assistant" ? "model" : "user",
+      parts: parts
+    };
+  });
   
   const config: any = {
     systemInstruction: systemInstruction || "You are ExeAi, an advanced AI assistant that is highly intelligent, friendly, and helpful.",
     temperature: temperature !== undefined ? Number(temperature) : 0.7
   };
 
+  // Start the thinking block
+  let thinkText = "<think>[Sistem ExeAI] Memulai koneksi...\n";
+  if (redirectedForImage) {
+    thinkText = "<think>[Sistem ExeAI] Mendeteksi file gambar terlampir.\n• Mengalihkan rute pemrosesan secara otomatis ke Gemini Vision Engine...\n";
+  } else {
+    thinkText = "<think>[Sistem ExeAI] Menghubungkan ke Gemini Engine...\n";
+  }
+  res.write(`data: ${JSON.stringify({ text: thinkText })}\n\n`);
+
   if (keysToTry.length === 0) {
     console.warn("No valid Gemini API keys defined. Falling back directly to ExeAI (Cerebras)...");
     try {
-      res.write(`data: ${JSON.stringify({ text: "*(System did not detect Google API Key, dynamically redirecting to ExeAI Engine...)*\n\n" })}\n\n`);
+      res.write(`data: ${JSON.stringify({ text: "• Gagal: Google API Key tidak terkonfigurasi di server.\n• Mengalihkan rute secara dinamis ke ExeAI Engine...\n</think>\n\n*(System did not detect Google API Key, dynamically redirecting to ExeAI Engine...)*\n\n" })}\n\n`);
       await runCerebrasModel("gemma-4-31b", messages, systemInstruction, temperature, res);
       return;
     } catch (err3: any) {
@@ -280,6 +376,7 @@ async function streamGemini(messages: any[], systemInstruction: string, temperat
   for (let i = 0; i < keysToTry.length; i++) {
     const { key, name } = keysToTry[i];
     const isBackup = i > 0;
+    const keyLabel = isBackup ? "Cadangan (Opsi 2)" : "Utama (Opsi 1)";
     
     const ai = new GoogleGenAI({
       apiKey: key,
@@ -290,54 +387,108 @@ async function streamGemini(messages: any[], systemInstruction: string, temperat
       }
     });
 
-    if (isBackup) {
-      res.write(`data: ${JSON.stringify({ text: "*(Primary API Key exhausted or invalid, connecting to Backup API Key / Option 2...)*\n\n" })}\n\n`);
+    res.write(`data: ${JSON.stringify({ text: `• Menghubungkan dengan API Key ${keyLabel}...\n` })}\n\n`);
+
+    // Model 1: gemini-3.5-flash (with up to 2 retry attempts)
+    let successModel1 = false;
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      const model1Start = Date.now();
+      const attemptLabel = attempt > 1 ? ` (Percobaan ${attempt})` : "";
+      res.write(`data: ${JSON.stringify({ text: `  - Mencoba menghubungkan ke model: gemini-3.5-flash${attemptLabel}...\n` })}\n\n`);
+      try {
+        await runGeminiModel(ai, "gemini-3.5-flash", contents, config, webSearchEnabled, res, true, (duration) => {
+          res.write(`data: ${JSON.stringify({ text: `  - [Sukses] Terhubung ke gemini-3.5-flash dalam ${duration}ms.\n  - [Sistem] Memulai analisis visual dan pemrosesan jawaban...\n\n` })}\n\n`);
+        });
+        successModel1 = true;
+        break;
+      } catch (err1: any) {
+        const duration1 = Date.now() - model1Start;
+        const errStr1 = String(err1.message || JSON.stringify(err1));
+        res.write(`data: ${JSON.stringify({ text: `  - [Gagal] gemini-3.5-flash${attemptLabel} (${duration1}ms): ${errStr1.substring(0, 100)}\n` })}\n\n`);
+        
+        const isSevereKeyError = errStr1.toLowerCase().includes("not valid") || 
+                                 errStr1.toLowerCase().includes("invalid") || 
+                                 errStr1.toLowerCase().includes("expired") || 
+                                 errStr1.toLowerCase().includes("key_invalid") || 
+                                 errStr1.toLowerCase().includes("unauthorized") || 
+                                 errStr1.toLowerCase().includes("forbidden") || 
+                                 errStr1.toLowerCase().includes("quota") || 
+                                 errStr1.toLowerCase().includes("exhausted") || 
+                                 errStr1.toLowerCase().includes("429") || 
+                                 errStr1.toLowerCase().includes("limit");
+
+        if (isSevereKeyError) {
+          if (i < keysToTry.length - 1) {
+            res.write(`data: ${JSON.stringify({ text: `  - [Sistem] Masalah kredensial/kuota terdeteksi pada kunci ${keyLabel}. Segera beralih ke kunci cadangan...\n` })}\n\n`);
+          }
+          break; // Stop attempts for this key, proceed to next key
+        }
+
+        if (attempt < 2) {
+          res.write(`data: ${JSON.stringify({ text: `  - [Sistem] Terjadi kesalahan sementara (misal: beban tinggi / 503). Menunggu 800ms sebelum mencoba kembali...\n` })}\n\n`);
+          await new Promise(resolve => setTimeout(resolve, 800));
+        }
+      }
     }
 
-    try {
-      await runGeminiModel(ai, "gemini-3.5-flash", contents, config, webSearchEnabled, res);
-      return;
-    } catch (err1: any) {
-      const errStr1 = String(err1.message || JSON.stringify(err1)).toLowerCase();
-      console.warn(`gemini-3.5-flash failed with Key ${name}:`, errStr1);
-      
-      const isSevereKeyError = errStr1.includes("not valid") || 
-                               errStr1.includes("invalid") || 
-                               errStr1.includes("expired") || 
-                               errStr1.includes("key_invalid") || 
-                               errStr1.includes("unauthorized") || 
-                               errStr1.includes("forbidden") || 
-                               errStr1.includes("quota") || 
-                               errStr1.includes("exhausted") || 
-                               errStr1.includes("429") || 
-                               errStr1.includes("limit");
+    if (successModel1) return;
 
-      if (isSevereKeyError && i < keysToTry.length - 1) {
-        console.log(`Severe key error with ${name} key. Immediately switching to Backup Key...`);
-        continue;
-      }
-      
+    // Model 2: gemini-3.1-flash-lite (with up to 2 retry attempts)
+    let successModel2 = false;
+    for (let attempt2 = 1; attempt2 <= 2; attempt2++) {
+      const model2Start = Date.now();
+      const attemptLabel2 = attempt2 > 1 ? ` (Percobaan ${attempt2})` : "";
+      res.write(`data: ${JSON.stringify({ text: `  - Mencoba rute alternatif model: gemini-3.1-flash-lite${attemptLabel2}...\n` })}\n\n`);
       try {
-        res.write(`data: ${JSON.stringify({ text: "*(Activating power saving mode and switching to Gemini Flash Lite engine...)*\n\n" })}\n\n`);
-        await runGeminiModel(ai, "gemini-3.1-flash-lite", contents, config, webSearchEnabled, res);
-        return;
+        await runGeminiModel(ai, "gemini-3.1-flash-lite", contents, config, webSearchEnabled, res, true, (duration) => {
+          res.write(`data: ${JSON.stringify({ text: `  - [Sukses] Terhubung ke gemini-3.1-flash-lite dalam ${duration}ms.\n  - [Sistem] Memulai analisis visual alternatif...\n\n` })}\n\n`);
+        });
+        successModel2 = true;
+        break;
       } catch (err2: any) {
-        const errStr2 = String(err2.message || JSON.stringify(err2)).toLowerCase();
-        console.warn(`gemini-3.1-flash-lite failed with Key ${name}:`, errStr2);
+        const duration2 = Date.now() - model2Start;
+        const errStr2 = String(err2.message || JSON.stringify(err2));
+        res.write(`data: ${JSON.stringify({ text: `  - [Gagal] gemini-3.1-flash-lite${attemptLabel2} (${duration2}ms): ${errStr2.substring(0, 100)}\n` })}\n\n`);
         
-        if (i < keysToTry.length - 1) {
-          continue;
+        const isSevereKeyError = errStr2.toLowerCase().includes("not valid") || 
+                                 errStr2.toLowerCase().includes("invalid") || 
+                                 errStr2.toLowerCase().includes("expired") || 
+                                 errStr2.toLowerCase().includes("key_invalid") || 
+                                 errStr2.toLowerCase().includes("unauthorized") || 
+                                 errStr2.toLowerCase().includes("forbidden") || 
+                                 errStr2.toLowerCase().includes("quota") || 
+                                 errStr2.toLowerCase().includes("exhausted") || 
+                                 errStr2.toLowerCase().includes("429") || 
+                                 errStr2.toLowerCase().includes("limit");
+
+        if (isSevereKeyError) {
+          if (i < keysToTry.length - 1) {
+            res.write(`data: ${JSON.stringify({ text: `  - [Sistem] Masalah kredensial/kuota terdeteksi pada kunci ${keyLabel} selama rute alternatif. Beralih ke kunci cadangan...\n` })}\n\n`);
+          }
+          break; // Stop attempts for this key, proceed to next key
         }
-        
-        console.warn("All Gemini API keys failed or exhausted. Falling back to ExeAI (Cerebras)...");
-        try {
-          res.write(`data: ${JSON.stringify({ text: "*(System detects peak capacity across Google AI, dynamically redirecting to ExeAI Engine...)*\n\n" })}\n\n`);
-          await runCerebrasModel("gemma-4-31b", messages, systemInstruction, temperature, res);
-          return;
-        } catch (err3: any) {
-          handleGeminiError(err2, res);
+
+        if (attempt2 < 2) {
+          res.write(`data: ${JSON.stringify({ text: `  - [Sistem] Terjadi kesalahan sementara (misal: beban tinggi / 503). Menunggu 800ms sebelum mencoba kembali...\n` })}\n\n`);
+          await new Promise(resolve => setTimeout(resolve, 800));
         }
       }
+    }
+
+    if (successModel2) return;
+
+    if (i < keysToTry.length - 1) {
+      res.write(`data: ${JSON.stringify({ text: `  - [Sistem] Seluruh model gagal pada kunci ini. Mencoba kunci API alternatif...\n` })}\n\n`);
+      continue;
+    }
+    
+    // If everything failed on Gemini, fallback to Cerebras
+    res.write(`data: ${JSON.stringify({ text: `• [Sistem] Seluruh opsi Gemini gagal atau habis kuota.\n• Mengalihkan ke ExeAI (Cerebras) sebagai fallback terakhir...\n</think>\n\n*(System detected Google API Key issues, dynamically redirecting to ExeAI Engine...)*\n\n` })}\n\n`);
+    try {
+      await runCerebrasModel("gemma-4-31b", messages, systemInstruction, temperature, res);
+      return;
+    } catch (errCerebras: any) {
+      handleGeminiError(errCerebras, res);
     }
   }
 }
@@ -463,7 +614,7 @@ async function runCerebrasModel(
 }
 
 function handleGeminiError(err: any, res: any) {
-  console.error("Gemini stream error:", err);
+  console.warn("Gemini stream error:", err);
   let errMsg = "An error occurred while calling the Gemini API.";
   const errString = String(err.message || JSON.stringify(err));
   if (errString.includes("API key not valid") || errString.includes("API_KEY_INVALID") || errString.includes("INVALID_ARGUMENT")) {
@@ -640,21 +791,46 @@ app.post("/api/chat/stream", async (req, res) => {
       "7. Kadang sedikit 'rebellious' dan anti-boring.\n" +
       "Jangan pernah kaku, formal kaku, atau terlalu 'safety-first' sampai membosankan. Prioritaskan kebenaran, kegunaan praktis, dan kesenangan user.";
 
-    systemInstruction = (systemInstruction || "You are ExeAi, an advanced AI assistant that is highly intelligent, friendly, and helpful.") + thinkInstruction + linkInstruction + designInstruction + modernEventInstruction + userRequestedPersonality;
+    const imageLimitInstruction = "\n\n[PENTING - BATASAN KEMAMPUAN GAMBAR & EDIT FOTO]:\n" +
+      "1. ExeChat saat ini HANYA merupakan AI khusus teks (text-only AI) dan masih dalam masa BETA (belum dirilis penuh secara komersial).\n" +
+      "2. ExeChat/Hexky TIDAK memproduksi AI pembuat atau pengedit gambar (tidak bisa generate gambar atau edit foto).\n" +
+      "3. Jika pengguna meminta untuk mengedit foto, memodifikasi gambar, menghasilkan gambar baru (generate image), atau sejenisnya, kamu harus menjelaskan batas kemampuan ini dengan sangat sopan, ramah, jujur, dan profesional.\n" +
+      "4. Kamu bisa membaca/menganalisis gambar yang diunggah pengguna (menggunakan bantuan sistem analisis gambar), namun kamu tidak bisa mengedit atau memodifikasi file gambar tersebut.\n" +
+      "5. Tanggal hari ini adalah Monday, July 20, 2026.";
+
+    systemInstruction = (systemInstruction || "You are ExeAi, an advanced AI assistant that is highly intelligent, friendly, and helpful.") + thinkInstruction + linkInstruction + designInstruction + modernEventInstruction + userRequestedPersonality + imageLimitInstruction;
 
     if (!messages || !Array.isArray(messages)) {
       res.write(`data: ${JSON.stringify({ error: "Invalid or missing messages array" })}\n\n`);
       return res.end();
     }
 
-    if (model === "llama-3.1-8b-instant") {
-      await streamGroq(messages, systemInstruction, temperature, res);
+    // Detect if there is any image attachment in the message history
+    let hasImageAttachment = false;
+    for (const m of messages) {
+      if (m.attachment && m.attachment.type === "image" && m.attachment.base64) {
+        hasImageAttachment = true;
+        break;
+      }
+    }
+
+    // If an image is detected, automatically route the whole conversation to Gemini for proper vision analysis
+    if (hasImageAttachment) {
+      console.log(`[Image System] Image detected for model ${model}. Automatically routing to streamGemini with vision redirection...`);
+      await streamGemini(messages, systemInstruction, temperature, webSearchEnabled, res, true);
       res.write("data: [DONE]\n\n");
       return res.end();
     }
 
-    if (model === "gemini-ai" || model === "gemini-3.5-flash" || webSearchEnabled) {
-      await streamGemini(messages, systemInstruction, temperature, webSearchEnabled, res);
+    const isGeminiModel = (model === "gemini-ai" || model === "gemini-3.5-flash" || webSearchEnabled);
+    if (isGeminiModel) {
+      await streamGemini(messages, systemInstruction, temperature, webSearchEnabled, res, false);
+      res.write("data: [DONE]\n\n");
+      return res.end();
+    }
+
+    if (model === "llama-3.1-8b-instant") {
+      await streamGroq(messages, systemInstruction, temperature, res);
       res.write("data: [DONE]\n\n");
       return res.end();
     }
