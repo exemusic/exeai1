@@ -23,6 +23,11 @@
 /* Base style overrides */
 html {
   font-size: 15px;
+  scroll-behavior: smooth !important;
+}
+
+* {
+  scroll-behavior: smooth !important;
 }
 
 @media (min-width: 640px) {

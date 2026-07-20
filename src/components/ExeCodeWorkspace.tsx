@@ -557,6 +557,7 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
   const [expandedActions, setExpandedActions] = useState<Record<string, boolean>>({});
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const thinkingStartTimesRef = useRef<Record<string, number>>({});
+  const finalThinkingDurationsRef = useRef<Record<string, number>>({});
   const activeAssistantMsgIdRef = useRef<string | null>(null);
 
   // Live ticking of thinkingDuration in ExeCodeWorkspace
@@ -576,6 +577,9 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
           prev.map((m) => {
             if (m.id === activeId) {
               let updatedContent = m.content;
+              if (updatedContent && updatedContent.includes("</think>")) {
+                return m;
+              }
               // Only modify if it's still using one of the initial placeholders
               if (
                 updatedContent.includes("Thinking...") || 
@@ -1436,7 +1440,14 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
                   typewriterTargetRef.current = fullText;
                   
                   const startTime = thinkingStartTimesRef.current[assistantMsgId];
-                  const dur = startTime ? Math.max(0.1, Number(((Date.now() - startTime) / 1000).toFixed(1))) : 0.1;
+                  let dur = startTime ? Math.max(0.1, Number(((Date.now() - startTime) / 1000).toFixed(1))) : 0.1;
+
+                  if (fullText.includes("</think>")) {
+                    if (!finalThinkingDurationsRef.current[assistantMsgId]) {
+                      finalThinkingDurationsRef.current[assistantMsgId] = dur;
+                    }
+                    dur = finalThinkingDurationsRef.current[assistantMsgId];
+                  }
 
                   // Run dynamic typewriter
                   if (!typewriterIntervalIdRef.current) {
@@ -1539,7 +1550,10 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
         refreshPreview(mergedFiles);
         
         const startTime = thinkingStartTimesRef.current[assistantMsgId];
-        const finalDur = startTime ? Math.max(0.1, Number(((Date.now() - startTime) / 1000).toFixed(1))) : 0.1;
+        let finalDur = startTime ? Math.max(0.1, Number(((Date.now() - startTime) / 1000).toFixed(1))) : 0.1;
+        if (finalThinkingDurationsRef.current[assistantMsgId]) {
+          finalDur = finalThinkingDurationsRef.current[assistantMsgId];
+        }
 
         // Keep the original <think>...</think> block so the thought history is never deleted/removed
         let thinkHeader = "";
@@ -1566,7 +1580,10 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
         triggerStatus("Your workspace was successfully updated!", "success");
       } else {
         const startTime = thinkingStartTimesRef.current[assistantMsgId];
-        const finalDur = startTime ? Math.max(0.1, Number(((Date.now() - startTime) / 1000).toFixed(1))) : 0.1;
+        let finalDur = startTime ? Math.max(0.1, Number(((Date.now() - startTime) / 1000).toFixed(1))) : 0.1;
+        if (finalThinkingDurationsRef.current[assistantMsgId]) {
+          finalDur = finalThinkingDurationsRef.current[assistantMsgId];
+        }
 
         setChatHistory(prev => prev.map(msg => 
           msg.id === assistantMsgId 

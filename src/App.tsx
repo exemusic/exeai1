@@ -82,12 +82,14 @@ function TypewriterMessage({
   parseMessageThinking,
   thinkingDuration
 }: TypewriterMessageProps) {
-  const [displayedContent, setDisplayedContent] = useState(isLatest ? "" : content);
-  const currentIdxRef = useRef(isLatest ? 0 : content.length);
+  const [displayedContent, setDisplayedContent] = useState(() => {
+    return (isLatest && isGenerating) ? "" : content;
+  });
+  const currentIdxRef = useRef((isLatest && isGenerating) ? 0 : content.length);
   const pauseCounterRef = useRef(0);
 
   useEffect(() => {
-    if (!isLatest) {
+    if (!isLatest || !isGenerating) {
       setDisplayedContent(content);
       currentIdxRef.current = content.length;
       return;
@@ -793,9 +795,15 @@ export default function App() {
             if (hasMsg) {
               return {
                 ...s,
-                messages: s.messages.map((m) =>
-                  m.id === activeId ? { ...m, thinkingDuration: elapsed } : m
-                )
+                messages: s.messages.map((m) => {
+                  if (m.id === activeId) {
+                    if (m.content && m.content.includes("</think>")) {
+                      return m;
+                    }
+                    return { ...m, thinkingDuration: elapsed };
+                  }
+                  return m;
+                })
               };
             }
             return s;
@@ -1376,7 +1384,7 @@ export default function App() {
       textContent: selectedFile.textContent,
     } : null;
 
-    playNotifySound(true);
+    playNotifySound(false);
     setInputMessage("");
     setSelectedFile(null); 
 
@@ -1541,6 +1549,7 @@ export default function App() {
       }
 
       let buffer = "";
+      let hasPlayedSound = false;
       while (true) {
         const { value, done } = await reader.read();
         if (done) break;
@@ -1566,6 +1575,10 @@ export default function App() {
               throw new Error(parsed.error);
             }
             if (parsed.text) {
+              if (!hasPlayedSound) {
+                playNotifySound(true);
+                hasPlayedSound = true;
+              }
 
               setSessions((prev) =>
                 prev.map((s) => {
@@ -1841,6 +1854,7 @@ export default function App() {
 
       let buffer = "";
       let accumulatedText = "";
+      let hasPlayedSound = false;
       while (true) {
         const { value, done } = await reader.read();
         if (done) break;
@@ -1856,6 +1870,10 @@ export default function App() {
             try {
               const parsed = JSON.parse(trimmed.substring(5));
               if (parsed.text) {
+                if (!hasPlayedSound) {
+                  playNotifySound(true);
+                  hasPlayedSound = true;
+                }
                 accumulatedText += parsed.text;
 
                 setSessions((prev) =>
@@ -2484,7 +2502,8 @@ export default function App() {
                 {/* Search Icon Button */}
                 <button
                   onClick={() => {
-                    setIsDesktopSidebarOpen(true);
+                    setShowSearchModal(true);
+                    playNotifySound();
                   }}
                   className={`p-2 rounded-xl hover:bg-zinc-550/10 transition-all duration-200 cursor-pointer ${
                     isDark ? "text-zinc-400 hover:text-white" : "text-zinc-600 hover:text-zinc-900"
