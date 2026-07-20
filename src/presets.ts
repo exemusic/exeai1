@@ -2,6 +2,12 @@ import { SystemPreset, ModelOption } from "./types";
 
 export const MODEL_OPTIONS: ModelOption[] = [
   {
+    id: "automatic",
+    name: "Automatic (Rekomendasi)",
+    badge: "Auto AI",
+    description: "Sistem cerdas memilih model terbaik berdasarkan topik (misal Gemini AI untuk analisis gambar atau web search, exeai-e5 untuk penalaran cepat).",
+  },
+  {
     id: "gemma-4-31b",
     name: "exeai-e5:5:9 (latest)",
     badge: "Preview",

@@ -5,6 +5,7 @@ export interface Message {
   timestamp: number;
   thinkingDuration?: number;
   isPending?: boolean;
+  routedModelId?: string;
   attachment?: {
     type: "audio" | "image" | "file";
     name: string;

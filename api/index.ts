@@ -1,6 +1,7 @@
 import express from "express";
 import dotenv from "dotenv";
 import path from "path";
+import * as crypto from "crypto";
 import { GoogleGenAI } from "@google/genai";
 import { createClient } from "@supabase/supabase-js";
 
@@ -66,6 +67,265 @@ app.get("/api/supabase/config", (req, res) => {
     hasAnonKey,
     isConfigured: !!(url && (hasServiceRole || hasAnonKey))
   });
+});
+
+// --- COOKIE ENCRYPTION HELPERS & ENDPOINTS ---
+const COOKIE_KEY_SEED = process.env.COOKIE_ENCRYPTION_KEY || "exechat_secure_cookie_key_seed_2026";
+// Hash the seed to get a proper 32-byte key for AES-256
+const ENCRYPTION_KEY = crypto.createHash("sha256").update(COOKIE_KEY_SEED).digest();
+const IV_LENGTH = 16;
+
+function encrypt(text: string): string {
+  const iv = crypto.randomBytes(IV_LENGTH);
+  const cipher = crypto.createCipheriv("aes-256-cbc", ENCRYPTION_KEY, iv);
+  let encrypted = cipher.update(text);
+  encrypted = Buffer.concat([encrypted, cipher.final()]);
+  return iv.toString("hex") + ":" + encrypted.toString("hex");
+}
+
+function decrypt(text: string): string {
+  try {
+    const textParts = text.split(":");
+    const ivHex = textParts.shift();
+    if (!ivHex) return "";
+    const iv = Buffer.from(ivHex, "hex");
+    const encryptedText = Buffer.from(textParts.join(":"), "hex");
+    const decipher = crypto.createDecipheriv("aes-256-cbc", ENCRYPTION_KEY, iv);
+    let decrypted = decipher.update(encryptedText);
+    decrypted = Buffer.concat([decrypted, decipher.final()]);
+    return decrypted.toString();
+  } catch (err) {
+    console.warn("Failed to decrypt cookie value:", err);
+    return "";
+  }
+}
+
+// Set Encrypted Cookie Endpoint
+app.post("/api/cookie/set", (req, res) => {
+  try {
+    const { name, value, maxAgeDays = 30 } = req.body;
+    if (!name || value === undefined) {
+      return res.status(400).json({ error: "Missing cookie name or value" });
+    }
+    const encryptedValue = encrypt(String(value));
+    const maxAge = maxAgeDays * 24 * 60 * 60 * 1000;
+    res.setHeader("Set-Cookie", `${name}=${encodeURIComponent(encryptedValue)}; Max-Age=${maxAge}; Path=/; HttpOnly; SameSite=Lax`);
+    res.json({ success: true, message: `Cookie '${name}' set successfully.` });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message || "Failed to set cookie" });
+  }
+});
+
+// Get Encrypted Cookie Endpoint
+app.post("/api/cookie/get", (req, res) => {
+  try {
+    const { name } = req.body;
+    if (!name) {
+      return res.status(400).json({ error: "Missing cookie name" });
+    }
+    const rawCookies = req.headers.cookie;
+    const cookies: Record<string, string> = {};
+    if (rawCookies) {
+      rawCookies.split(";").forEach(c => {
+        const parts = c.split("=");
+        cookies[parts.shift()!.trim()] = decodeURIComponent(parts.join("="));
+      });
+    }
+    const encryptedValue = cookies[name];
+    if (!encryptedValue) {
+      return res.json({ value: null });
+    }
+    const decryptedValue = decrypt(encryptedValue);
+    res.json({ value: decryptedValue });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message || "Failed to get cookie" });
+  }
+});
+
+// Clear Cookie Endpoint
+app.post("/api/cookie/clear", (req, res) => {
+  try {
+    const { name } = req.body;
+    if (!name) {
+      return res.status(400).json({ error: "Missing cookie name" });
+    }
+    res.setHeader("Set-Cookie", `${name}=; Max-Age=0; Path=/; HttpOnly; SameSite=Lax`);
+    res.json({ success: true, message: `Cookie '${name}' cleared.` });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message || "Failed to clear cookie" });
+  }
+});
+
+// --- SUPABASE PERMANENT DATABASE ROUTING ---
+function getSupabaseClient() {
+  const url = process.env.SUPABASE_URL || "https://knmjalxisidyduzwfwnp.supabase.co";
+  const key = process.env.SUPABASE_SERVICE_ROLE || process.env.SUPABASE_ANON_KEY;
+  if (!key) return null;
+  return createClient(url, key);
+}
+
+// Endpoint to save complete user profile and chats
+app.post("/api/db/save-all", async (req, res) => {
+  try {
+    const { uid, email, username, displayName, sessions } = req.body;
+    if (!uid) {
+      return res.status(400).json({ error: "Missing user uid" });
+    }
+
+    const supabase = getSupabaseClient();
+    if (!supabase) {
+      return res.status(400).json({ error: "Supabase client not configured." });
+    }
+
+    const payload = {
+      uid,
+      email,
+      username,
+      displayName,
+      sessions,
+      updatedAt: Date.now()
+    };
+
+    const fileContent = JSON.stringify(payload, null, 2);
+    const buffer = Buffer.from(fileContent, "utf-8");
+    const bucket = "execode";
+    const filePath = `database/user_db_${uid}.json`;
+
+    const { error: uploadError } = await supabase.storage
+      .from(bucket)
+      .upload(filePath, buffer, {
+        contentType: "application/json",
+        upsert: true
+      });
+
+    if (uploadError) {
+      throw uploadError;
+    }
+
+    res.json({ success: true, message: "All user permanent data successfully saved in Supabase database." });
+  } catch (err: any) {
+    console.error("Supabase DB Save Error:", err);
+    res.status(500).json({ error: err.message || "Failed to save data to Supabase database." });
+  }
+});
+
+// Endpoint to load user profile and chats
+app.post("/api/db/load-all", async (req, res) => {
+  try {
+    const { uid } = req.body;
+    if (!uid) {
+      return res.status(400).json({ error: "Missing user uid" });
+    }
+
+    const supabase = getSupabaseClient();
+    if (!supabase) {
+      return res.status(400).json({ error: "Supabase client not configured." });
+    }
+
+    const bucket = "execode";
+    const filePath = `database/user_db_${uid}.json`;
+
+    const { data, error } = await supabase.storage
+      .from(bucket)
+      .download(filePath);
+
+    if (error) {
+      if (error.message?.includes("Object not found") || (error as any).status === 404) {
+        return res.json({ found: false });
+      }
+      throw error;
+    }
+
+    const textContent = await data.text();
+    const parsedData = JSON.parse(textContent);
+
+    res.json({ found: true, data: parsedData });
+  } catch (err: any) {
+    console.error("Supabase DB Load Error:", err);
+    res.status(500).json({ error: err.message || "Failed to load data from Supabase database." });
+  }
+});
+
+// Endpoint to clear user data completely from permanent database
+app.post("/api/db/clear-all", async (req, res) => {
+  try {
+    const { uid } = req.body;
+    if (!uid) {
+      return res.status(400).json({ error: "Missing user uid" });
+    }
+
+    const supabase = getSupabaseClient();
+    if (!supabase) {
+      return res.status(400).json({ error: "Supabase client not configured." });
+    }
+
+    const bucket = "execode";
+    const dbPath = `database/user_db_${uid}.json`;
+
+    await supabase.storage.from(bucket).remove([dbPath]);
+
+    try {
+      const { data: folderContents } = await supabase.storage.from(bucket).list(`projects`);
+      if (folderContents && folderContents.length > 0) {
+        const filesToDelete = folderContents
+          .filter(item => item.name.includes(uid) || item.name.startsWith(uid))
+          .map(item => `projects/${item.name}`);
+        
+        if (filesToDelete.length > 0) {
+          await supabase.storage.from(bucket).remove(filesToDelete);
+        }
+      }
+    } catch (folderErr) {
+      console.warn("Folder cleanup warning:", folderErr);
+    }
+
+    res.json({ success: true, message: "User permanent database completely purged." });
+  } catch (err: any) {
+    console.error("Supabase DB Clear Error:", err);
+    res.status(500).json({ error: err.message || "Failed to clear database." });
+  }
+});
+
+// Endpoint to fetch storage capacity metrics for settings
+app.post("/api/db/metrics", async (req, res) => {
+  try {
+    const { uid } = req.body;
+    const supabase = getSupabaseClient();
+    if (!supabase) {
+      return res.json({ connected: false, totalBytes: 0, limitBytes: 52428800 });
+    }
+
+    let totalBytes = 0;
+    const bucket = "execode";
+
+    if (uid) {
+      const { data, error } = await supabase.storage.from(bucket).list("database");
+      if (data) {
+        const file = data.find(item => item.name === `user_db_${uid}.json`);
+        if (file) {
+          totalBytes += file.metadata?.size || (file as any).size || 0;
+        }
+      }
+
+      const { data: projectFiles } = await supabase.storage.from(bucket).list(`projects`);
+      if (projectFiles) {
+        projectFiles.forEach(f => {
+          if (f.name.includes(uid) || f.name.startsWith(uid)) {
+            totalBytes += f.metadata?.size || (f as any).size || 0;
+          }
+        });
+      }
+    }
+
+    res.json({
+      connected: true,
+      totalBytes,
+      limitBytes: 52428800,
+      formattedSize: (totalBytes / 1024).toFixed(2) + " KB"
+    });
+  } catch (err) {
+    res.json({ connected: false, totalBytes: 0, limitBytes: 52428800 });
+  }
 });
 
 app.post("/api/supabase/upload", async (req, res) => {
@@ -814,22 +1074,33 @@ app.post("/api/chat/stream", async (req, res) => {
       }
     }
 
-    // If an image is detected, automatically route the whole conversation to Gemini for proper vision analysis
-    if (hasImageAttachment) {
-      console.log(`[Image System] Image detected for model ${model}. Automatically routing to streamGemini with vision redirection...`);
-      await streamGemini(messages, systemInstruction, temperature, webSearchEnabled, res, true);
-      res.write("data: [DONE]\n\n");
-      return res.end();
+    // Determine active model based on "automatic" or selected model
+    let activeModel = model;
+    if (model === "automatic") {
+      if (hasImageAttachment || webSearchEnabled) {
+        activeModel = "gemini-ai";
+      } else {
+        const lastMsg = messages[messages.length - 1]?.content?.toLowerCase() || "";
+        const searchKeywords = ["search", "cari", "berita", "news", "terbaru", "cuaca", "weather", "google", "live", "skor", "score", "match", "euro 2024", "copa america", "world cup"];
+        const needsWeb = searchKeywords.some(kw => lastMsg.includes(kw));
+        if (needsWeb) {
+          activeModel = "gemini-ai";
+        } else {
+          activeModel = "gemma-4-31b";
+        }
+      }
+      console.log(`[Automatic Model] Routed request to: ${activeModel}`);
     }
 
-    const isGeminiModel = (model === "gemini-ai" || model === "gemini-3.5-flash" || webSearchEnabled);
+    // If an image is detected or activeModel is a Gemini model, route to Gemini
+    const isGeminiModel = (activeModel === "gemini-ai" || activeModel === "gemini-3.5-flash" || webSearchEnabled || hasImageAttachment);
     if (isGeminiModel) {
-      await streamGemini(messages, systemInstruction, temperature, webSearchEnabled, res, false);
+      await streamGemini(messages, systemInstruction, temperature, webSearchEnabled, res, hasImageAttachment);
       res.write("data: [DONE]\n\n");
       return res.end();
     }
 
-    if (model === "llama-3.1-8b-instant") {
+    if (activeModel === "llama-3.1-8b-instant") {
       await streamGroq(messages, systemInstruction, temperature, res);
       res.write("data: [DONE]\n\n");
       return res.end();

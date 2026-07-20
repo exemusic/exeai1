@@ -47,7 +47,9 @@ import {
   Globe,
   Trophy,
   Pencil,
-  Maximize2
+  Maximize2,
+  Eye,
+  EyeOff
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { Message, ChatSession, SystemPreset, ModelOption } from "./types";
@@ -479,6 +481,17 @@ export default function App() {
   const [showUploadMenuHome, setShowUploadMenuHome] = useState(false);
   const [showUploadMenuChat, setShowUploadMenuChat] = useState(false);
   const [mobileSettingsPage, setMobileSettingsPage] = useState<"menu" | "akun" | "model" | "tampilan" | "ingatan">("menu");
+
+  const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
+  const [editingMessageText, setEditingMessageText] = useState<string>("");
+  const [showYesterdayHistory, setShowYesterdayHistory] = useState<boolean>(() => {
+    const saved = localStorage.getItem("exechat_show_yesterday");
+    return saved !== "false";
+  });
+
+  useEffect(() => {
+    localStorage.setItem("exechat_show_yesterday", String(showYesterdayHistory));
+  }, [showYesterdayHistory]);
 
   useEffect(() => {
     if (showSettings) {
@@ -1237,6 +1250,38 @@ export default function App() {
     return "New Discussion";
   };
 
+  const getRoutedModelInfo = (apiModel: string, text: string, attachment?: any) => {
+    if (apiModel !== "automatic") {
+      const match = MODEL_OPTIONS.find((m) => m.id === apiModel);
+      return {
+        routedModelId: apiModel,
+        routedModelName: match ? match.name : apiModel,
+      };
+    }
+
+    // Automatic routing rules
+    const isImage = attachment && attachment.type === "image";
+    const isSearchKeyword = /googling|search|internet|berita|cuaca|news|live|realtime/i.test(text);
+    const isCodingKeyword = /script|code|coding|function|class|pawn|mysql|database|schema/i.test(text);
+
+    if (isImage || isSearchKeyword) {
+      return {
+        routedModelId: "gemini-ai",
+        routedModelName: "Gemini AI",
+      };
+    } else if (isCodingKeyword) {
+      return {
+        routedModelId: "gpt-oss-120b",
+        routedModelName: "exeai-oss-120b",
+      };
+    } else {
+      return {
+        routedModelId: "gemma-4-31b",
+        routedModelName: "exeai-e5:5:9",
+      };
+    }
+  };
+
   const handleGoogleLoginSuccess = (credentialResponse: any) => {
     if (!credentialResponse || !credentialResponse.credential) {
       setErrorText("Google sign-in failed: No credential returned.");
@@ -1384,6 +1429,28 @@ export default function App() {
   };
 
   const createNewSession = (initialMsg?: string) => {
+    // Spam protection check: maximum 5 new chats per minute
+    const now = Date.now();
+    const oneMinuteAgo = now - 60000;
+    
+    let creationTimestamps: number[] = [];
+    try {
+      const stored = localStorage.getItem("exechat_creation_timestamps");
+      if (stored) {
+        creationTimestamps = JSON.parse(stored);
+      }
+    } catch (e) {}
+    
+    const recentCreations = creationTimestamps.filter((t) => t > oneMinuteAgo);
+    
+    if (recentCreations.length >= 5) {
+      setErrorText("Spam Protection: Limit pembuatan chat baru maksimal 5 kali per menit.");
+      playNotifySound();
+      return "";
+    }
+    
+    recentCreations.push(now);
+    localStorage.setItem("exechat_creation_timestamps", JSON.stringify(recentCreations));
 
     const chars = "abcdefghijklmnopqrstuvwxyz0123456789";
     let randomId = "";
@@ -1393,7 +1460,7 @@ export default function App() {
     const id = randomId;
     const newSession: ChatSession = {
       id,
-      title: initialMsg ? generateSmartTitle(initialMsg) : `New Chat`,
+      title: "New Chat",
       messages: [],
       systemInstructionId: selectedPresetId,
       temperature,
@@ -1509,6 +1576,7 @@ export default function App() {
 
     if (!targetSessionId) {
       targetSessionId = createNewSession(text);
+      if (!targetSessionId) return;
     }
 
     const userMessage: Message = {
@@ -1524,10 +1592,9 @@ export default function App() {
       prev.map((s) => {
         if (s.id === targetSessionId) {
 
-          const shouldRename = (s.title === "Obrolan Baru" || s.title === "New Chat") && s.messages.length === 0;
           return {
             ...s,
-            title: shouldRename ? generateSmartTitle(text) : s.title,
+            title: s.title,
             messages: [...s.messages, userMessage],
           };
         }
@@ -1544,7 +1611,9 @@ export default function App() {
     scrollToBottom("smooth");
 
     const activeSessionState = sessions.find((s) => s.id === targetSessionId);
-    const apiModel = activeSessionState ? activeSessionState.model : selectedModelId;
+    const rawModel = activeSessionState ? activeSessionState.model : selectedModelId;
+    const { routedModelId } = getRoutedModelInfo(rawModel, text, attachmentObj);
+    const apiModel = routedModelId;
     const apiPreset = SYSTEM_PRESETS.find(
       (p) => p.id === (activeSessionState ? activeSessionState.systemInstructionId : selectedPresetId)
     ) || SYSTEM_PRESETS[0];
@@ -1600,6 +1669,7 @@ export default function App() {
           content: "<think>Thinking...",
           timestamp: Date.now(),
           thinkingDuration: 0.1,
+          routedModelId: rawModel === "automatic" ? apiModel : undefined,
         };
 
         setSessions((prev) =>
@@ -1655,6 +1725,7 @@ export default function App() {
         content: "",
         timestamp: Date.now(),
         thinkingDuration: 0.1,
+        routedModelId: rawModel === "automatic" ? apiModel : undefined,
       };
 
       setSessions((prev) =>
@@ -1840,8 +1911,14 @@ export default function App() {
       setSessions((prev) =>
         prev.map((s) => {
           if (s.id === targetSessionId) {
+            const firstUserMsg = s.messages.find((m) => m.role === "user");
+            const finalTitle = (s.title === "New Chat" && firstUserMsg)
+              ? generateSmartTitle(firstUserMsg.content)
+              : s.title;
+
             return {
               ...s,
+              title: finalTitle,
               messages: s.messages.map((m) =>
                 m.isPending ? { ...m, isPending: false } : m
               ),
@@ -1879,6 +1956,191 @@ export default function App() {
     }
   };
 
+  const handleEditMessageSave = async (messageId: string, newContent: string) => {
+    if (isGenerating || !currentSessionId) return;
+
+    const activeSessionObj = sessions.find((s) => s.id === currentSessionId);
+    if (!activeSessionObj) return;
+
+    const msgIndex = activeSessionObj.messages.findIndex((m) => m.id === messageId);
+    if (msgIndex === -1) return;
+
+    // Retrieve prior messages up to the user message index, and replace its content
+    const truncatedMessages = activeSessionObj.messages.slice(0, msgIndex + 1).map((m) => {
+      if (m.id === messageId) {
+        return { ...m, content: newContent };
+      }
+      return m;
+    });
+
+    const userMessage = truncatedMessages[truncatedMessages.length - 1];
+
+    const rawModel = activeSessionObj.model || selectedModelId;
+    const { routedModelId } = getRoutedModelInfo(rawModel, userMessage.content, userMessage.attachment);
+    const apiModel = routedModelId;
+
+    const assistantMsgId = "msg_" + Date.now() + "_assistant";
+    const assistantPlaceholder: Message = {
+      id: assistantMsgId,
+      role: "model",
+      content: "",
+      timestamp: Date.now(),
+      thinkingDuration: 0.1,
+      routedModelId: rawModel === "automatic" ? apiModel : undefined,
+    };
+
+    // Update the session state immediately: keep up to the user message and append assistant placeholder
+    setSessions((prev) =>
+      prev.map((s) => {
+        if (s.id === currentSessionId) {
+          return {
+            ...s,
+            messages: truncatedMessages.concat(assistantPlaceholder),
+          };
+        }
+        return s;
+      })
+    );
+
+    setEditingMessageId(null);
+    setEditingMessageText("");
+
+    thinkingStartTimesRef.current[assistantMsgId] = Date.now();
+    activeAssistantMsgIdRef.current = assistantMsgId;
+    setIsGenerating(true);
+    setErrorText(null);
+
+    const apiPreset = SYSTEM_PRESETS.find(
+      (p) => p.id === (activeSessionObj.systemInstructionId || selectedPresetId)
+    ) || SYSTEM_PRESETS[0];
+    const apiTemp = activeSessionObj.temperature || temperature;
+    const apiWebSearch = apiModel === "gemini-ai";
+
+    const formattedHistory = truncatedMessages.map((m) => {
+      let content = m.content;
+      if (m.role === "user" && m.attachment) {
+        if (m.attachment.textContent) {
+          content = `[Attached File: ${m.attachment.name}]\n====================\n${m.attachment.textContent}\n====================\n\n${m.content}`;
+        } else {
+          content = `[Attached File: ${m.attachment.name} (${m.attachment.size} bytes, type: ${m.attachment.mime || "unknown"})]\n\n${m.content}`;
+        }
+      }
+      return {
+        role: m.role,
+        content: content,
+        attachment: m.attachment ? {
+          type: m.attachment.type,
+          name: m.attachment.name,
+          mime: m.attachment.mime,
+          size: m.attachment.size,
+          base64: m.id === userMessage.id ? m.attachment.base64 : undefined,
+          textContent: m.attachment.textContent,
+        } : undefined,
+      };
+    });
+
+    let finalInstruction = apiPreset.instruction;
+    if (memories.length > 0) {
+      finalInstruction += "\n\n[AI MEMORY (Saved user memories)]:\n" + memories.map((m, idx) => `${idx + 1}. ${m}`).join("\n");
+    }
+    finalInstruction += `\n\n[CURRENT REAL-TIME TIME INFO]\n${getFormattedCurrentDate()}`;
+    finalInstruction += getBrowserLanguageInstruction();
+    finalInstruction += getDeveloperConfidentialityDirective(newContent);
+
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
+    try {
+      const response = await fetch("/api/chat/stream", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          messages: formattedHistory,
+          systemInstruction: finalInstruction,
+          temperature: apiTemp,
+          model: apiModel,
+          uid: isLoggedIn ? userId : null,
+          idToken: null,
+          webSearchEnabled: apiWebSearch,
+        }),
+        signal: controller.signal,
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to establish stream connection (status ${response.status})`);
+      }
+
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder("utf-8");
+      if (!reader) {
+        throw new Error("Response body is not readable.");
+      }
+
+      let buffer = "";
+      let accumulatedText = "";
+      let hasPlayedSound = false;
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+
+        buffer = lines.pop() || "";
+
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (trimmed.startsWith("data:")) {
+            try {
+              const parsed = JSON.parse(trimmed.substring(5));
+              if (parsed.text) {
+                if (!hasPlayedSound) {
+                  playNotifySound(true);
+                  hasPlayedSound = true;
+                }
+                accumulatedText += parsed.text;
+
+                setSessions((prev) =>
+                  prev.map((s) => {
+                    if (s.id === currentSessionId) {
+                      const updatedMsgs = s.messages.map((m) => {
+                        if (m.id === assistantMsgId) {
+                          let thinkingDuration = m.thinkingDuration;
+                          const startTime = thinkingStartTimesRef.current[assistantMsgId];
+                          if (startTime) {
+                            if (!accumulatedText.includes("</think>")) {
+                              thinkingDuration = Math.max(0.1, Number(((Date.now() - startTime) / 1000).toFixed(1)));
+                            } else if (!m.content?.includes("</think>") && accumulatedText.includes("</think>")) {
+                              thinkingDuration = Math.max(0.1, Number(((Date.now() - startTime) / 1000).toFixed(1)));
+                            }
+                          }
+                          return { ...m, content: accumulatedText, thinkingDuration };
+                        }
+                        return m;
+                      });
+                      return { ...s, messages: updatedMsgs };
+                    }
+                    return s;
+                  })
+                );
+              }
+            } catch (err) {
+            }
+          }
+        }
+      }
+    } catch (err: any) {
+      if (err.name !== "AbortError") {
+        setErrorText("An error occurred during response generation: " + err.message);
+      }
+    } finally {
+      setIsGenerating(false);
+      abortControllerRef.current = null;
+    }
+  };
+
   const copyMessageToClipboard = (msgId: string, text: string) => {
     navigator.clipboard.writeText(text);
     setCopiedMessageId(msgId);
@@ -1902,12 +2164,21 @@ export default function App() {
       return;
     }
 
+    const rawModel = activeSessionObj.model || selectedModelId;
+    const { routedModelId } = getRoutedModelInfo(rawModel, userMessage.content, userMessage.attachment);
+    const apiModel = routedModelId;
+
     setSessions((prev) =>
       prev.map((s) => {
         if (s.id === currentSessionId) {
           const updatedMsgs = s.messages.map((m) => {
             if (m.id === assistantMsgId) {
-              return { ...m, content: "", thinkingDuration: 1 };
+              return { 
+                ...m, 
+                content: "", 
+                thinkingDuration: 1,
+                routedModelId: rawModel === "automatic" ? apiModel : undefined
+              };
             }
             return m;
           });
@@ -1922,7 +2193,6 @@ export default function App() {
     setIsGenerating(true);
     setErrorText(null);
 
-    const apiModel = activeSessionObj.model || selectedModelId;
     const apiPreset = SYSTEM_PRESETS.find(
       (p) => p.id === (activeSessionObj.systemInstructionId || selectedPresetId)
     ) || SYSTEM_PRESETS[0];
@@ -2146,23 +2416,37 @@ export default function App() {
 
   const groupSessionsByDate = (sessionsToGroup: ChatSession[]) => {
     const today: ChatSession[] = [];
+    const yesterday: ChatSession[] = [];
     const earlier: ChatSession[] = [];
 
     const now = new Date();
     const todayMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    const yesterdayMidnight = todayMidnight - 24 * 60 * 60 * 1000;
 
     sessionsToGroup.forEach((s) => {
       const createdAt = s.createdAt || Date.now();
       if (createdAt >= todayMidnight) {
         today.push(s);
+      } else if (createdAt >= yesterdayMidnight) {
+        yesterday.push(s);
       } else {
         earlier.push(s);
       }
     });
 
     const categories: { label: string; items: ChatSession[] }[] = [];
-    if (today.length > 0) categories.push({ label: "Today", items: today });
-    if (earlier.length > 0) categories.push({ label: "Earlier", items: earlier });
+    if (today.length > 0) {
+      categories.push({ label: "Today", items: today });
+    }
+    
+    if (showYesterdayHistory) {
+      if (yesterday.length > 0) {
+        categories.push({ label: "Yesterday", items: yesterday });
+      }
+      if (earlier.length > 0) {
+        categories.push({ label: "Earlier", items: earlier });
+      }
+    }
 
     return categories;
   };
@@ -2282,6 +2566,24 @@ export default function App() {
               <ChevronRight className="h-3.5 w-3.5 shrink-0" />
             ) : (
               <ChevronDown className="h-3.5 w-3.5 shrink-0" />
+            )}
+          </button>
+
+          <button
+            onClick={() => {
+              const newVal = !showYesterdayHistory;
+              setShowYesterdayHistory(newVal);
+              localStorage.setItem("showYesterdayHistory", JSON.stringify(newVal));
+            }}
+            className={`p-1 rounded-md transition-all duration-200 cursor-pointer hover:bg-zinc-500/10 ${
+              showYesterdayHistory ? "text-amber-500" : "text-zinc-400 hover:text-zinc-200"
+            }`}
+            title={showYesterdayHistory ? "Hide Yesterday & Older" : "Show Yesterday & Older"}
+          >
+            {showYesterdayHistory ? (
+              <Eye className="h-3.5 w-3.5" />
+            ) : (
+              <EyeOff className="h-3.5 w-3.5" />
             )}
           </button>
         </div>
@@ -2669,19 +2971,19 @@ export default function App() {
       <div className="flex w-full h-full relative z-10">
 
         {/* UNIFIED DESKTOP SIDEBAR (GEMINI-LIKE EXPANDED/COLLAPSED) */}
-        <aside 
-          className={`hidden md:flex flex-col h-full shrink-0 ${curTheme.sidebarBg} select-none transition-all duration-300 z-20 ${
-            isDesktopSidebarOpen 
-              ? `w-68 border-r ${curTheme.border}` 
-              : "w-16 border-r-0"
-          }`}
+        <motion.aside 
+          animate={{ 
+            width: isDesktopSidebarOpen ? 240 : 60
+          }}
+          transition={{ type: "spring", stiffness: 260, damping: 26 }}
+          className={`hidden md:flex flex-col h-full shrink-0 ${curTheme.sidebarBg} select-none z-20 overflow-hidden border-r ${curTheme.border}`}
         >
           {isDesktopSidebarOpen ? (
-            <div className="w-68 h-full flex flex-col overflow-hidden">
+            <div className="w-60 h-full flex flex-col overflow-hidden">
               {renderSidebarContent(false)}
             </div>
           ) : (
-            <div className="flex flex-col items-center justify-between py-6 w-full h-full">
+            <div className="flex flex-col items-center justify-between py-6 w-[60px] h-full shrink-0 overflow-hidden">
               {/* Top Section */}
               <div className="flex flex-col items-center gap-6 w-full">
                 {/* ExeChat Logo at the very top */}
@@ -2693,7 +2995,7 @@ export default function App() {
                 <button
                   onClick={() => setIsDesktopSidebarOpen(true)}
                   className={`p-2 rounded-xl transition-all duration-200 cursor-pointer ${
-                    isDark ? "text-zinc-400 hover:text-white hover:bg-zinc-800/50" : "text-zinc-600 hover:text-zinc-900 hover:bg-zinc-200/50"
+                    isDark ? "text-zinc-400 hover:text-white hover:bg-zinc-800/50" : "text-zinc-650 hover:text-zinc-900 hover:bg-zinc-200/50"
                   }`}
                   title="Expand Sidebar"
                 >
@@ -2709,7 +3011,7 @@ export default function App() {
                     setShowExeCode(false);
                   }}
                   className={`p-2 rounded-xl hover:bg-zinc-550/10 transition-all duration-200 cursor-pointer ${
-                    isDark ? "text-zinc-400 hover:text-white" : "text-zinc-600 hover:text-zinc-900"
+                    isDark ? "text-zinc-400 hover:text-white" : "text-zinc-650 hover:text-zinc-900"
                   }`}
                   title="New Chat"
                 >
@@ -2723,7 +3025,7 @@ export default function App() {
                     playNotifySound();
                   }}
                   className={`p-2 rounded-xl hover:bg-zinc-550/10 transition-all duration-200 cursor-pointer ${
-                    isDark ? "text-zinc-400 hover:text-white" : "text-zinc-600 hover:text-zinc-900"
+                    isDark ? "text-zinc-400 hover:text-white" : "text-zinc-650 hover:text-zinc-900"
                   }`}
                   title="Search Conversations"
                 >
@@ -2742,7 +3044,7 @@ export default function App() {
                   className={`p-2 rounded-xl transition-all duration-200 cursor-pointer ${
                     showExeCode 
                       ? "bg-amber-500/10 text-amber-500" 
-                      : `hover:bg-zinc-500/10 ${isDark ? "text-zinc-400 hover:text-white" : "text-zinc-600 hover:text-zinc-900"}`
+                      : `hover:bg-zinc-500/10 ${isDark ? "text-zinc-400 hover:text-white" : "text-zinc-650 hover:text-zinc-900"}`
                   }`}
                   title="ExeCode Workspace"
                 >
@@ -2758,7 +3060,7 @@ export default function App() {
                   className={`p-2 rounded-xl transition-all duration-200 cursor-pointer ${
                     showSettings 
                       ? "bg-[#1a73e8]/10 text-[#1a73e8]" 
-                      : `hover:bg-zinc-500/10 ${isDark ? "text-zinc-400 hover:text-white" : "text-zinc-600 hover:text-zinc-900"}`
+                      : `hover:bg-zinc-500/10 ${isDark ? "text-zinc-400 hover:text-white" : "text-zinc-650 hover:text-zinc-900"}`
                   }`}
                   title="Settings"
                 >
@@ -2836,7 +3138,7 @@ export default function App() {
               </div>
             </div>
           )}
-        </aside>
+        </motion.aside>
 
         <AnimatePresence>
           {isMobileSidebarOpen && (
@@ -3134,61 +3436,126 @@ export default function App() {
 
                              {/* Message content */}
                              {isUser ? (
-                               <div className={`whitespace-pre-wrap leading-relaxed font-sans text-sm sm:text-[15px] md:text-base select-text flex flex-col gap-2.5 ${isDark ? "text-zinc-250" : "text-zinc-850"} ${msg.isPending ? "opacity-65" : ""}`}>
-                                 {msg.attachment && (
-                                   <div className={`flex items-center gap-3 p-3 rounded-xl border max-w-sm transition-all duration-300 ${
-                                     isDark 
-                                       ? "bg-zinc-950/70 border-zinc-800/80 hover:border-zinc-700/80" 
-                                       : "bg-zinc-50 border-zinc-200 hover:border-zinc-350"
-                                   }`}>
-                                     <div className={`p-2.5 rounded-lg border text-amber-500 shrink-0 shadow-inner ${
-                                       isDark ? "bg-zinc-900 border-zinc-800" : "bg-white border-zinc-200"
+                               editingMessageId === msg.id ? (
+                                 <div className="w-full flex flex-col gap-2.5 min-w-[240px] sm:min-w-[320px] md:min-w-[400px]">
+                                   <textarea
+                                     value={editingMessageText}
+                                     onChange={(e) => setEditingMessageText(e.target.value)}
+                                     rows={Math.max(2, editingMessageText.split("\n").length)}
+                                     className={`w-full rounded-xl p-3 text-sm focus:outline-none border font-sans resize-y leading-relaxed transition-all ${
+                                       isDark 
+                                         ? "bg-zinc-950 border-zinc-800 text-zinc-100 focus:border-zinc-700" 
+                                         : "bg-white border-zinc-200 text-zinc-900 focus:border-zinc-400"
+                                     }`}
+                                     autoFocus
+                                   />
+                                   <div className="flex justify-end gap-2 text-xs">
+                                     <button
+                                       onClick={() => {
+                                         setEditingMessageId(null);
+                                         setEditingMessageText("");
+                                       }}
+                                       className={`px-3 py-1.5 rounded-lg border font-medium cursor-pointer transition-all ${
+                                         isDark 
+                                           ? "border-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-800/40" 
+                                           : "border-zinc-200 text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100"
+                                       }`}
+                                     >
+                                       Cancel
+                                     </button>
+                                     <button
+                                       onClick={() => handleEditMessageSave(msg.id, editingMessageText)}
+                                       disabled={!editingMessageText.trim() || editingMessageText.trim() === msg.content}
+                                       className="px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-zinc-950 font-bold transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                                     >
+                                       Save & Submit
+                                     </button>
+                                   </div>
+                                 </div>
+                               ) : (
+                                 <div className="whitespace-pre-wrap leading-relaxed font-sans text-sm sm:text-[15px] md:text-base select-text flex flex-col gap-2.5 relative group/msg">
+                                   {msg.attachment && (
+                                     <div className={`flex items-center gap-3 p-3 rounded-xl border max-w-sm transition-all duration-300 ${
+                                       isDark 
+                                         ? "bg-zinc-950/70 border-zinc-800/80 hover:border-zinc-700/80" 
+                                         : "bg-zinc-50 border-zinc-200 hover:border-zinc-350"
                                      }`}>
-                                       {msg.attachment.type === "image" ? (
-                                         <div 
-                                           onClick={() => setExpandedImage(msg.attachment!.base64 || msg.attachment!.url)}
-                                           className="relative h-10 w-10 -m-1 rounded overflow-hidden cursor-pointer hover:opacity-85 active:scale-95 transition-all shadow-sm shrink-0 group"
-                                           title="Klik untuk memperbesar"
-                                         >
-                                           <img 
-                                             src={msg.attachment.base64 || msg.attachment.url} 
-                                             alt={msg.attachment.name} 
-                                             className="h-full w-full object-cover"
-                                             referrerPolicy="no-referrer"
-                                           />
-                                         </div>
-                                       ) : msg.attachment.type === "audio" ? (
-                                         <Volume2 className="h-4 w-4" />
-                                       ) : (
-                                         <FileText className="h-4 w-4" />
-                                       )}
-                                     </div>
-                                     <div className="flex-1 min-w-0">
-                                       <div className={`text-xs font-semibold truncate flex items-center gap-1.5 ${isDark ? "text-zinc-100" : "text-zinc-900"}`}>
-                                         <span>{msg.attachment.name}</span>
-                                         {msg.attachment.textContent && (
-                                           <span className={`text-[9px] px-1 py-0.5 rounded border font-normal ${
-                                             isDark ? "bg-zinc-900 text-zinc-400 border-zinc-850" : "bg-zinc-200 text-zinc-600 border-zinc-300"
-                                           }`}>
-                                             Text
-                                           </span>
+                                       <div className={`p-2.5 rounded-lg border text-amber-500 shrink-0 shadow-inner ${
+                                         isDark ? "bg-zinc-900 border-zinc-800" : "bg-white border-zinc-200"
+                                       }`}>
+                                         {msg.attachment.type === "image" ? (
+                                           <div 
+                                             onClick={() => setExpandedImage(msg.attachment!.base64 || msg.attachment!.url)}
+                                             className="relative h-10 w-10 -m-1 rounded overflow-hidden cursor-pointer hover:opacity-85 active:scale-95 transition-all shadow-sm shrink-0"
+                                             title="Klik untuk memperbesar"
+                                           >
+                                             <img 
+                                               src={msg.attachment.base64 || msg.attachment.url} 
+                                               alt={msg.attachment.name} 
+                                               className="h-full w-full object-cover"
+                                               referrerPolicy="no-referrer"
+                                             />
+                                           </div>
+                                         ) : msg.attachment.type === "audio" ? (
+                                           <Volume2 className="h-4 w-4" />
+                                         ) : (
+                                           <FileText className="h-4 w-4" />
                                          )}
                                        </div>
-                                       <div className={`text-[10px] font-mono mt-0.5 ${isDark ? "text-zinc-500" : "text-zinc-500"}`}>
-                                         {(msg.attachment.size / 1024).toFixed(1)} KB • {msg.attachment.mime || "unknown"}
+                                       <div className="flex-1 min-w-0">
+                                         <div className={`text-xs font-semibold truncate flex items-center gap-1.5 ${isDark ? "text-zinc-100" : "text-zinc-900"}`}>
+                                           <span>{msg.attachment.name}</span>
+                                           {msg.attachment.textContent && (
+                                             <span className={`text-[9px] px-1 py-0.5 rounded border font-normal ${
+                                               isDark ? "bg-zinc-900 text-zinc-400 border-zinc-850" : "bg-zinc-200 text-zinc-600 border-zinc-300"
+                                             }`}>
+                                               Text
+                                             </span>
+                                           )}
+                                         </div>
+                                         <div className={`text-[10px] font-mono mt-0.5 ${isDark ? "text-zinc-500" : "text-zinc-500"}`}>
+                                           {(msg.attachment.size / 1024).toFixed(1)} KB • {msg.attachment.mime || "unknown"}
+                                         </div>
                                        </div>
                                      </div>
-                                   </div>
-                                 )}
-                                 <div className="flex items-start justify-between gap-2.5">
-                                   <div className="flex-1">{msg.content}</div>
-                                   {msg.isPending && (
-                                     <span className="flex items-center gap-1 text-[10px] text-amber-500 font-sans select-none shrink-0 mt-1" title="Sending to ExeAI server...">
-                                       <Clock className="h-3.5 w-3.5 animate-spin" />
-                                     </span>
                                    )}
+                                   <div className="flex items-start justify-between gap-4">
+                                     <div 
+                                       className="flex-1 cursor-pointer hover:opacity-90 active:scale-[0.99] transition-all"
+                                       title="Double-click to edit message"
+                                       onDoubleClick={() => {
+                                         if (!isGenerating) {
+                                           setEditingMessageId(msg.id);
+                                           setEditingMessageText(msg.content);
+                                         }
+                                       }}
+                                     >
+                                       {msg.content}
+                                     </div>
+                                     <div className="flex items-center gap-1.5 shrink-0 select-none">
+                                       {!isGenerating && (
+                                         <button
+                                           onClick={() => {
+                                             setEditingMessageId(msg.id);
+                                             setEditingMessageText(msg.content);
+                                           }}
+                                           className={`opacity-0 group-hover/msg:opacity-100 p-1 rounded-lg transition-all cursor-pointer ${
+                                             isDark ? "text-zinc-500 hover:text-zinc-200 hover:bg-zinc-800" : "text-zinc-550 hover:text-zinc-800 hover:bg-zinc-200/50"
+                                           }`}
+                                           title="Edit message"
+                                         >
+                                           <Pencil className="h-3.5 w-3.5" />
+                                         </button>
+                                       )}
+                                       {msg.isPending && (
+                                         <span className="flex items-center gap-1 text-[10px] text-amber-500 font-sans select-none shrink-0" title="Sending to ExeAI server...">
+                                           <Clock className="h-3.5 w-3.5 animate-spin" />
+                                         </span>
+                                       )}
+                                     </div>
+                                   </div>
                                  </div>
-                               </div>
+                               )
                              ) : (
                               // Custom Markdown rendering
                               msg.content === "" && isGenerating && index === currentSession.messages.length - 1 ? (
@@ -3199,7 +3566,15 @@ export default function App() {
                                     <span className="h-1.5 w-1.5 rounded-full bg-zinc-500 animate-[bounce_1s_infinite_300ms]" />
                                   </div>
                                   <span className="text-xs text-zinc-500 font-medium font-sans">
-                                    Thinking...
+                                    {(() => {
+                                      if (msg.routedModelId) {
+                                        const matchedModel = MODEL_OPTIONS.find(m => m.id === msg.routedModelId);
+                                        const modelDisplayName = matchedModel ? matchedModel.name : msg.routedModelId;
+                                        const cleanName = modelDisplayName.split(" (")[0];
+                                        return `memuat model ${cleanName}...`;
+                                      }
+                                      return "Thinking...";
+                                    })()}
                                   </span>
                                 </div>
                               ) : (
@@ -3355,7 +3730,15 @@ export default function App() {
                               <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
                             </span>
                             <span className="font-medium animate-pulse text-amber-600 dark:text-amber-450">
-                              Thinking ({elapsed}s)...
+                              {(() => {
+                                if (latestMsg.routedModelId) {
+                                  const matchedModel = MODEL_OPTIONS.find(m => m.id === latestMsg.routedModelId);
+                                  const modelDisplayName = matchedModel ? matchedModel.name : latestMsg.routedModelId;
+                                  const cleanName = modelDisplayName.split(" (")[0];
+                                  return `memuat model ${cleanName} (${elapsed}s)...`;
+                                }
+                                return `Thinking (${elapsed}s)...`;
+                              })()}
                             </span>
                           </div>
                         );
@@ -3925,6 +4308,33 @@ export default function App() {
                             </div>
 
                             <div className={`rounded-2xl p-5 border ${isDark ? "bg-zinc-900/10 border-transparent shadow-none" : "bg-white border-zinc-200"}`}>
+                              <h3 className="text-xs md:text-sm font-bold uppercase tracking-wider text-zinc-500 mb-2.5">Chat History</h3>
+                              <div className="flex items-center justify-between">
+                                <div>
+                                  <h4 className="text-sm font-semibold">Yesterday & Older</h4>
+                                  <p className="text-xs text-zinc-500 mt-1">Show older chat sessions in your history sidebar.</p>
+                                </div>
+                                <button
+                                  onClick={() => {
+                                    const newVal = !showYesterdayHistory;
+                                    setShowYesterdayHistory(newVal);
+                                    localStorage.setItem("showYesterdayHistory", JSON.stringify(newVal));
+                                    playNotifySound();
+                                  }}
+                                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none cursor-pointer ${
+                                    showYesterdayHistory ? "bg-amber-500" : "bg-zinc-700"
+                                  }`}
+                                >
+                                  <span
+                                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                                      showYesterdayHistory ? "translate-x-6" : "translate-x-1"
+                                    }`}
+                                  />
+                                </button>
+                              </div>
+                            </div>
+
+                            <div className={`rounded-2xl p-5 border ${isDark ? "bg-zinc-900/10 border-transparent shadow-none" : "bg-white border-zinc-200"}`}>
                               <h3 className="text-xs md:text-sm font-bold uppercase tracking-wider text-zinc-500 mb-2.5">Sound feedback</h3>
                               <p className="text-xs md:text-sm leading-relaxed text-zinc-500">ExeChat plays a subtle sound when generating responses is complete.</p>
                             </div>
@@ -4354,6 +4764,32 @@ export default function App() {
                                   </div>
                                 );
                               })}
+                            </div>
+                          </div>
+
+                          <div className={`rounded-3xl p-6 md:p-8 border space-y-4 ${isDark ? "bg-zinc-900/10 border-transparent shadow-none" : "bg-white border-zinc-200/80 shadow-md"}`}>
+                            <h4 className="text-base font-bold text-zinc-800 dark:text-zinc-200">Chat History Settings</h4>
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <p className="text-xs md:text-sm text-zinc-500 font-medium">Toggle yesterday, earlier and older chat logs in your navigation sidebar list.</p>
+                              </div>
+                              <button
+                                onClick={() => {
+                                  const newVal = !showYesterdayHistory;
+                                  setShowYesterdayHistory(newVal);
+                                  localStorage.setItem("showYesterdayHistory", JSON.stringify(newVal));
+                                  playNotifySound();
+                                }}
+                                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none cursor-pointer ${
+                                  showYesterdayHistory ? "bg-amber-500" : "bg-zinc-700"
+                                }`}
+                              >
+                                <span
+                                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                                    showYesterdayHistory ? "translate-x-6" : "translate-x-1"
+                                  }`}
+                                />
+                              </button>
                             </div>
                           </div>
 
