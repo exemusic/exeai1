@@ -57,6 +57,46 @@ import { MODEL_OPTIONS, SYSTEM_PRESETS, SUGGESTED_PROMPTS } from "./presets";
 import { ExeCodeWorkspace } from "./components/ExeCodeWorkspace";
 import { PublicProjectView } from "./components/PublicProjectView";
 
+const ExeChatLogo = ({ className = "h-8 w-8", size = 32 }: { className?: string; size?: number }) => (
+  <svg 
+    width={size} 
+    height={size} 
+    viewBox="0 0 100 100" 
+    className={className}
+    fill="none" 
+    xmlns="http://www.w3.org/2000/svg"
+    style={{ display: "inline-block", verticalAlign: "middle" }}
+  >
+    <defs>
+      <linearGradient id="exeGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stopColor="#0f172a" />
+        <stop offset="100%" stopColor="#020617" />
+      </linearGradient>
+      <linearGradient id="glowGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stopColor="#4f46e5" />
+        <stop offset="50%" stopColor="#06b6d4" />
+        <stop offset="100%" stopColor="#10b981" />
+      </linearGradient>
+    </defs>
+    <rect x="2" y="2" width="96" height="96" rx="24" fill="url(#exeGrad)" stroke="#1e293b" strokeWidth="4" />
+    <path d="M40 76 L32 88 L52 82 Z" fill="url(#glowGrad)" />
+    <rect x="20" y="20" width="60" height="52" rx="14" fill="url(#glowGrad)" />
+    <path 
+      d="M34 36L46 46L34 56" 
+      stroke="#ffffff" 
+      strokeWidth="7" 
+      strokeLinecap="round" 
+      strokeLinejoin="round" 
+    />
+    <path 
+      d="M52 56H66" 
+      stroke="#ffffff" 
+      strokeWidth="7" 
+      strokeLinecap="round" 
+    />
+  </svg>
+);
+
 const notifySoundUrl = new URL("../Sound/notify.mp3", import.meta.url).href;
 
 interface TypewriterMessageProps {
@@ -416,7 +456,9 @@ export default function App() {
     };
   }, []);
 
-  const [viewportHeight, setViewportHeight] = useState<string>("100dvh");
+  const [viewportHeight, setViewportHeight] = useState<string>(() => {
+    return typeof window !== "undefined" && window.innerHeight ? `${window.innerHeight}px` : "100vh";
+  });
 
   useEffect(() => {
     if (!window.visualViewport) return;
@@ -2029,7 +2071,7 @@ export default function App() {
     <div className={`flex flex-col h-full w-full ${curTheme.sidebarBg} ${isDark ? "text-zinc-150" : "text-zinc-800"} select-none`}>
       <div className={`p-5 border-b ${curTheme.border} flex items-center justify-between shrink-0`}>
         <div className="flex items-center gap-3">
-          <img src="/exechat.png" alt="ExeChat Logo" className="h-5 w-5 object-contain" referrerPolicy="no-referrer" />
+          <ExeChatLogo className="h-5 w-5 shrink-0" size={20} />
           <div>
             <h1 className={`font-display font-bold text-base tracking-tight flex items-center gap-1.5 ${isDark ? "text-zinc-100" : "text-zinc-900"}`}>
               ExeChat
@@ -2388,10 +2430,27 @@ export default function App() {
 
   if (authLoading) {
     return (
-      <div style={{ height: viewportHeight }} className="flex w-full flex-col items-center justify-center bg-zinc-950 font-sans text-zinc-100 antialiased">
+      <div 
+        style={{ 
+          height: viewportHeight,
+          minHeight: "100vh",
+          backgroundColor: "#09090b",
+          color: "#f4f4f5",
+          display: "flex",
+          width: "100%",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          fontFamily: "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif"
+        }} 
+        className="flex w-full flex-col items-center justify-center bg-zinc-950 font-sans text-zinc-100 antialiased"
+      >
         <div className="relative flex flex-col items-center">
-          <div className="mb-6 p-1 hover:scale-105 transition-transform">
-            <img src="/exechat.png" alt="ExeChat Logo" className="h-16 w-16 object-contain" referrerPolicy="no-referrer" />
+          <div className="mb-6">
+            <svg className="animate-spin h-8 w-8 text-zinc-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
           </div>
           <h2 className="text-lg font-medium tracking-wide animate-pulse">Connecting to ExeChat...</h2>
           <p className="mt-2 text-xs text-zinc-500 font-mono">Verifying secure session...</p>
@@ -2402,21 +2461,45 @@ export default function App() {
 
   if (!isLoggedIn) {
     return (
-      <div style={{ height: viewportHeight }} className="flex w-full items-center justify-center bg-zinc-950 font-sans text-zinc-100 antialiased selection:bg-zinc-800 relative overflow-hidden">
+      <div 
+        style={{ 
+          height: viewportHeight,
+          minHeight: "100vh",
+          backgroundColor: "#09090b",
+          color: "#f4f4f5",
+          display: "flex",
+          width: "100%",
+          alignItems: "center",
+          justifyContent: "center",
+          fontFamily: "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
+          position: "relative",
+          overflow: "hidden"
+        }} 
+        className="flex w-full items-center justify-center bg-zinc-950 font-sans text-zinc-100 antialiased selection:bg-zinc-800 relative overflow-hidden"
+      >
         <div className="absolute inset-0 bg-radial-[circle_at_center,rgba(39,39,42,0.15),transparent_70%] pointer-events-none" />
 
         <motion.div
           initial={{ opacity: 0, y: 12, scale: 0.98 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
           transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+          style={{
+            width: "100%",
+            maxWidth: "400px",
+            borderRadius: "16px",
+            border: "1px solid #27272a",
+            backgroundColor: "#18181b",
+            padding: "2.5rem",
+            boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.3)",
+            zIndex: 10,
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            textAlign: "center",
+            boxSizing: "border-box"
+          }}
           className="w-full max-w-[400px] rounded-2xl border border-zinc-800 bg-zinc-900/40 p-8 sm:p-10 shadow-xl z-10 mx-4 flex flex-col items-center text-center"
         >
-          <div className="mb-6 select-none">
-            <div className="h-12 w-12 rounded-xl bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-200 shadow-md overflow-hidden">
-              <img src="/exechat.png" alt="ExeChat Logo" className="h-8 w-8 object-contain" referrerPolicy="no-referrer" />
-            </div>
-          </div>
-
           <div className="mb-8 select-none">
             <h2 className="text-xl font-semibold tracking-tight text-white">
               Welcome
@@ -2493,7 +2576,7 @@ export default function App() {
               <div className="flex flex-col items-center gap-6 w-full">
                 {/* ExeChat Logo at the very top */}
                 <div className="p-1 hover:scale-105 transition-transform shrink-0 select-none">
-                  <img src="/exechat.png" alt="ExeChat Logo" className="h-6 w-6 object-contain" referrerPolicy="no-referrer" />
+                  <ExeChatLogo className="h-6 w-6 shrink-0" size={24} />
                 </div>
 
                 {/* Menu Button to open */}
@@ -2729,7 +2812,7 @@ export default function App() {
                           transition={{ duration: 0.6, ease: "easeOut" }}
                           className="inline-flex items-center justify-center"
                         >
-                          <img src="/exechat.png" alt="" className="h-14 w-14 md:h-18 md:w-18 object-contain" referrerPolicy="no-referrer" />
+                          <ExeChatLogo className="h-14 w-14 md:h-18 md:w-18 shrink-0" size={72} />
                         </motion.div>
                       </div>
 
