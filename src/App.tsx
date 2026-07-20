@@ -459,6 +459,16 @@ export default function App() {
   const [popupSearchQuery, setPopupSearchQuery] = useState("");
   const [showProfileMenu, setShowProfileMenu] = useState(false);
 
+  const [showUploadMenuHome, setShowUploadMenuHome] = useState(false);
+  const [showUploadMenuChat, setShowUploadMenuChat] = useState(false);
+  const [mobileSettingsPage, setMobileSettingsPage] = useState<"menu" | "akun" | "model" | "tampilan" | "ingatan">("menu");
+
+  useEffect(() => {
+    if (showSettings) {
+      setMobileSettingsPage("menu");
+    }
+  }, [showSettings]);
+
   const [themeMode, setThemeMode] = useState<"system" | "dark" | "light">(() => {
     return (localStorage.getItem("exechat_theme_mode") as any) || "dark";
   });
@@ -1461,7 +1471,7 @@ export default function App() {
           })
         );
       }
-    }, 4000);
+    }, 3000);
 
     try {
       const response = await fetch("/api/chat/stream", {
@@ -2383,86 +2393,87 @@ export default function App() {
 
       <div className="flex w-full h-full relative z-10">
 
-        <div className={`hidden md:flex flex-col items-center justify-between py-6 w-16 h-full shrink-0 border-r ${curTheme.border} ${curTheme.sidebarBg} z-20 select-none`}>
-          <div className="flex flex-col items-center gap-6 w-full">
-            <div className="p-1 cursor-pointer hover:scale-105 transition-transform" onClick={() => {
-              setCurrentSessionId(null);
-              setShowSettings(false);
-            }}>
-              <img src="/exechat.png" alt="ExeChat Logo" className="h-6.5 w-6.5 object-contain" referrerPolicy="no-referrer" />
+        {/* UNIFIED DESKTOP SIDEBAR (GEMINI-LIKE EXPANDED/COLLAPSED) */}
+        <aside 
+          className={`hidden md:flex flex-col h-full shrink-0 ${curTheme.sidebarBg} select-none transition-all duration-300 z-20 ${
+            isDesktopSidebarOpen 
+              ? `w-68 border-r ${curTheme.border}` 
+              : "w-16 border-r-0"
+          }`}
+        >
+          {isDesktopSidebarOpen ? (
+            <div className="w-68 h-full flex flex-col overflow-hidden">
+              {renderSidebarContent(false)}
             </div>
+          ) : (
+            <div className="flex flex-col items-center justify-between py-6 w-full h-full">
+              {/* Top Section */}
+              <div className="flex flex-col items-center gap-6 w-full">
+                {/* Menu Button to open */}
+                <button
+                  onClick={() => setIsDesktopSidebarOpen(true)}
+                  className={`p-2 rounded-xl transition-all duration-200 cursor-pointer ${
+                    isDark ? "text-zinc-400 hover:text-white hover:bg-zinc-800/50" : "text-zinc-600 hover:text-zinc-900 hover:bg-zinc-200/50"
+                  }`}
+                  title="Expand Sidebar"
+                >
+                  <Menu className="h-5 w-5" />
+                </button>
 
-            <button
-              onClick={() => setIsDesktopSidebarOpen(prev => !prev)}
-              className={`p-2 rounded-xl transition-all duration-200 ${
-                isDesktopSidebarOpen 
-                  ? (resolvedTheme === "dark" ? "bg-zinc-800 text-white" : "bg-zinc-200 text-zinc-900") 
-                  : `hover:bg-zinc-500/10 ${resolvedTheme === "dark" ? "text-zinc-400" : "text-zinc-500"}`
-              }`}
-              title="Toggle Sidebar"
-            >
-              <Menu className="h-4.5 w-4.5" />
-            </button>
-          </div>
+                {/* New Chat Icon Button */}
+                <button
+                  onClick={() => {
+                    playNotifySound();
+                    setCurrentSessionId(null);
+                    setShowSettings(false);
+                    setShowExeCode(false);
+                  }}
+                  className={`p-2 rounded-xl hover:bg-zinc-550/10 transition-all duration-200 cursor-pointer ${
+                    isDark ? "text-zinc-400 hover:text-white" : "text-zinc-600 hover:text-zinc-900"
+                  }`}
+                  title="New Chat"
+                >
+                  <Plus className="h-5 w-5 stroke-[2]" />
+                </button>
+              </div>
 
-          <div className="flex flex-col items-center gap-4 w-full">
-            <button
-              onClick={() => {
-                setCurrentSessionId(null);
-                setShowSettings(false);
-              }}
-              className={`p-2.5 rounded-xl hover:bg-zinc-500/10 transition-all duration-200 ${resolvedTheme === "dark" ? "text-zinc-400 hover:text-white" : "text-zinc-600 hover:text-zinc-900"}`}
-              title="New Chat"
-            >
-              <Plus className="h-4.5 w-4.5" />
-            </button>
+              {/* Bottom Section */}
+              <div className="flex flex-col items-center gap-4 w-full">
+                {/* ExeCode Workspace Icon */}
+                <button
+                  onClick={() => {
+                    setShowExeCode(prev => !prev);
+                    setShowSettings(false);
+                  }}
+                  className={`p-2 rounded-xl transition-all duration-200 cursor-pointer ${
+                    showExeCode 
+                      ? "bg-amber-500/10 text-amber-500" 
+                      : `hover:bg-zinc-500/10 ${isDark ? "text-zinc-400 hover:text-white" : "text-zinc-600 hover:text-zinc-900"}`
+                  }`}
+                  title="ExeCode Workspace"
+                >
+                  <Code className="h-5 w-5" />
+                </button>
 
-            <button
-              onClick={() => {
-                setShowSearchModal(true);
-              }}
-              className={`p-2.5 rounded-xl hover:bg-zinc-500/10 transition-all duration-200 ${resolvedTheme === "dark" ? "text-zinc-400 hover:text-white" : "text-zinc-600 hover:text-zinc-900"}`}
-              title="Search Chat"
-            >
-              <Search className="h-4.5 w-4.5" />
-            </button>
+                {/* Settings Icon */}
+                <button
+                  onClick={() => {
+                    setShowSettings(prev => !prev);
+                    setShowExeCode(false);
+                  }}
+                  className={`p-2 rounded-xl transition-all duration-200 cursor-pointer ${
+                    showSettings 
+                      ? "bg-[#1a73e8]/10 text-[#1a73e8]" 
+                      : `hover:bg-zinc-500/10 ${isDark ? "text-zinc-400 hover:text-white" : "text-zinc-600 hover:text-zinc-900"}`
+                  }`}
+                  title="Settings"
+                >
+                  <Settings className="h-5 w-5" />
+                </button>
 
-            <button
-              onClick={() => {
-                setShowExeCode(prev => !prev);
-                setShowSettings(false);
-              }}
-              className={`p-2.5 rounded-xl transition-all duration-200 ${
-                showExeCode 
-                  ? "bg-amber-500/10 text-amber-500" 
-                  : `hover:bg-zinc-500/10 ${resolvedTheme === "dark" ? "text-zinc-400 hover:text-white" : "text-zinc-600 hover:text-zinc-900"}`
-              }`}
-              title="ExeCode Workspace"
-            >
-              <Code className="h-4.5 w-4.5" />
-            </button>
-
-            <button
-              onClick={() => {
-                setShowSettings(prev => !prev);
-                setShowExeCode(false);
-              }}
-              className={`p-2.5 rounded-xl transition-all duration-200 ${
-                showSettings 
-                  ? "bg-[#1a73e8]/10 text-[#1a73e8]" 
-                  : `hover:bg-zinc-500/10 ${resolvedTheme === "dark" ? "text-zinc-400 hover:text-white" : "text-zinc-600 hover:text-zinc-900"}`
-              }`}
-              title="Settings"
-            >
-              <Settings className="h-4.5 w-4.5" />
-            </button>
-          </div>
-
-          <div className="flex flex-col items-center gap-4 relative">
-            <div className="relative">
-              {isLoggedIn ? (
-                <>
-                  {userPhoto ? (
+                {/* Profile Photo / Avatar */}
+                <div className="relative">
+                  {isLoggedIn && userPhoto ? (
                     <img
                       onClick={() => setShowProfileMenu(prev => !prev)}
                       src={userPhoto}
@@ -2481,7 +2492,7 @@ export default function App() {
                     </div>
                   )}
 
-                  {/* Profile Menu Dropdown Popup */}
+                  {/* Profile Menu Popup when clicked */}
                   <AnimatePresence>
                     {showProfileMenu && (
                       <>
@@ -2496,71 +2507,42 @@ export default function App() {
                               : "bg-white/95 border-zinc-250 text-zinc-900 backdrop-blur-md"
                           }`}
                         >
-                          <div className="px-3 py-2 border-b border-zinc-800/40 text-xs text-zinc-500 dark:text-zinc-400 truncate">
+                          <div className="px-3 py-2 border-b border-zinc-800/40 text-xs text-zinc-500 truncate">
                             {userDisplayName || userName || "User"}
                           </div>
-                          <div className="p-1 space-y-0.5">
-                            <button
-                              onClick={() => {
-                                setShowSettings(true);
-                                setShowProfileMenu(false);
-                              }}
-                              className={`flex items-center gap-2.5 w-full text-left px-3 py-2 text-xs md:text-sm font-medium transition-colors rounded-lg ${
-                                isDark 
-                                  ? "hover:bg-zinc-850 text-zinc-300 hover:text-white" 
-                                  : "hover:bg-zinc-100 text-zinc-700 hover:text-zinc-900"
-                              }`}
-                            >
-                              <Settings className="h-4 w-4 text-zinc-400" />
-                              <span>Settings</span>
-                            </button>
-                            <button
-                              onClick={() => {
-                                handleLogout();
-                                setShowProfileMenu(false);
-                              }}
-                              className={`flex items-center gap-2.5 w-full text-left px-3 py-2 text-xs md:text-sm font-medium transition-colors rounded-lg text-red-500 ${
-                                isDark ? "hover:bg-red-950/20 hover:text-red-400" : "hover:bg-red-50 hover:text-red-600"
-                              }`}
-                            >
-                              <LogOut className="h-4 w-4 text-red-500" />
-                              <span>Sign Out</span>
-                            </button>
-                          </div>
+                          <button
+                            onClick={() => {
+                              setShowSettings(true);
+                              setShowProfileMenu(false);
+                            }}
+                            className={`flex items-center gap-2.5 w-full text-left px-3 py-2 text-xs md:text-sm font-medium transition-colors rounded-lg mt-1 ${
+                              isDark ? "hover:bg-zinc-850 text-zinc-300" : "hover:bg-zinc-100 text-zinc-750"
+                            }`}
+                          >
+                            <Settings className="h-4 w-4" />
+                            <span>Settings</span>
+                          </button>
+                          <button
+                            onClick={() => {
+                              handleLogout();
+                              setShowProfileMenu(false);
+                            }}
+                            className={`flex items-center gap-2.5 w-full text-left px-3 py-2 text-xs md:text-sm font-medium transition-colors rounded-lg text-red-500 ${
+                              isDark ? "hover:bg-red-950/20" : "hover:bg-red-50"
+                            }`}
+                          >
+                            <LogOut className="h-4 w-4" />
+                            <span>Sign Out</span>
+                          </button>
                         </motion.div>
                       </>
                     )}
                   </AnimatePresence>
-                </>
-              ) : (
-                <button
-                  onClick={handleGoogleLoginClick}
-                  className={`h-8 w-8 rounded-full flex items-center justify-center transition-colors border ${resolvedTheme === "dark" ? "bg-zinc-800 border-zinc-700 text-zinc-400 hover:text-white" : "bg-white border-zinc-200 text-zinc-600 hover:text-zinc-900"}`}
-                  title="Sign In"
-                >
-                  <Cpu className="h-4 w-4" />
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* DESKTOP SIDEBAR */}
-        <AnimatePresence initial={false}>
-          {isDesktopSidebarOpen && (
-            <motion.aside
-              initial={{ width: 0, opacity: 0 }}
-              animate={{ width: 280, opacity: 1 }}
-              exit={{ width: 0, opacity: 0 }}
-              transition={{ type: "spring", damping: 30, stiffness: 300 }}
-              className={`h-full border-r ${curTheme.border} ${curTheme.sidebarBg} flex-col shrink-0 relative hidden md:flex overflow-hidden`}
-            >
-              <div className="w-[280px] h-full flex flex-col">
-                {renderSidebarContent(false)}
+                </div>
               </div>
-            </motion.aside>
+            </div>
           )}
-        </AnimatePresence>
+        </aside>
 
         <AnimatePresence>
           {isMobileSidebarOpen && (
@@ -2590,7 +2572,7 @@ export default function App() {
         <main className={`flex-1 h-full flex ${curTheme.mainBg} relative overflow-hidden`}>
 
           <div className="flex-1 h-full flex flex-col min-w-0">
-            <div className={`h-14 md:h-16 px-3.5 md:px-6 border-b ${curTheme.border} ${curTheme.sectionBg} flex items-center justify-between z-10 shrink-0`}>
+            <div className={`h-14 md:h-16 px-3.5 md:px-6 border-b md:border-b-0 ${curTheme.border} ${curTheme.sectionBg} flex items-center justify-between z-10 shrink-0`}>
               <div className="min-w-0 flex items-center gap-2 md:gap-3">
                 <button
                   onClick={() => setIsMobileSidebarOpen(true)}
@@ -2700,20 +2682,53 @@ export default function App() {
                       )}
 
                       <div className="flex items-end gap-2.5">
-                        <button
-                          onClick={() => {
-                            console.log("[Button] Upload clicked");
-                            fileInputRef.current?.click();
-                          }}
-                          className={`h-10 w-10 rounded-full transition-all duration-200 shrink-0 flex items-center justify-center cursor-pointer ${
-                            isDark 
-                              ? "hover:bg-zinc-800/50 hover:text-amber-400 text-zinc-400" 
-                              : "hover:bg-zinc-200 text-zinc-600 hover:text-[#1a73e8]"
-                          }`}
-                          title="Attach File (Text, Code, Image, Audio, etc.)"
-                        >
-                          <Plus className="h-5 w-5 stroke-[2]" />
-                        </button>
+                        <div className="relative">
+                          <button
+                            onClick={() => setShowUploadMenuHome(!showUploadMenuHome)}
+                            className={`h-10 w-10 rounded-full transition-all duration-200 shrink-0 flex items-center justify-center cursor-pointer ${
+                              isDark 
+                                ? "hover:bg-zinc-800/50 hover:text-amber-400 text-zinc-400" 
+                                : "hover:bg-zinc-200 text-zinc-600 hover:text-[#1a73e8]"
+                            }`}
+                            title="Options"
+                          >
+                            <Plus className={`h-5 w-5 stroke-[2] transition-transform duration-300 ${showUploadMenuHome ? "rotate-[135deg]" : ""}`} />
+                          </button>
+
+                          <AnimatePresence>
+                            {showUploadMenuHome && (
+                              <>
+                                <div className="fixed inset-0 z-40" onClick={() => setShowUploadMenuHome(false)} />
+                                <motion.div
+                                  initial={{ opacity: 0, scale: 0.95, y: -8 }}
+                                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                                  exit={{ opacity: 0, scale: 0.95, y: -8 }}
+                                  transition={{ duration: 0.15 }}
+                                  className={`absolute bottom-full left-0 mb-2 w-44 rounded-xl p-1.5 shadow-xl border z-50 transition-all ${
+                                    isDark 
+                                      ? "bg-zinc-900/95 border-zinc-800 text-zinc-100 backdrop-blur-md" 
+                                      : "bg-white/95 border-zinc-250 text-zinc-900 backdrop-blur-md"
+                                  }`}
+                                >
+                                  <button
+                                    onClick={() => {
+                                      setShowUploadMenuHome(false);
+                                      fileInputRef.current?.click();
+                                    }}
+                                    className={`flex items-center gap-2.5 w-full text-left px-3 py-2 text-xs md:text-sm font-semibold transition-colors rounded-lg cursor-pointer ${
+                                      isDark 
+                                        ? "hover:bg-zinc-800 text-zinc-300 hover:text-white" 
+                                        : "hover:bg-zinc-150 text-zinc-700 hover:text-zinc-900"
+                                    }`}
+                                  >
+                                    <Paperclip className="h-4 w-4 text-amber-500 shrink-0" />
+                                    <span>Upload File</span>
+                                  </button>
+                                </motion.div>
+                              </>
+                            )}
+                          </AnimatePresence>
+                        </div>
 
                         <textarea
                           ref={homeTextareaRef}
@@ -3119,18 +3134,51 @@ export default function App() {
 
                     <div className="flex items-center w-full gap-1.5 md:gap-2">
                       {/* Upload button inside textbox - left side */}
-                      <button
-                        onClick={() => {
-                          console.log("[Button] Upload clicked");
-                          fileInputRef.current?.click();
-                        }}
-                        className={`h-9 w-9 md:h-10 md:w-10 rounded-full hover:text-amber-400 transition-all duration-200 text-zinc-500 shrink-0 flex items-center justify-center cursor-pointer ${
-                          isDark ? "hover:bg-zinc-800" : "hover:bg-zinc-200"
-                        }`}
-                        title="Upload supporting file (Text, Code, Image, etc.)"
-                      >
-                        <Plus className="h-4.5 w-4.5 md:h-5 md:w-5 stroke-[2]" />
-                      </button>
+                      <div className="relative">
+                        <button
+                          onClick={() => setShowUploadMenuChat(!showUploadMenuChat)}
+                          className={`h-9 w-9 md:h-10 md:w-10 rounded-full hover:text-amber-400 transition-all duration-200 text-zinc-500 shrink-0 flex items-center justify-center cursor-pointer ${
+                            isDark ? "hover:bg-zinc-800" : "hover:bg-zinc-200"
+                          }`}
+                          title="Options"
+                        >
+                          <Plus className={`h-4.5 w-4.5 md:h-5 md:w-5 stroke-[2] transition-transform duration-300 ${showUploadMenuChat ? "rotate-[135deg]" : ""}`} />
+                        </button>
+
+                        <AnimatePresence>
+                          {showUploadMenuChat && (
+                            <>
+                              <div className="fixed inset-0 z-40" onClick={() => setShowUploadMenuChat(false)} />
+                              <motion.div
+                                initial={{ opacity: 0, scale: 0.95, y: -8 }}
+                                animate={{ opacity: 1, scale: 1, y: 0 }}
+                                exit={{ opacity: 0, scale: 0.95, y: -8 }}
+                                transition={{ duration: 0.15 }}
+                                className={`absolute bottom-full left-0 mb-2 w-44 rounded-xl p-1.5 shadow-xl border z-50 transition-all ${
+                                  isDark 
+                                    ? "bg-zinc-900/95 border-zinc-800 text-zinc-100 backdrop-blur-md" 
+                                    : "bg-white/95 border-zinc-250 text-zinc-900 backdrop-blur-md"
+                                }`}
+                              >
+                                <button
+                                  onClick={() => {
+                                    setShowUploadMenuChat(false);
+                                    fileInputRef.current?.click();
+                                  }}
+                                  className={`flex items-center gap-2.5 w-full text-left px-3 py-2 text-xs md:text-sm font-semibold transition-colors rounded-lg cursor-pointer ${
+                                    isDark 
+                                      ? "hover:bg-zinc-800 text-zinc-300 hover:text-white" 
+                                      : "hover:bg-zinc-150 text-zinc-700 hover:text-zinc-900"
+                                  }`}
+                                >
+                                  <Paperclip className="h-4 w-4 text-amber-500 shrink-0" />
+                                  <span>Upload File</span>
+                                </button>
+                              </motion.div>
+                            </>
+                          )}
+                        </AnimatePresence>
+                      </div>
 
                      <textarea
                        ref={chatTextareaRef}
@@ -3207,468 +3255,692 @@ export default function App() {
                 transition={{ duration: 0.2 }}
                 className={`absolute inset-0 backdrop-blur-xl flex flex-col z-40 ${isDark ? "bg-zinc-950/98 text-zinc-100" : "bg-zinc-50/98 text-zinc-850"}`}
               >
-                {/* Header */}
-                <div className={`p-5 px-6 border-b ${curTheme.border} ${curTheme.sectionBg} flex items-center justify-between shrink-0`}>
-                  <div className="flex items-center gap-3">
-                    <div className={`p-2 rounded-xl ${isDark ? "bg-zinc-900 text-zinc-300" : "bg-zinc-100 text-zinc-700"}`}>
-                      <Settings className="h-5 w-5" />
-                    </div>
-                    <div>
-                      <h2 className={`text-base font-display font-bold ${curTheme.textTitle}`}>
-                        ExeChat Settings
-                      </h2>
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => setShowSettings(false)}
-                    className={`p-2 rounded-xl transition-all shadow-sm ${isDark ? "bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200" : "bg-white hover:bg-zinc-100 text-zinc-600 hover:text-zinc-900 border border-zinc-200"}`}
-                  >
-                    <X className="h-5 w-5" />
-                  </button>
-                </div>
-
-                {/* Tabs bar */}
-                <div className={`px-6 py-2 border-b ${curTheme.border} flex items-center justify-start gap-1 overflow-x-auto scrollbar-none shrink-0 ${isDark ? "bg-zinc-950/40" : "bg-zinc-100/30"}`}>
-                  {[
-                    { id: "akun", name: "Account & Profile", icon: User },
-                    { id: "model", name: "Engine & AI Personality", icon: Cpu },
-                    { id: "tampilan", name: "Theme & Display", icon: Sun },
-                    { id: "ingatan", name: "AI Memory", icon: Brain },
-                  ].map((tab) => {
-                    const TabIcon = tab.icon;
-                    const isActive = settingsTab === tab.id;
-                    return (
-                      <button
-                        key={tab.id}
-                        onClick={() => setSettingsTab(tab.id as any)}
-                        className={`flex items-center gap-2 py-2 px-4.5 rounded-xl text-xs font-semibold cursor-pointer transition-all duration-200 whitespace-nowrap shrink-0 ${
-                          isActive
-                            ? isDark
-                              ? "bg-zinc-900 text-white shadow border border-zinc-850"
-                              : "bg-white text-zinc-900 shadow border border-zinc-200"
-                            : isDark
-                              ? "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900/40"
-                              : "text-zinc-550 hover:text-zinc-800 hover:bg-zinc-100/50"
-                        }`}
-                      >
-                        <TabIcon className={`h-4 w-4 ${isActive ? (isDark ? "text-amber-400" : "text-[#1a73e8]") : "text-zinc-500"}`} />
-                        <span>{tab.name}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-
-                {/* Tab Content Container */}
-                <div className="flex-1 overflow-y-auto p-6 md:p-8 max-w-4xl mx-auto w-full space-y-6">
-
-                  {/* TAB 1: AKUN & PROFIL */}
-                  {settingsTab === "akun" && (
-                    <div className="space-y-6 animate-fadeIn">
-                      <div className={`rounded-2xl p-6 border ${isDark ? "bg-zinc-900/20 border-zinc-850" : "bg-white border-zinc-200 shadow-sm"}`}>
-                        <h3 className={`text-xs font-semibold tracking-wider font-mono uppercase mb-4 ${isDark ? "text-zinc-500" : "text-zinc-400"}`}>
-                          Membership Status
-                        </h3>
-
-                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-                          <div className="flex items-center gap-4">
-                            {userPhoto ? (
-                              <img src={userPhoto} referrerPolicy="no-referrer" alt="Profile Photo" className="h-14 w-14 rounded-full border border-zinc-500/20 shadow-md shrink-0" />
-                            ) : (
-                              <div className={`h-14 w-14 rounded-full border flex items-center justify-center shrink-0 ${isDark ? "bg-zinc-900 border-zinc-800 text-zinc-400" : "bg-zinc-100 border-zinc-200 text-zinc-600"}`}>
-                                <User className="h-7 w-7" />
-                              </div>
-                            )}
-                            <div>
-                              <div className="space-y-1">
-                                <div className={`flex items-center gap-2 font-bold text-base ${isDark ? "text-zinc-100" : "text-zinc-900"}`}>
-                                  <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-                                  <span>Connected via Google</span>
-                                </div>
-                                <p className={`text-xs ${isDark ? "text-zinc-400" : "text-zinc-550"}`}>{userEmail}</p>
-                              </div>
-                            </div>
-                          </div>
-
-                          <div className="shrink-0 flex items-center gap-2">
-                            <button
-                              onClick={handleLogout}
-                              className={`text-xs font-semibold py-2 px-5 rounded-xl border transition-all duration-200 cursor-pointer ${
-                                isDark 
-                                  ? "bg-red-950/30 hover:bg-red-900/30 text-red-300 border-red-900/40" 
-                                  : "bg-red-50 hover:bg-red-100 text-red-600 border-red-200"
-                              }`}
-                            >
-                              Logout
-                            </button>
-                          </div>
+                {/* 1. MOBILE VIEW (WHATSAPP-STYLE) */}
+                <div className="flex md:hidden flex-col h-full w-full overflow-hidden">
+                  {mobileSettingsPage === "menu" ? (
+                    <div className="flex flex-col h-full w-full">
+                      {/* WhatsApp Header */}
+                      <div className={`p-4 px-5 flex items-center gap-4 shrink-0 border-b ${curTheme.border} ${isDark ? "bg-zinc-900" : "bg-[#075e54] text-white"}`}>
+                        <button
+                          onClick={() => setShowSettings(false)}
+                          className={`p-1.5 rounded-full transition-colors ${isDark ? "hover:bg-zinc-800 text-zinc-300" : "hover:bg-teal-700 text-white"}`}
+                        >
+                          <ChevronLeft className="h-6 w-6 stroke-[2.5]" />
+                        </button>
+                        <div>
+                          <h2 className="text-lg font-bold tracking-tight">Settings</h2>
+                          <p className={`text-[11px] ${isDark ? "text-zinc-550" : "text-teal-100"}`}>ExeChat Premium Account</p>
                         </div>
                       </div>
 
-                      {isLoggedIn && (
-                        <div className={`rounded-2xl p-6 border ${isDark ? "bg-zinc-900/20 border-zinc-850" : "bg-white border-zinc-200 shadow-sm"}`}>
-                          <h3 className={`text-xs font-semibold tracking-wider font-mono uppercase mb-2 ${isDark ? "text-zinc-500" : "text-zinc-400"}`}>
-                            Username Personalization
-                          </h3>
-                          <p className={`text-xs leading-relaxed mb-4 ${isDark ? "text-zinc-500" : "text-zinc-500"}`}>
-                            Set your nickname that the Hexky assistant will use to greet you in this private chat.
-                          </p>
+                      {/* WhatsApp Menu Content */}
+                      <div className="flex-1 overflow-y-auto py-2 divide-y divide-zinc-500/10">
+                        {/* Profile Row */}
+                        <div 
+                          onClick={() => setMobileSettingsPage("akun")}
+                          className={`p-5 flex items-center gap-4 cursor-pointer transition-colors ${isDark ? "hover:bg-zinc-900/60" : "hover:bg-zinc-100"}`}
+                        >
+                          {userPhoto ? (
+                            <img src={userPhoto} referrerPolicy="no-referrer" alt="Profile" className="h-14 w-14 rounded-full border border-zinc-500/20 shadow shrink-0" />
+                          ) : (
+                            <div className={`h-14 w-14 rounded-full border flex items-center justify-center shrink-0 bg-gradient-to-tr from-[#59a6ff] to-[#c084fc] text-white text-lg font-bold`}>
+                              {(userDisplayName || userName || "U").charAt(0).toUpperCase()}
+                            </div>
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <h3 className={`text-base font-bold truncate ${isDark ? "text-zinc-100" : "text-zinc-900"}`}>{userDisplayName || "Guest Profile"}</h3>
+                            <p className="text-xs text-zinc-500 truncate mt-0.5">{userEmail || "Connected as guest offline"}</p>
+                            <span className="inline-flex items-center gap-1 text-[10px] text-amber-500 font-bold bg-amber-500/10 px-2 py-0.5 rounded-full mt-1.5">
+                              ★ Premium Member
+                            </span>
+                          </div>
+                          <ChevronRight className="h-5 w-5 text-zinc-500 shrink-0" />
+                        </div>
 
-                          <div className="space-y-3">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs mb-2">
-                              <div className={`p-3 rounded-xl border flex justify-between ${isDark ? "bg-zinc-950/50 border-zinc-850/60" : "bg-zinc-50 border-zinc-200"}`}>
-                                <span className="text-zinc-500">Google Name</span>
-                                <span className={`font-semibold ${isDark ? "text-zinc-200" : "text-zinc-800"}`}>{googleDefaultName || userEmail?.split("@")[0]}</span>
+                        {/* Setting Items */}
+                        <div className="py-2">
+                          {[
+                            { id: "akun", name: "Account & Profile", desc: "Change nickname, view authentication details", icon: User },
+                            { id: "model", name: "Engine & AI Personality", desc: "Select fast/powerful model or cognitive topics", icon: Cpu },
+                            { id: "tampilan", name: "Theme & Display", desc: "Dark mode preferences, alert sound customizers", icon: Sun },
+                            { id: "ingatan", name: "AI Memory", desc: "Set persistent user background context", icon: Brain },
+                          ].map((item) => {
+                            const ItemIcon = item.icon;
+                            return (
+                              <div
+                                key={item.id}
+                                onClick={() => setMobileSettingsPage(item.id as any)}
+                                className={`px-5 py-4 flex items-center gap-4 cursor-pointer transition-colors ${isDark ? "hover:bg-zinc-900/60" : "hover:bg-zinc-100"}`}
+                              >
+                                <div className={`p-2.5 rounded-full shrink-0 ${isDark ? "bg-zinc-900 text-amber-400" : "bg-zinc-100 text-[#075e54]"}`}>
+                                  <ItemIcon className="h-5 w-5" />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <h4 className={`text-sm font-semibold ${isDark ? "text-zinc-200" : "text-zinc-800"}`}>{item.name}</h4>
+                                  <p className="text-xs text-zinc-500 truncate mt-0.5">{item.desc}</p>
+                                </div>
+                                <ChevronRight className="h-4 w-4 text-zinc-500 shrink-0" />
                               </div>
-                              <div className={`p-3 rounded-xl border flex justify-between ${isDark ? "bg-zinc-950/50 border-zinc-850/60" : "bg-zinc-50 border-zinc-200"}`}>
-                                <span className="text-zinc-500">Active Nickname</span>
-                                <span className={`font-semibold ${isDark ? "text-zinc-200" : "text-zinc-800"}`}>{userDisplayName || "Guest"}</span>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col h-full w-full">
+                      {/* WhatsApp Subpage Header */}
+                      <div className={`p-4 px-5 flex items-center gap-4 shrink-0 border-b ${curTheme.border} ${isDark ? "bg-zinc-900" : "bg-[#075e54] text-white"}`}>
+                        <button
+                          onClick={() => setMobileSettingsPage("menu")}
+                          className={`p-1.5 rounded-full transition-colors ${isDark ? "hover:bg-zinc-800 text-zinc-300" : "hover:bg-teal-700 text-white"}`}
+                        >
+                          <ChevronLeft className="h-6 w-6 stroke-[2.5]" />
+                        </button>
+                        <div>
+                          <h2 className="text-base font-bold capitalize">
+                            {mobileSettingsPage === "akun" ? "Account & Profile" :
+                             mobileSettingsPage === "model" ? "AI Engine & Topics" :
+                             mobileSettingsPage === "tampilan" ? "Theme & Display" : "AI Memory"}
+                          </h2>
+                          <p className={`text-[10px] ${isDark ? "text-zinc-500" : "text-teal-100"}`}>Configuring ExeChat preferences</p>
+                        </div>
+                      </div>
+
+                      {/* WhatsApp Subpage Content */}
+                      <div className="flex-1 overflow-y-auto p-5 space-y-6">
+                        {/* SUBPAGE: AKUN */}
+                        {mobileSettingsPage === "akun" && (
+                          <div className="space-y-6 animate-fadeIn">
+                            <div className={`rounded-2xl p-5 border ${isDark ? "bg-zinc-900/20 border-zinc-850" : "bg-white border-zinc-200"}`}>
+                              <h3 className="text-xs font-bold font-mono text-zinc-550 uppercase tracking-wider mb-3">Membership status</h3>
+                              <div className="flex items-center gap-3">
+                                {userPhoto ? (
+                                  <img src={userPhoto} referrerPolicy="no-referrer" alt="Profile" className="h-12 w-12 rounded-full border border-zinc-500/20" />
+                                ) : (
+                                  <div className="h-12 w-12 rounded-full border flex items-center justify-center bg-zinc-900 text-zinc-400">
+                                    <User className="h-6 w-6" />
+                                  </div>
+                                )}
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                                    <span className="text-xs font-bold text-zinc-800 dark:text-zinc-200">Connected via Google</span>
+                                  </div>
+                                  <p className="text-xs text-zinc-500 truncate mt-0.5">{userEmail || "Offline mode"}</p>
+                                </div>
+                                <button
+                                  onClick={handleLogout}
+                                  className="text-xs font-bold py-1.5 px-3 rounded-lg border border-red-900/20 text-red-500 bg-red-500/5 hover:bg-red-500/10"
+                                >
+                                  Logout
+                                </button>
                               </div>
                             </div>
 
-                            <div className="flex gap-2">
+                            <div className={`rounded-2xl p-5 border ${isDark ? "bg-zinc-900/20 border-zinc-850" : "bg-white border-zinc-200"}`}>
+                              <h3 className="text-xs font-bold font-mono text-zinc-550 uppercase tracking-wider mb-1">Nickname settings</h3>
+                              <p className="text-xs text-zinc-500 leading-relaxed mb-4">Set your nickname that the AI assistant will use to greet you.</p>
+                              
+                              <div className="space-y-3">
+                                <input
+                                  value={userName}
+                                  onChange={(e) => setUserName(e.target.value)}
+                                  placeholder="Enter nickname..."
+                                  className={`w-full rounded-xl px-4 py-3 text-xs focus:outline-none border ${
+                                    isDark ? "bg-zinc-950 border-zinc-850 text-zinc-100" : "bg-zinc-50 border-zinc-200"
+                                  }`}
+                                />
+                                <button
+                                  onClick={handleSaveUsername}
+                                  className="w-full py-3 rounded-xl text-xs font-bold bg-amber-500 text-zinc-950"
+                                >
+                                  Save Nickname
+                                </button>
+                                {redeemFeedback && (
+                                  <p className="text-xs text-emerald-500 mt-1">✓ {redeemFeedback}</p>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* SUBPAGE: MODEL */}
+                        {mobileSettingsPage === "model" && (
+                          <div className="space-y-6 animate-fadeIn">
+                            <div className="space-y-3">
+                              <h3 className="text-xs font-bold font-mono text-zinc-550 uppercase tracking-wider">AI Engines</h3>
+                              <div className="space-y-2.5">
+                                {MODEL_OPTIONS.map((m) => {
+                                  const isSelected = currentSession ? currentSession.model === m.id : selectedModelId === m.id;
+                                  return (
+                                    <div
+                                      key={m.id}
+                                      onClick={() => {
+                                        if (currentSession) {
+                                          setSessions((prev) => prev.map((s) => s.id === currentSessionId ? { ...s, model: m.id } : s));
+                                        } else {
+                                          setSelectedModelId(m.id);
+                                        }
+                                        playNotifySound();
+                                      }}
+                                      className={`p-4 rounded-xl border cursor-pointer transition-colors ${
+                                        isSelected 
+                                          ? isDark ? "bg-zinc-900 border-amber-500/40 text-zinc-100" : "bg-blue-50/70 border-blue-500 text-zinc-900"
+                                          : isDark ? "border-zinc-850 bg-zinc-950/20 text-zinc-400" : "border-zinc-200 bg-white text-zinc-600"
+                                      }`}
+                                    >
+                                      <div className="flex items-center justify-between mb-1">
+                                        <span className="text-xs font-bold">{m.name}</span>
+                                        {isSelected && <span className="text-[9px] px-2 py-0.5 rounded-full font-mono font-bold bg-amber-500/10 text-amber-400 border border-amber-500/25">Active</span>}
+                                      </div>
+                                      <p className="text-[11px] leading-relaxed text-zinc-550">{m.description}</p>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+
+                            <div className="space-y-3">
+                              <h3 className="text-xs font-bold font-mono text-zinc-550 uppercase tracking-wider">Cognitive Topics</h3>
+                              <div className="space-y-2.5">
+                                {SYSTEM_PRESETS.map((preset) => {
+                                  const isSelected = currentSession ? currentSession.systemInstructionId === preset.id : selectedPresetId === preset.id;
+                                  return (
+                                    <div
+                                      key={preset.id}
+                                      onClick={() => {
+                                        if (currentSession) {
+                                          setSessions((prev) => prev.map((s) => s.id === currentSessionId ? { ...s, systemInstructionId: preset.id } : s));
+                                        } else {
+                                          setSelectedPresetId(preset.id);
+                                        }
+                                        playNotifySound();
+                                      }}
+                                      className={`p-4 rounded-xl border cursor-pointer transition-colors ${
+                                        isSelected 
+                                          ? isDark ? "bg-zinc-900 border-amber-500/40" : "bg-blue-50/70 border-blue-500"
+                                          : isDark ? "border-zinc-850 bg-zinc-950/20" : "border-zinc-200 bg-white"
+                                      }`}
+                                    >
+                                      <div className="flex items-center gap-2 mb-1.5">
+                                        <div className={`p-1.5 rounded-lg border ${isSelected ? "text-amber-500 border-amber-500/25" : "text-zinc-500 border-zinc-800"}`}>
+                                          {getPresetIcon(preset.icon, "h-4 w-4")}
+                                        </div>
+                                        <span className="text-xs font-bold text-zinc-800 dark:text-zinc-200">{preset.name}</span>
+                                      </div>
+                                      <p className="text-[11px] leading-relaxed text-zinc-550">{preset.description}</p>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* SUBPAGE: TAMPILAN */}
+                        {mobileSettingsPage === "tampilan" && (
+                          <div className="space-y-6 animate-fadeIn">
+                            <div className="space-y-3">
+                              <h3 className="text-xs font-bold font-mono text-zinc-550 uppercase tracking-wider">Theme</h3>
+                              <div className="space-y-2">
+                                {[
+                                  { id: "system", name: "System Preset", icon: Laptop },
+                                  { id: "dark", name: "Dark Mode", icon: Moon },
+                                  { id: "light", name: "Light Mode", icon: Sun },
+                                ].map((t) => {
+                                  const isSelected = themeMode === t.id;
+                                  const IconComp = t.icon;
+                                  return (
+                                    <div
+                                      key={t.id}
+                                      onClick={() => {
+                                        setThemeMode(t.id as any);
+                                        playNotifySound();
+                                      }}
+                                      className={`p-4 rounded-xl border flex items-center justify-between cursor-pointer ${
+                                        isSelected 
+                                          ? isDark ? "bg-zinc-900 border-amber-500/40 text-zinc-100" : "bg-blue-50/75 border-blue-500 text-zinc-900"
+                                          : isDark ? "border-zinc-850 bg-zinc-950/20 text-zinc-450" : "border-zinc-200 bg-white text-zinc-650"
+                                      }`}
+                                    >
+                                      <div className="flex items-center gap-2.5">
+                                        <IconComp className="h-4 w-4 text-zinc-500" />
+                                        <span className="text-xs font-semibold">{t.name}</span>
+                                      </div>
+                                      {isSelected && <span className="h-2 w-2 rounded-full bg-amber-500" />}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+
+                            <div className={`rounded-2xl p-5 border ${isDark ? "bg-zinc-900/20 border-zinc-850" : "bg-white border-zinc-200"}`}>
+                              <h3 className="text-xs font-bold font-mono text-zinc-550 uppercase tracking-wider mb-2.5">Sound feedback</h3>
+                              <p className="text-xs leading-relaxed text-zinc-500">ExeChat plays a subtle sound when generating responses is complete.</p>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* SUBPAGE: INGATAN */}
+                        {mobileSettingsPage === "ingatan" && (
+                          <div className="space-y-6 animate-fadeIn">
+                            <div className={`rounded-2xl p-5 border ${isDark ? "bg-zinc-900/20 border-zinc-850" : "bg-white border-zinc-200"}`}>
+                              <div className="flex items-center gap-2 mb-2">
+                                <Brain className="h-5 w-5 text-amber-500" />
+                                <h3 className="text-xs font-bold font-mono text-zinc-550 uppercase tracking-wider">AI Memory Limits (Max 5)</h3>
+                              </div>
+                              <p className="text-xs text-zinc-500 leading-relaxed mb-4">Saved background information gets added contextually to help customize the responses.</p>
+                              
+                              <div className="flex gap-2">
+                                <input
+                                  type="text"
+                                  value={memoryInput}
+                                  onChange={(e) => setMemoryInput(e.target.value)}
+                                  placeholder={memories.length >= 5 ? "Limit reached" : "Enter personal preference..."}
+                                  disabled={memories.length >= 5}
+                                  className={`flex-1 rounded-xl px-3 py-2.5 text-xs focus:outline-none border ${
+                                    isDark ? "bg-zinc-950 border-zinc-850 text-zinc-150" : "bg-white border-zinc-200 text-zinc-900"
+                                  }`}
+                                />
+                                <button
+                                  onClick={() => {
+                                    if (memoryInput.trim() && memories.length < 5) {
+                                      setMemories((prev) => [...prev, memoryInput.trim()]);
+                                      setMemoryInput("");
+                                      playNotifySound();
+                                    }
+                                  }}
+                                  disabled={!memoryInput.trim() || memories.length >= 5}
+                                  className="px-4 py-2.5 rounded-xl text-xs font-bold bg-amber-500 text-zinc-950 disabled:opacity-40"
+                                >
+                                  Add
+                                </button>
+                              </div>
+
+                              <div className="space-y-2 mt-4 pt-4 border-t border-zinc-500/10">
+                                {memories.length === 0 ? (
+                                  <div className="text-center py-5 text-xs text-zinc-500 italic">No saved memories yet.</div>
+                                ) : (
+                                  memories.map((mem, idx) => (
+                                    <div key={idx} className="flex items-center justify-between gap-3 p-3 rounded-xl bg-zinc-500/5 border border-zinc-500/10 text-xs">
+                                      <span className="truncate flex-1 font-medium text-zinc-800 dark:text-zinc-300">{mem}</span>
+                                      <button
+                                        onClick={() => {
+                                          setMemories((prev) => prev.filter((_, i) => i !== idx));
+                                          playNotifySound();
+                                        }}
+                                        className="p-1 text-zinc-500 hover:text-red-500"
+                                      >
+                                        <Trash2 className="h-4 w-4" />
+                                      </button>
+                                    </div>
+                                  ))
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* 2. DESKTOP VIEW (PREMIUM DUAL COLUMN PANELS WITH SPACIOUS TYPOGRAPHY) */}
+                <div className="hidden md:flex flex-row h-full w-full overflow-hidden">
+                  {/* Left categories sidebar panel */}
+                  <div className={`w-80 shrink-0 border-r ${curTheme.border} ${isDark ? "bg-zinc-900/60" : "bg-zinc-100/50"} flex flex-col justify-between p-6`}>
+                    <div className="space-y-8">
+                      {/* Brand info */}
+                      <div className="flex items-center gap-3.5 px-2">
+                        <div className="p-2.5 rounded-2xl bg-gradient-to-tr from-[#59a6ff] to-[#c084fc] text-white shadow-md">
+                          <Settings className="h-5.5 w-5.5 animate-spin-slow" />
+                        </div>
+                        <div>
+                          <h2 className="text-lg font-display font-bold text-zinc-900 dark:text-zinc-100 tracking-tight">ExeChat Configuration</h2>
+                          <p className="text-[11px] text-zinc-500 font-medium uppercase tracking-widest font-sans mt-0.5">Control Center</p>
+                        </div>
+                      </div>
+
+                      {/* Navigation categories */}
+                      <nav className="space-y-2">
+                        {[
+                          { id: "akun", name: "Account Profile & Status", desc: "View Google logins & usernames", icon: User },
+                          { id: "model", name: "Model Engine & Personalities", desc: "Select fast/powerful AI engines", icon: Cpu },
+                          { id: "tampilan", name: "Display Aesthetics & Sounds", desc: "Configure visual modes & feedback", icon: Sun },
+                          { id: "ingatan", name: "Persistent Cognitive Memory", desc: "Inject customizable permanent facts", icon: Brain },
+                        ].map((item) => {
+                          const IconComp = item.icon;
+                          const isActive = settingsTab === item.id;
+                          return (
+                            <button
+                              key={item.id}
+                              onClick={() => setSettingsTab(item.id as any)}
+                              className={`w-full flex items-center gap-4 p-4 rounded-2xl border text-left transition-all duration-300 cursor-pointer ${
+                                isActive
+                                  ? isDark
+                                    ? "bg-zinc-900 border-zinc-750 text-white shadow-xl ring-1 ring-amber-500/10"
+                                    : "bg-white border-zinc-250 text-zinc-900 shadow-md ring-1 ring-blue-500/10"
+                                  : isDark
+                                    ? "border-transparent text-zinc-400 hover:bg-zinc-850/50 hover:text-zinc-200"
+                                    : "border-transparent text-zinc-600 hover:bg-zinc-150/50 hover:text-zinc-900"
+                              }`}
+                            >
+                              <div className={`p-2.5 rounded-xl border transition-colors ${
+                                isActive 
+                                  ? isDark ? "bg-zinc-950 border-zinc-850 text-amber-400" : "bg-zinc-100 border-blue-250 text-[#1a73e8]" 
+                                  : isDark ? "bg-zinc-900 border-zinc-800 text-zinc-500" : "bg-white border-zinc-200 text-zinc-500"
+                              }`}>
+                                <IconComp className="h-5 w-5" />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <h4 className="text-sm font-bold tracking-tight">{item.name}</h4>
+                                <p className="text-xs text-zinc-500 truncate mt-0.5 font-medium">{item.desc}</p>
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </nav>
+                    </div>
+
+                    {/* Exit button at bottom of sidebar */}
+                    <button
+                      onClick={() => setShowSettings(false)}
+                      className="w-full flex items-center justify-center gap-2 p-3.5 rounded-2xl font-bold text-sm border transition-all duration-300 hover:scale-[1.02] cursor-pointer bg-zinc-900 hover:bg-zinc-850 text-white border-zinc-850 dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 dark:border-transparent"
+                    >
+                      <X className="h-4 w-4 stroke-[2.5]" />
+                      <span>Back to Workspace</span>
+                    </button>
+                  </div>
+
+                  {/* Right configuration values content panel */}
+                  <div className="flex-1 overflow-y-auto p-8 md:p-12">
+                    <div className="max-w-3xl space-y-8 animate-fadeIn">
+                      {/* TAB: AKUN */}
+                      {settingsTab === "akun" && (
+                        <div className="space-y-8">
+                          <div>
+                            <h3 className="text-xl font-display font-bold text-zinc-900 dark:text-zinc-100 tracking-tight">Account Profile & Status</h3>
+                            <p className="text-sm text-zinc-500 mt-1 font-medium">Verify login authenticity status and customize greeting nicknames.</p>
+                          </div>
+
+                          <div className={`rounded-3xl p-6 md:p-8 border ${isDark ? "bg-zinc-900/10 border-zinc-850" : "bg-white border-zinc-200/80 shadow-md"}`}>
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6">
+                              <div className="flex items-center gap-4">
+                                {userPhoto ? (
+                                  <img src={userPhoto} referrerPolicy="no-referrer" alt="Profile" className="h-16 w-16 rounded-full border border-zinc-500/20 shadow-md" />
+                                ) : (
+                                  <div className="h-16 w-16 rounded-full border flex items-center justify-center bg-zinc-900 border-zinc-800 text-zinc-400 shadow-md">
+                                    <User className="h-8 w-8" />
+                                  </div>
+                                )}
+                                <div>
+                                  <div className="flex items-center gap-2">
+                                    <span className="h-2.5 w-2.5 rounded-full bg-emerald-500 animate-pulse" />
+                                    <span className="text-base font-bold text-zinc-800 dark:text-zinc-200">Active Premium Connection</span>
+                                  </div>
+                                  <p className="text-sm text-zinc-500 mt-1 font-mono">{userEmail || "Offline Local Storage Mode"}</p>
+                                </div>
+                              </div>
+                              <button
+                                onClick={handleLogout}
+                                className="px-6 py-3 text-sm font-bold rounded-2xl border border-red-950/20 text-red-500 bg-red-500/5 hover:bg-red-500/10 transition-colors"
+                              >
+                                Sign Out Account
+                              </button>
+                            </div>
+                          </div>
+
+                          <div className={`rounded-3xl p-6 md:p-8 border space-y-6 ${isDark ? "bg-zinc-900/10 border-zinc-850" : "bg-white border-zinc-200/80 shadow-md"}`}>
+                            <div>
+                              <h4 className="text-base font-bold text-zinc-800 dark:text-zinc-200">Personalize AI Nickname Greetings</h4>
+                              <p className="text-xs text-zinc-500 mt-1 font-medium">Set a unique name the assistant will use during private chat dialogs.</p>
+                            </div>
+
+                            <div className="space-y-4">
+                              <div className="flex gap-3">
+                                <input
+                                  value={userName}
+                                  onChange={(e) => setUserName(e.target.value)}
+                                  placeholder="Enter custom name..."
+                                  className={`flex-1 rounded-2xl px-4 py-3.5 text-sm focus:outline-none border ${
+                                    isDark ? "bg-zinc-950 border-zinc-850 text-zinc-100" : "bg-zinc-50 border-zinc-200"
+                                  }`}
+                                />
+                                <button
+                                  onClick={handleSaveUsername}
+                                  className="px-6 py-3.5 rounded-2xl text-sm font-bold bg-amber-500 text-zinc-950 transition-transform hover:scale-[1.01]"
+                                >
+                                  Save Nickname
+                                </button>
+                              </div>
+                              {redeemFeedback && (
+                                <p className="text-sm text-emerald-500 font-semibold flex items-center gap-1.5">
+                                  <span>✓</span> <span>{redeemFeedback}</span>
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* TAB: MODEL */}
+                      {settingsTab === "model" && (
+                        <div className="space-y-8">
+                          <div>
+                            <h3 className="text-xl font-display font-bold text-zinc-900 dark:text-zinc-100 tracking-tight">AI Engine & Cognitive Topics</h3>
+                            <p className="text-sm text-zinc-500 mt-1 font-medium">Switch high-level AI reasoning engines and focus topics for tailored behaviors.</p>
+                          </div>
+
+                          <div className="space-y-4">
+                            <h4 className="text-sm font-bold text-zinc-550 uppercase font-mono tracking-wider">Available LLM Engines</h4>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                              {MODEL_OPTIONS.map((m) => {
+                                const isSelected = currentSession ? currentSession.model === m.id : selectedModelId === m.id;
+                                return (
+                                  <div
+                                    key={m.id}
+                                    onClick={() => {
+                                      if (currentSession) {
+                                        setSessions((prev) => prev.map((s) => s.id === currentSessionId ? { ...s, model: m.id } : s));
+                                      } else {
+                                        setSelectedModelId(m.id);
+                                      }
+                                      playNotifySound();
+                                    }}
+                                    className={`p-6 rounded-3xl border cursor-pointer transition-all duration-300 flex flex-col justify-between ${
+                                      isSelected
+                                        ? isDark
+                                          ? "bg-zinc-900 border-zinc-750 shadow-xl ring-2 ring-amber-500/10 text-zinc-100"
+                                          : "bg-blue-50/75 border-[#1a73e8] shadow-md ring-2 ring-blue-500/10 text-zinc-900"
+                                        : isDark
+                                          ? "border-zinc-850 bg-zinc-950/20 text-zinc-400 hover:border-zinc-700 hover:bg-zinc-950/40"
+                                          : "border-zinc-200 bg-white text-zinc-600 hover:border-zinc-350 hover:bg-zinc-50/50"
+                                    }`}
+                                  >
+                                    <div>
+                                      <div className="flex items-center justify-between mb-3">
+                                        <span className="text-sm font-bold">{m.name}</span>
+                                        {isSelected ? (
+                                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/25 uppercase font-mono">Selected</span>
+                                        ) : (
+                                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-zinc-500/5 text-zinc-500 border border-zinc-500/10 uppercase font-mono">Compatible</span>
+                                        )}
+                                      </div>
+                                      <p className="text-xs leading-relaxed text-zinc-500">{m.description}</p>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+
+                          <div className="space-y-4">
+                            <h4 className="text-sm font-bold text-zinc-550 uppercase font-mono tracking-wider">Specialized Cognitive Presets</h4>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                              {SYSTEM_PRESETS.map((preset) => {
+                                const isSelected = currentSession ? currentSession.systemInstructionId === preset.id : selectedPresetId === preset.id;
+                                return (
+                                  <div
+                                    key={preset.id}
+                                    onClick={() => {
+                                      if (currentSession) {
+                                        setSessions((prev) => prev.map((s) => s.id === currentSessionId ? { ...s, systemInstructionId: preset.id } : s));
+                                      } else {
+                                        setSelectedPresetId(preset.id);
+                                      }
+                                      playNotifySound();
+                                    }}
+                                    className={`p-6 rounded-3xl border cursor-pointer transition-all duration-300 ${
+                                      isSelected
+                                        ? isDark
+                                          ? "bg-zinc-900 border-zinc-750 shadow-xl ring-2 ring-amber-500/10"
+                                          : "bg-blue-50/75 border-[#1a73e8] shadow-md ring-2 ring-blue-500/10"
+                                        : isDark
+                                          ? "border-zinc-850 bg-zinc-950/20 hover:border-zinc-700 hover:bg-zinc-950/40"
+                                          : "border-zinc-200 bg-white hover:border-zinc-350 hover:bg-zinc-50/50"
+                                    }`}
+                                  >
+                                    <div className="flex items-center gap-3.5 mb-3">
+                                      <div className={`p-2 rounded-xl border ${isSelected ? "text-amber-500 border-amber-500/25 bg-zinc-950" : "text-zinc-500 border-zinc-200 bg-zinc-50"}`}>
+                                        {getPresetIcon(preset.icon, "h-5 w-5")}
+                                      </div>
+                                      <span className="text-sm font-bold text-zinc-800 dark:text-zinc-200">{preset.name}</span>
+                                      {preset.badge && (
+                                        <span className="ml-auto text-[9px] font-bold px-2 py-0.5 rounded bg-amber-500/10 text-amber-500 uppercase font-mono tracking-wider">{preset.badge}</span>
+                                      )}
+                                    </div>
+                                    <p className="text-xs leading-relaxed text-zinc-500">{preset.description}</p>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* TAB: TAMPILAN */}
+                      {settingsTab === "tampilan" && (
+                        <div className="space-y-8">
+                          <div>
+                            <h3 className="text-xl font-display font-bold text-zinc-900 dark:text-zinc-100 tracking-tight">Display Aesthetics & Themes</h3>
+                            <p className="text-sm text-zinc-500 mt-1 font-medium">Customize the layout presentation, system colors, and sound effects.</p>
+                          </div>
+
+                          <div className={`rounded-3xl p-6 md:p-8 border space-y-6 ${isDark ? "bg-zinc-900/10 border-zinc-850" : "bg-white border-zinc-200/80 shadow-md"}`}>
+                            <h4 className="text-sm font-bold text-zinc-550 uppercase font-mono tracking-wider">Select Style theme</h4>
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                              {[
+                                { id: "system", name: "System Sync", desc: "Follow OS configurations", icon: Laptop },
+                                { id: "dark", name: "Slate Dark", desc: "Eye-saving deep slate", icon: Moon },
+                                { id: "light", name: "Pure Light", desc: "High contrast paper white", icon: Sun },
+                              ].map((t) => {
+                                const isSelected = themeMode === t.id;
+                                const IconComp = t.icon;
+                                return (
+                                  <div
+                                    key={t.id}
+                                    onClick={() => {
+                                      setThemeMode(t.id as any);
+                                      playNotifySound();
+                                    }}
+                                    className={`p-5 rounded-2xl border cursor-pointer transition-all duration-300 flex flex-col justify-between items-start text-left ${
+                                      isSelected
+                                        ? isDark
+                                          ? "bg-zinc-900 border-amber-500/40 shadow-md text-white"
+                                          : "bg-blue-50/75 border-[#1a73e8] shadow shadow-blue-500/5 text-zinc-900"
+                                        : isDark
+                                          ? "border-zinc-850 bg-zinc-950/20 text-zinc-400 hover:border-zinc-700 hover:bg-zinc-950/40"
+                                          : "border-zinc-200 bg-white text-zinc-650 hover:border-zinc-350 hover:bg-zinc-50"
+                                    }`}
+                                  >
+                                    <div className="flex items-center gap-3 mb-3">
+                                      <div className={`p-2 rounded-lg border ${isSelected ? "text-amber-400 border-amber-500/25" : "text-zinc-500 border-zinc-800"}`}>
+                                        <IconComp className="h-4.5 w-4.5" />
+                                      </div>
+                                      <span className="text-xs font-bold">{t.name}</span>
+                                    </div>
+                                    <p className="text-[11px] leading-relaxed text-zinc-500">{t.desc}</p>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+
+                          <div className={`rounded-3xl p-6 md:p-8 border space-y-4 ${isDark ? "bg-zinc-900/10 border-zinc-850" : "bg-white border-zinc-200/80 shadow-md"}`}>
+                            <h4 className="text-base font-bold text-zinc-800 dark:text-zinc-200">Acoustic Audio Feedback</h4>
+                            <p className="text-xs text-zinc-500 leading-relaxed font-medium">ExeChat will play a peaceful, gentle notify sound when generation is complete. This helps with multitasking or screen-off interactive prompts.</p>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* TAB: INGATAN */}
+                      {settingsTab === "ingatan" && (
+                        <div className="space-y-8">
+                          <div>
+                            <h3 className="text-xl font-display font-bold text-zinc-900 dark:text-zinc-100 tracking-tight">AI Memory Preferences</h3>
+                            <p className="text-sm text-zinc-500 mt-1 font-medium">Give ExeChat persistent background facts (like occupation, coding preference, language) to remember permanently.</p>
+                          </div>
+
+                          <div className={`rounded-3xl p-6 md:p-8 border space-y-6 ${isDark ? "bg-zinc-900/10 border-zinc-850" : "bg-white border-zinc-200/80 shadow-md"}`}>
+                            <div className="flex items-center gap-3">
+                              <Brain className="h-6 w-6 text-amber-500 animate-pulse" />
+                              <h4 className="text-base font-bold text-zinc-800 dark:text-zinc-200">Inject custom memory preference (Max 5)</h4>
+                            </div>
+
+                            <div className="flex gap-3">
                               <input
-                                value={userName}
-                                onChange={(e) => setUserName(e.target.value)}
-                                placeholder="Enter new nickname..."
-                                className={`flex-1 rounded-xl px-4 py-2.5 text-xs focus:outline-none border transition-colors ${
-                                  isDark 
-                                    ? "bg-zinc-950 border-zinc-850 text-zinc-100 focus:border-zinc-750 placeholder-zinc-700" 
-                                    : "bg-white border-zinc-200 text-zinc-900 focus:border-zinc-350 placeholder-zinc-400"
+                                type="text"
+                                value={memoryInput}
+                                onChange={(e) => setMemoryInput(e.target.value)}
+                                placeholder={memories.length >= 5 ? "Maximum limit of 5 preferences reached" : "Example: I prefer codes written in React TSX style..."}
+                                disabled={memories.length >= 5}
+                                className={`flex-1 rounded-2xl px-4 py-3.5 text-sm focus:outline-none border ${
+                                  isDark ? "bg-zinc-950 border-zinc-850 text-zinc-100" : "bg-zinc-50 border-zinc-200"
                                 }`}
                               />
                               <button
-                                onClick={handleSaveUsername}
-                                className={`px-5 py-2.5 rounded-xl text-xs font-semibold transition-all shadow-sm ${
-                                  isDark 
-                                    ? "bg-amber-500 hover:bg-amber-600 text-zinc-950 hover:scale-[1.02]" 
-                                    : "bg-zinc-900 hover:bg-zinc-800 text-white hover:scale-[1.02]"
-                                }`}
+                                onClick={() => {
+                                  if (memoryInput.trim() && memories.length < 5) {
+                                    setMemories((prev) => [...prev, memoryInput.trim()]);
+                                    setMemoryInput("");
+                                    playNotifySound();
+                                  }
+                                }}
+                                disabled={!memoryInput.trim() || memories.length >= 5}
+                                className="px-6 py-3.5 rounded-2xl text-sm font-bold bg-amber-500 text-zinc-950 disabled:opacity-40"
                               >
-                                Save Name
+                                Save Memory
                               </button>
                             </div>
 
-                            {redeemFeedback && (
-                              <p className="text-[11px] text-emerald-500 font-sans tracking-wide">
-                                ✓ {redeemFeedback}
-                              </p>
-                            )}
+                            <div className="space-y-3 pt-4 border-t border-zinc-500/10">
+                              {memories.length === 0 ? (
+                                <div className="text-center py-8 text-sm text-zinc-500 italic border border-dashed rounded-2xl border-zinc-500/20">No persistent memories configured yet. Customize yours above!</div>
+                              ) : (
+                                memories.map((mem, idx) => (
+                                  <div key={idx} className="flex items-center justify-between gap-4 p-4.5 rounded-2xl bg-zinc-500/5 border border-zinc-500/10 text-sm">
+                                    <div className="flex items-center gap-3 min-w-0">
+                                      <span className="h-2 w-2 rounded-full bg-amber-500 shrink-0" />
+                                      <span className="font-medium truncate text-zinc-800 dark:text-zinc-300">{mem}</span>
+                                    </div>
+                                    <button
+                                      onClick={() => {
+                                        setMemories((prev) => prev.filter((_, i) => i !== idx));
+                                        playNotifySound();
+                                      }}
+                                      className="p-1.5 rounded-xl border border-zinc-500/10 hover:bg-red-500/10 text-zinc-400 hover:text-red-500"
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </button>
+                                  </div>
+                                ))
+                              )}
+                            </div>
                           </div>
                         </div>
                       )}
                     </div>
-                  )}
-
-                  {/* TAB 2: ENGINE & KARAKTER AI */}
-                  {settingsTab === "model" && (
-                    <div className="space-y-6 animate-fadeIn">
-                      {/* Model Engine AI Selection */}
-                      <div className="space-y-3">
-                        <h3 className={`text-xs font-semibold tracking-wider font-mono uppercase ${isDark ? "text-zinc-500" : "text-zinc-400"}`}>
-                          Primary AI Engine Choice
-                        </h3>
-                        <p className={`text-xs ${isDark ? "text-zinc-500" : "text-zinc-500"}`}>
-                          The engine determines the intelligence behind your assistant's responses.
-                        </p>
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          {MODEL_OPTIONS.map((m) => {
-                            const isSelected = currentSession
-                              ? currentSession.model === m.id
-                              : selectedModelId === m.id;
-
-                            return (
-                              <div
-                                key={m.id}
-                                onClick={() => {
-                                  if (currentSession) {
-                                    setSessions((prev) =>
-                                      prev.map((s) => (s.id === currentSessionId ? { ...s, model: m.id } : s))
-                                    );
-                                  } else {
-                                    setSelectedModelId(m.id);
-                                  }
-                                  playNotifySound();
-                                }}
-                                className={`p-4.5 rounded-2xl border cursor-pointer transition-all duration-300 flex flex-col justify-between ${
-                                  isSelected
-                                    ? isDark
-                                      ? "bg-zinc-900 border-zinc-750 shadow-lg ring-1 ring-amber-500/20 text-zinc-100"
-                                      : "bg-blue-50/75 border-[#1a73e8] shadow-sm ring-1 ring-blue-500/20 text-zinc-900"
-                                    : isDark
-                                      ? "border-zinc-850 bg-zinc-900/10 text-zinc-400 hover:border-zinc-700 hover:bg-zinc-900/20"
-                                      : "border-zinc-200 bg-white text-zinc-600 hover:border-zinc-300 hover:bg-zinc-50"
-                                }`}
-                              >
-                                <div>
-                                  <div className="flex items-center justify-between mb-2">
-                                    <span className={`text-xs font-bold ${isSelected ? (isDark ? "text-zinc-100" : "text-zinc-900") : "text-zinc-500"}`}>
-                                      {m.name}
-                                    </span>
-                                    {isSelected ? (
-                                      <span className={`text-[9px] px-2 py-0.5 rounded-full font-mono border font-bold ${
-                                        isDark ? "bg-amber-500/10 border-amber-500/30 text-amber-400" : "bg-blue-500/10 border-blue-500/20 text-blue-600"
-                                      }`}>
-                                        Active
-                                      </span>
-                                    ) : (
-                                      <span className={`text-[9px] px-2 py-0.5 rounded-full font-mono border ${
-                                        isDark ? "bg-zinc-950 border-zinc-850 text-zinc-500" : "bg-zinc-100 border-zinc-200 text-zinc-500"
-                                      }`}>
-                                        {m.id === "gemma-4-31b" ? "Fast" : "Powerful"}
-                                      </span>
-                                    )}
-                                  </div>
-                                  <p className={`text-xs leading-relaxed ${isDark ? "text-zinc-500" : "text-zinc-550"}`}>
-                                    {m.description}
-                                  </p>
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-
-                      {/* Discussion Topic Selection */}
-                      <div className="space-y-3 pt-2">
-                        <h3 className={`text-xs font-semibold tracking-wider font-mono uppercase ${isDark ? "text-zinc-500" : "text-zinc-400"}`}>
-                          Discussion Topics
-                        </h3>
-                        <p className={`text-xs ${isDark ? "text-zinc-500" : "text-zinc-500"}`}>
-                          Select a specialized discussion topic to focus the conversation's context and cognitive orientation.
-                        </p>
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          {SYSTEM_PRESETS.map((preset) => {
-                            const isSelected = currentSession
-                              ? currentSession.systemInstructionId === preset.id
-                              : selectedPresetId === preset.id;
-
-                            return (
-                              <div
-                                key={preset.id}
-                                onClick={() => {
-                                  if (currentSession) {
-                                    setSessions((prev) =>
-                                      prev.map((s) => (s.id === currentSessionId ? { ...s, systemInstructionId: preset.id } : s))
-                                    );
-                                  } else {
-                                    setSelectedPresetId(preset.id);
-                                  }
-                                  playNotifySound();
-                                }}
-                                className={`p-4.5 rounded-2xl border cursor-pointer transition-all duration-300 ${
-                                  isSelected
-                                    ? isDark
-                                      ? "bg-zinc-900 border-zinc-750 shadow-lg ring-1 ring-amber-500/20"
-                                      : "bg-blue-50/75 border-[#1a73e8] shadow-sm ring-1 ring-blue-500/20"
-                                    : isDark
-                                      ? "border-zinc-850 bg-zinc-900/10 hover:border-zinc-700 hover:bg-zinc-900/20"
-                                      : "border-zinc-200 bg-white hover:border-zinc-300 hover:bg-zinc-50"
-                                }`}
-                              >
-                                <div className="flex items-center gap-3 mb-2.5">
-                                  <div className={`p-2 rounded-xl border ${
-                                    isSelected 
-                                      ? isDark ? "bg-zinc-950 border-zinc-800 text-amber-400" : "bg-white border-blue-250 text-blue-600" 
-                                      : isDark ? "bg-zinc-900 border-zinc-800/80 text-zinc-400" : "bg-zinc-100 border-zinc-200 text-zinc-500"
-                                  }`}>
-                                    {getPresetIcon(preset.icon, "h-4 w-4")}
-                                  </div>
-                                  <span className={`text-xs font-bold ${isSelected ? (isDark ? "text-zinc-100" : "text-zinc-900") : "text-zinc-500"}`}>
-                                    {preset.name}
-                                  </span>
-                                  {preset.badge && (
-                                    <span className="ml-auto text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-500 dark:bg-amber-500/25 dark:text-amber-400 uppercase tracking-wider font-sans">
-                                      {preset.badge}
-                                    </span>
-                                  )}
-                                </div>
-                                <p className={`text-xs leading-relaxed ${isDark ? "text-zinc-500" : "text-zinc-550"}`}>
-                                  {preset.description}
-                                </p>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* TAB 3: TEMA & TAMPILAN */}
-                  {settingsTab === "tampilan" && (
-                    <div className="space-y-6 animate-fadeIn">
-                      <div className={`rounded-2xl p-6 border ${isDark ? "bg-zinc-900/20 border-zinc-850" : "bg-white border-zinc-200 shadow-sm"}`}>
-                        <h3 className={`text-xs font-semibold tracking-wider font-mono uppercase mb-1.5 ${isDark ? "text-zinc-500" : "text-zinc-400"}`}>
-                          Display Theme Options
-                        </h3>
-                        <p className={`text-xs mb-5 ${isDark ? "text-zinc-500" : "text-zinc-500"}`}>
-                          Change the visual aesthetics of ExeChat to be comfortable on the eyes when reading chats.
-                        </p>
-
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                          {[
-                            { id: "system", name: "System Theme", desc: "Follow device OS settings", icon: Laptop },
-                            { id: "dark", name: "Black (Dark)", desc: "Energy-saving dark theme", icon: Moon },
-                            { id: "light", name: "White (Light)", desc: "High-contrast light theme", icon: Sun },
-                          ].map((t) => {
-                            const isSelected = themeMode === t.id;
-                            const IconComp = t.icon;
-
-                            return (
-                              <div
-                                key={t.id}
-                                onClick={() => {
-                                  setThemeMode(t.id as any);
-                                  playNotifySound();
-                                }}
-                                className={`p-4.5 rounded-2xl border cursor-pointer transition-all duration-300 flex flex-col justify-between items-start text-left ${
-                                  isSelected
-                                    ? isDark
-                                      ? "bg-zinc-900 border-amber-500/80 shadow-md text-zinc-100 ring-1 ring-amber-500/10"
-                                      : "bg-blue-50/75 border-[#1a73e8] shadow-sm text-zinc-900 ring-1 ring-blue-500/10"
-                                    : isDark
-                                      ? "border-zinc-850 bg-zinc-900/10 text-zinc-450 hover:border-zinc-700 hover:bg-zinc-900/20"
-                                      : "border-zinc-200 bg-white text-zinc-650 hover:border-zinc-300 hover:bg-zinc-50"
-                                }`}
-                              >
-                                <div className="flex items-center gap-2.5 mb-2.5">
-                                  <div className={`p-2 rounded-xl border ${
-                                    isSelected 
-                                      ? isDark ? "bg-amber-500/10 border-transparent text-amber-400" : "bg-[#1a73e8] border-transparent text-white" 
-                                      : isDark ? "bg-zinc-900 border-zinc-800/80 text-zinc-400" : "bg-zinc-100 border-zinc-200 text-zinc-500"
-                                  }`}>
-                                    <IconComp className="h-4 w-4" />
-                                  </div>
-                                  <span className={`text-xs font-bold ${isSelected ? (isDark ? "text-zinc-100" : "text-zinc-900") : "text-zinc-500"}`}>
-                                    {t.name}
-                                  </span>
-                                </div>
-                                <p className={`text-[11px] leading-normal ${isDark ? "text-zinc-500" : "text-zinc-550"}`}>
-                                  {t.desc}
-                                </p>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-
-                      <div className={`rounded-2xl p-6 border ${isDark ? "bg-zinc-900/20 border-zinc-850" : "bg-white border-zinc-200 shadow-sm"}`}>
-                        <h3 className={`text-xs font-semibold tracking-wider font-mono uppercase mb-2 ${isDark ? "text-zinc-500" : "text-zinc-400"}`}>
-                          Audio & Sound Customization
-                        </h3>
-                        <p className={`text-xs leading-relaxed ${isDark ? "text-zinc-500" : "text-zinc-500"}`}>
-                          ExeChat automatically plays a gentle notification sound when the assistant finishes responding as interactive feedback.
-                        </p>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* TAB 4: INGATAN AI */}
-                  {settingsTab === "ingatan" && (
-                    <div className="space-y-6 animate-fadeIn">
-                      <div className={`rounded-2xl p-6 border ${isDark ? "bg-zinc-900/20 border-zinc-850" : "bg-white border-zinc-200 shadow-sm"}`}>
-                        <div className="flex items-center gap-2.5 mb-2">
-                          <Brain className="h-5 w-5 text-amber-500 animate-pulse" />
-                          <h3 className={`text-xs font-semibold tracking-wider font-mono uppercase ${isDark ? "text-zinc-500" : "text-zinc-400"}`}>
-                            AI Memory Configuration (Max 5)
-                          </h3>
-                        </div>
-                        <p className={`text-xs leading-relaxed mb-5 ${isDark ? "text-zinc-500" : "text-zinc-500"}`}>
-                          The assistant will remember your name, work preferences, language, or specific instructions set here permanently across your different chat sessions.
-                        </p>
-
-                        {/* Add Memory Form */}
-                        <div className="flex gap-2 mb-4">
-                          <input
-                            type="text"
-                            value={memoryInput}
-                            onChange={(e) => setMemoryInput(e.target.value)}
-                            placeholder={memories.length >= 5 ? "Maximum memory limit reached" : "Example: I am a React programmer..."}
-                            disabled={memories.length >= 5}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter" && memoryInput.trim()) {
-                                e.preventDefault();
-                                if (memories.length < 5) {
-                                  setMemories((prev) => [...prev, memoryInput.trim()]);
-                                  setMemoryInput("");
-                                  playNotifySound();
-                                }
-                              }
-                            }}
-                            className={`flex-1 rounded-xl px-4 py-2.5 text-xs focus:outline-none border transition-colors ${
-                              isDark 
-                                ? "bg-zinc-950 border-zinc-850 text-zinc-100 placeholder-zinc-700 focus:border-zinc-750" 
-                                : "bg-white border-zinc-200 text-zinc-900 placeholder-zinc-400 focus:border-zinc-350"
-                            }`}
-                          />
-                          <button
-                            onClick={() => {
-                              if (memoryInput.trim() && memories.length < 5) {
-                                setMemories((prev) => [...prev, memoryInput.trim()]);
-                                setMemoryInput("");
-                                playNotifySound();
-                              }
-                            }}
-                            disabled={!memoryInput.trim() || memories.length >= 5}
-                            className={`px-5 py-2.5 rounded-xl text-xs font-semibold transition-all shrink-0 border ${
-                              isDark 
-                                ? "bg-zinc-100 hover:bg-zinc-200 disabled:bg-zinc-900 disabled:text-zinc-700 text-zinc-950 border-transparent cursor-pointer" 
-                                : "bg-zinc-900 hover:bg-zinc-800 disabled:bg-zinc-100 disabled:text-zinc-350 text-white border-transparent shadow-sm cursor-pointer"
-                            }`}
-                          >
-                            Save
-                          </button>
-                        </div>
-
-                        {memories.length >= 5 && (
-                          <p className="text-[10px] text-amber-500 mb-3">
-                            * You have saved 5 memories (maximum). Please delete old memories to add a new preference.
-                          </p>
-                        )}
-
-                        {/* Memories List */}
-                        <div className="space-y-2 pt-2 border-t border-zinc-500/10">
-                          {memories.length === 0 ? (
-                            <div className={`text-center py-6 border border-dashed rounded-xl text-xs ${isDark ? "border-zinc-800/80 text-zinc-600" : "border-zinc-200 text-zinc-400"}`}>
-                              No custom memories saved yet. Write your preferences above to let Hexky know you better!
-                            </div>
-                          ) : (
-                            memories.map((mem, idx) => (
-                              <div
-                                key={idx}
-                                className={`flex items-center justify-between gap-3 p-3.5 rounded-xl border transition-all text-left ${
-                                  isDark 
-                                    ? "border-zinc-850 bg-zinc-950/45 hover:bg-zinc-950" 
-                                    : "border-zinc-150 bg-white hover:bg-zinc-50 shadow-sm"
-                                }`}
-                              >
-                                <div className="flex items-center gap-2.5 min-w-0">
-                                  <span className="h-1.5 w-1.5 rounded-full bg-amber-500 shrink-0" />
-                                  <span className={`text-xs truncate font-sans font-medium ${isDark ? "text-zinc-300" : "text-zinc-700"}`}>{mem}</span>
-                                </div>
-                                <button
-                                  onClick={() => {
-                                    setMemories((prev) => prev.filter((_, i) => i !== idx));
-                                    playNotifySound();
-                                  }}
-                                  className={`p-1.5 rounded-lg transition-colors shrink-0 border ${
-                                    isDark 
-                                      ? "bg-zinc-900/40 border-zinc-800 hover:bg-red-950/25 text-zinc-500 hover:text-red-400" 
-                                      : "bg-zinc-50 border-zinc-200 hover:bg-red-50 text-zinc-500 hover:text-red-650"
-                                  }`}
-                                  title="Delete Memory"
-                                >
-                                  <Trash2 className="h-3.5 w-3.5" />
-                                </button>
-                              </div>
-                            ))
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
+                  </div>
                 </div>
               </motion.div>
             )}

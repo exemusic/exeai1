@@ -83,7 +83,7 @@ const DEFAULT_FILES: VirtualFile[] = [
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Cool ExeCode Application</title>
+  <title>Hello World!</title>
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- Google Fonts -->
@@ -92,65 +92,57 @@ const DEFAULT_FILES: VirtualFile[] = [
     body {
       font-family: 'Plus Jakarta Sans', sans-serif;
     }
-    @keyframes pulse-glow {
-      0%, 100% { transform: scale(1); opacity: 0.6; }
-      50% { transform: scale(1.05); opacity: 0.9; }
+    @keyframes gradient {
+      0% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
     }
-    .glow-bg {
-      animation: pulse-glow 8s ease-in-out infinite;
+    .animate-gradient {
+      background-size: 200% 200%;
+      animation: gradient 6s ease infinite;
     }
   </style>
 </head>
-<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col justify-between overflow-hidden relative">
+<body class="bg-[#0b0f19] text-slate-100 min-h-screen flex flex-col justify-between overflow-hidden relative">
 
-  <!-- Background Orbs -->
-  <div class="absolute top-1/4 left-1/4 w-96 h-96 bg-indigo-500/10 rounded-full blur-3xl glow-bg"></div>
-  <div class="absolute bottom-1/4 right-1/4 w-96 h-96 bg-amber-500/10 rounded-full blur-3xl glow-bg" style="animation-delay: -4s"></div>
+  <!-- Glow effects -->
+  <div class="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/3 w-[500px] h-[500px] bg-gradient-to-tr from-sky-500/10 to-indigo-500/10 rounded-full blur-3xl pointer-events-none"></div>
 
   <!-- Header -->
-  <header class="p-6 border-b border-slate-900/80 backdrop-blur flex justify-between items-center z-10">
-    <div class="flex items-center gap-3">
-      <div class="w-8 h-8 rounded-lg bg-gradient-to-tr from-amber-500 to-indigo-600 flex items-center justify-center font-bold text-white shadow-lg">
-        E
-      </div>
-      <span class="font-bold tracking-tight text-lg bg-gradient-to-r from-white via-slate-200 to-slate-400 bg-clip-text text-transparent">
-        ExeCode App
-      </span>
+  <header class="p-6 flex justify-between items-center z-10 max-w-7xl mx-auto w-full">
+    <div class="flex items-center gap-2">
+      <div class="w-6 h-6 rounded-full bg-gradient-to-tr from-sky-400 to-indigo-500 animate-pulse"></div>
+      <span class="font-bold tracking-tight text-sm text-slate-300">ExeCode Starter</span>
     </div>
-    <span class="text-xs font-mono px-3 py-1 bg-indigo-950/50 text-indigo-400 rounded-full border border-indigo-900/50">
-      Status: Live
+    <span class="text-[10px] font-mono px-2.5 py-1 bg-sky-500/10 text-sky-400 rounded-full border border-sky-500/20">
+      Template Loaded
     </span>
   </header>
 
   <!-- Main Content -->
   <main class="flex-1 flex flex-col items-center justify-center p-8 z-10">
     <div class="max-w-md text-center space-y-6">
-      <div class="inline-flex p-3 bg-amber-500/10 border border-amber-500/20 text-amber-500 rounded-2xl animate-bounce">
-        <svg class="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
-        </svg>
-      </div>
-      
-      <h1 class="text-3xl md:text-4xl font-extrabold tracking-tight">
-        Welcome to <span class="bg-gradient-to-r from-amber-400 via-amber-500 to-indigo-400 bg-clip-text text-transparent">ExeCode</span>
+      <h1 class="text-4xl md:text-5xl font-extrabold tracking-tight animate-fade-in">
+        <span class="bg-gradient-to-r from-sky-400 via-indigo-400 to-purple-400 bg-clip-text text-transparent animate-gradient">
+          Hello, World!
+        </span>
       </h1>
       
-      <p class="text-slate-400 text-sm leading-relaxed">
-        This is a real-time interactive preview of your application. Try writing a prompt in the AI Assistant on the left to modify this page magically!
+      <p class="text-slate-400 text-sm leading-relaxed max-w-sm mx-auto">
+        A clean, beautiful starter web template with high-contrast colors, modern gradients, and smooth responsiveness.
       </p>
 
-      <div class="p-4 bg-slate-900/60 border border-slate-800 rounded-xl flex items-center justify-between">
-        <span class="text-xs text-slate-500 font-mono">Click the button below for an interactive demo:</span>
-        <button id="actionBtn" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-bold transition-all shadow-md active:scale-95">
-          Click Me
+      <div class="pt-4">
+        <button id="clickBtn" class="px-5 py-2.5 bg-gradient-to-r from-sky-500 to-indigo-500 hover:from-sky-400 hover:to-indigo-400 text-white rounded-xl text-xs font-semibold tracking-wider transition-all duration-300 shadow-lg shadow-indigo-500/20 hover:shadow-indigo-500/30 active:scale-95">
+          Explore Universe
         </button>
       </div>
     </div>
   </main>
 
   <!-- Footer -->
-  <footer class="p-6 border-t border-slate-900 text-center text-xs text-slate-600 z-10">
-    &copy; 2026 ExeCode Workspace. All rights reserved.
+  <footer class="p-6 text-center text-[10px] text-slate-500 z-10 max-w-7xl mx-auto w-full">
+    &copy; 2026 Hello World Project. Built with ExeCode.
   </footer>
 
   <script src="app.js"></script>
@@ -159,25 +151,31 @@ const DEFAULT_FILES: VirtualFile[] = [
   },
   {
     path: "app.js",
-    content: `console.log("ExeCode App initialized!");
+    content: `console.log("Welcome to your Hello World App!");
 
-const button = document.getElementById("actionBtn");
+const button = document.getElementById("clickBtn");
 if (button) {
   button.addEventListener("click", () => {
-    const colors = ["#f59e0b", "#10b981", "#3b82f6", "#8b5cf6", "#ec4899", "#ef4444"];
-    const randomColor = colors[Math.floor(Math.random() * colors.length)];
+    // Elegant floating greeting ripple effect
+    const banner = document.createElement("div");
+    banner.className = "fixed top-8 left-1/2 transform -translate-x-1/2 bg-slate-900/90 border border-slate-800 backdrop-blur-md px-6 py-3 rounded-2xl text-xs font-semibold text-sky-400 shadow-2xl flex items-center gap-2 transition-all duration-500 opacity-0 -translate-y-2";
+    banner.innerHTML = \`
+      <span class="w-2 h-2 bg-sky-400 rounded-full animate-ping"></span>
+      <span>Greetings from the ExeCode Universe! 🚀</span>
+    \`;
     
-    button.style.backgroundColor = randomColor;
+    document.body.appendChild(banner);
     
-    const notification = document.createElement("div");
-    notification.className = "fixed bottom-20 left-1/2 transform -translate-x-1/2 bg-slate-900 border border-slate-800 px-4 py-2 rounded-lg text-xs font-bold text-white shadow-xl flex items-center gap-2 animate-fade-in";
-    notification.innerHTML = \`<span>Button color changed to <span style="color: \${randomColor}">\${randomColor}</span>!</span>\`;
-    
-    document.body.appendChild(notification);
-    
+    // Trigger entry transition
     setTimeout(() => {
-      notification.remove();
-    }, 2500);
+      banner.classList.remove("opacity-0", "-translate-y-2");
+    }, 50);
+    
+    // Dismiss after 3 seconds
+    setTimeout(() => {
+      banner.classList.add("opacity-0", "-translate-y-2");
+      setTimeout(() => banner.remove(), 500);
+    }, 3000);
   });
 }`
   }
@@ -215,7 +213,7 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
   const [supabaseBucket, setSupabaseBucket] = useState<string>("execode");
   const [isServerConfigured, setIsServerConfigured] = useState<boolean>(false);
 
-  const [activeRightTab, setActiveRightTab] = useState<"preview" | "code">("preview");
+  const [activeRightTab, setActiveRightTab] = useState<"preview" | "code" | "split">("preview");
   const [aiPrompt, setAiPrompt] = useState<string>("");
   const [isAIEditing, setIsAIEditing] = useState<boolean>(false);
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
@@ -263,6 +261,106 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const activeFile = files.find(f => f.path === activeFilePath) || files[0];
   const [isEditingCode, setIsEditingCode] = useState<boolean>(false);
+
+  // Advanced Editor UX States & Refs
+  const [editBackupContent, setEditBackupContent] = useState<string>("");
+  const [chatWidth, setChatWidth] = useState<number>(380);
+  const [isResizingChat, setIsResizingChat] = useState<boolean>(false);
+  const [previewWidth, setPreviewWidth] = useState<number>(450);
+  const [isResizingPreview, setIsResizingPreview] = useState<boolean>(false);
+
+  const editorScrollRef = useRef<HTMLTextAreaElement>(null);
+  const viewerScrollRef = useRef<HTMLDivElement>(null);
+  const lineNumbersScrollRef = useRef<HTMLDivElement>(null);
+
+  // Typewriter animation refs
+  const typewriterTargetRef = useRef<string>("");
+  const typewriterCurrentRef = useRef<string>("");
+  const typewriterIntervalIdRef = useRef<any>(null);
+  const isAIEditingActiveRef = useRef<boolean>(false);
+
+  // Initialize backup when entering edit mode or changing file
+  useEffect(() => {
+    if (isEditingCode) {
+      setEditBackupContent(activeFile.content);
+    }
+  }, [isEditingCode, activeFilePath]);
+
+  const handleUndoEdit = () => {
+    setFiles(prev => prev.map(f => f.path === activeFilePath ? { ...f, content: editBackupContent } : f));
+    triggerStatus("Changes reverted to previous version successfully!", "info");
+  };
+
+  const handleSaveEdit = () => {
+    setEditBackupContent(activeFile.content);
+    refreshPreview();
+    triggerStatus("Changes saved successfully!", "success");
+  };
+
+  // Scroll Sync Handlers
+  const handleEditorScroll = (e: React.UIEvent<HTMLTextAreaElement>) => {
+    if (lineNumbersScrollRef.current) {
+      lineNumbersScrollRef.current.scrollTop = e.currentTarget.scrollTop;
+    }
+  };
+
+  const handleViewerScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    if (lineNumbersScrollRef.current) {
+      lineNumbersScrollRef.current.scrollTop = e.currentTarget.scrollTop;
+    }
+  };
+
+  // Keep scroll position when toggling edit/view modes
+  useEffect(() => {
+    if (isEditingCode) {
+      if (editorScrollRef.current && lineNumbersScrollRef.current) {
+        editorScrollRef.current.scrollTop = lineNumbersScrollRef.current.scrollTop;
+      }
+    } else {
+      if (viewerScrollRef.current && lineNumbersScrollRef.current) {
+        viewerScrollRef.current.scrollTop = lineNumbersScrollRef.current.scrollTop;
+      }
+    }
+  }, [isEditingCode]);
+
+  // Resizing mouse move tracking
+  const startResizingChat = (e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsResizingChat(true);
+  };
+
+  const startResizingPreview = (e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsResizingPreview(true);
+  };
+
+  useEffect(() => {
+    const handleMouseMove = (ev: MouseEvent) => {
+      if (isResizingChat) {
+        const newWidth = Math.max(280, Math.min(600, ev.clientX));
+        setChatWidth(newWidth);
+      }
+      if (isResizingPreview) {
+        const newWidth = Math.max(300, Math.min(800, window.innerWidth - ev.clientX));
+        setPreviewWidth(newWidth);
+      }
+    };
+
+    const handleMouseUp = () => {
+      setIsResizingChat(false);
+      setIsResizingPreview(false);
+    };
+
+    if (isResizingChat || isResizingPreview) {
+      window.addEventListener("mousemove", handleMouseMove);
+      window.addEventListener("mouseup", handleMouseUp);
+    }
+
+    return () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", handleMouseUp);
+    };
+  }, [isResizingChat, isResizingPreview]);
 
   const highlightCode = (code: string, filepath: string) => {
     const lines = code.split("\n");
@@ -475,9 +573,25 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
         const elapsed = Math.max(1, Math.round((Date.now() - startTime) / 1000));
         
         setChatHistory(prev =>
-          prev.map((m) =>
-            m.id === activeId ? { ...m, thinkingDuration: elapsed } : m
-          )
+          prev.map((m) => {
+            if (m.id === activeId) {
+              let updatedContent = m.content;
+              // Only modify if it's still using one of the initial placeholders
+              if (
+                updatedContent.includes("Thinking...") || 
+                updatedContent.includes("Analyzing codebase") || 
+                updatedContent.includes("Reviewing project")
+              ) {
+                if (elapsed >= 5) {
+                  updatedContent = `<think>Analyzing codebase requirements (deep thinking process active... ${elapsed}s)</think>`;
+                } else {
+                  updatedContent = `<think>Reviewing project context and prompt... (${elapsed}s)</think>`;
+                }
+              }
+              return { ...m, thinkingDuration: elapsed, content: updatedContent };
+            }
+            return m;
+          })
         );
       }, 500); // Check every 500ms
     } else {
@@ -1224,6 +1338,14 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
     setAiPrompt("");
     setAiStreamingText("");
 
+    isAIEditingActiveRef.current = true;
+    typewriterTargetRef.current = "";
+    typewriterCurrentRef.current = "";
+    if (typewriterIntervalIdRef.current) {
+      clearTimeout(typewriterIntervalIdRef.current);
+      typewriterIntervalIdRef.current = null;
+    }
+
     const userMsg: ChatMessage = {
       id: "usr-" + Date.now(),
       role: "user",
@@ -1238,7 +1360,7 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
     const tempAssistantMsg: ChatMessage = {
       id: assistantMsgId,
       role: "assistant",
-      content: "<think>Thinking...</think>",
+      content: "<think>Reviewing project context and prompt... (1s)</think>",
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       modelId: selectedModel,
       thinkingDuration: 1,
@@ -1311,24 +1433,65 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
                 if (parsed.text) {
                   fullText += parsed.text;
                   setAiStreamingText(fullText);
+                  typewriterTargetRef.current = fullText;
                   
                   const startTime = thinkingStartTimesRef.current[assistantMsgId];
-                  let dur: number | undefined = undefined;
-                  if (startTime) {
-                    dur = Math.max(1, Math.round((Date.now() - startTime) / 1000));
-                  }
+                  const dur = startTime ? Math.max(1, Math.round((Date.now() - startTime) / 1000)) : 1;
 
-                  const displayable = cleanDisplayContent(fullText);
-                  setChatHistory(prev => prev.map(msg => 
-                    msg.id === assistantMsgId 
-                      ? { 
-                          ...msg, 
-                          content: displayable || "Assembling code changes...",
-                          thinkingDuration: dur,
-                          modelId: selectedModel
-                        } 
-                      : msg
-                  ));
+                  // Run dynamic typewriter
+                  if (!typewriterIntervalIdRef.current) {
+                    const runTypewriter = () => {
+                      const target = typewriterTargetRef.current;
+                      let current = typewriterCurrentRef.current;
+
+                      if (current.length < target.length) {
+                        const remaining = target.length - current.length;
+                        
+                        // Dynamically determine how many characters to write at once
+                        // "ngetik setiap kalimat jawaban tapi kalau jawaban terlalu panjang/pendek cepetin"
+                        let stride = 1;
+                        let delay = 12;
+
+                        if (target.length < 60) {
+                          // Short response -> type faster
+                          stride = 2;
+                          delay = 5;
+                        } else if (remaining > 250) {
+                          // Falling behind -> catch up fast!
+                          stride = Math.ceil(remaining / 30);
+                          delay = 2;
+                        } else if (target.length > 500) {
+                          // Long response -> speed it up!
+                          stride = Math.ceil(target.length / 140);
+                          delay = 5;
+                        }
+
+                        current = target.substring(0, current.length + stride);
+                        typewriterCurrentRef.current = current;
+
+                        setChatHistory(prev => prev.map(msg => 
+                          msg.id === assistantMsgId 
+                            ? { 
+                                ...msg, 
+                                content: current,
+                                thinkingDuration: dur,
+                                modelId: selectedModel
+                              } 
+                            : msg
+                        ));
+
+                        typewriterIntervalIdRef.current = setTimeout(runTypewriter, delay);
+                      } else {
+                        if (isAIEditingActiveRef.current) {
+                          typewriterIntervalIdRef.current = setTimeout(runTypewriter, 15);
+                        } else {
+                          typewriterIntervalIdRef.current = null;
+                        }
+                      }
+                    };
+
+                    runTypewriter();
+                  }
                 }
               } catch (e) {
               }
@@ -1336,6 +1499,14 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
           }
         }
       }
+
+      // Stream is finished! Final typewriter flush
+      isAIEditingActiveRef.current = false;
+      if (typewriterIntervalIdRef.current) {
+        clearTimeout(typewriterIntervalIdRef.current);
+        typewriterIntervalIdRef.current = null;
+      }
+      typewriterCurrentRef.current = fullText;
 
       const displayableText = cleanDisplayContent(fullText);
       setAiStreamingText(fullText);
@@ -1412,6 +1583,11 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
       ));
       triggerStatus(`Failed to process AI edit: ${err.message}`, "error");
     } finally {
+      isAIEditingActiveRef.current = false;
+      if (typewriterIntervalIdRef.current) {
+        clearTimeout(typewriterIntervalIdRef.current);
+        typewriterIntervalIdRef.current = null;
+      }
       setIsAIEditing(false);
     }
   };
@@ -1998,81 +2174,30 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
             </button>
           </div>
 
-          <div className="flex items-center gap-2">
-            <span className="font-sans font-extrabold text-base tracking-widest text-amber-400 uppercase">
+          <div className="flex items-center gap-3">
+            <span className="font-sans font-extrabold text-sm tracking-widest text-amber-400 uppercase shrink-0 hidden sm:block">
               EXECODE
             </span>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <button
-              onClick={handleUploadToSupabase}
-              className="px-3 py-1.5 rounded-xl text-xs font-normal bg-amber-500 hover:bg-amber-450 text-white flex items-center gap-1.5 transition-all shadow-md active:scale-95 cursor-pointer"
-              title="Save Project to Cloud"
-            >
-              <Upload className="h-3.5 w-3.5" />
-              <span>Save</span>
-            </button>
-
-            <button
-              onClick={() => setIsFullscreen(!isFullscreen)}
-              className={`p-1.5 rounded-xl border transition-all ${
-                isDark 
-                  ? "bg-zinc-900 border-zinc-800 text-zinc-300 hover:bg-zinc-800" 
-                  : "bg-white border-zinc-200 text-zinc-600 hover:bg-zinc-100"
-              }`}
-              title={isFullscreen ? "Show Chat Panel" : "Hide Chat Panel (Fullscreen)"}
-            >
-              {isFullscreen ? <Minimize2 className="h-4 w-4 text-zinc-400" /> : <Maximize2 className="h-4 w-4 text-zinc-400" />}
-            </button>
-          </div>
-        </div>
-      )}
-
-      <div className={`flex-1 flex flex-col md:flex-row overflow-hidden min-h-0 relative ${isDark ? "bg-zinc-950" : "bg-zinc-50"}`}>
-        
-        <div className={`${
-          isFullscreen 
-            ? "hidden" 
-            : `w-full md:w-[380px] h-1/2 md:h-full border-b md:border-b-0 md:border-r flex flex-col shrink-0 transition-colors duration-200 ${
-                isDark ? "border-zinc-850 bg-[#121214]" : "border-zinc-200 bg-[#fafafa]"
-              }`
-        }`}>
-          <div className={`p-4 border-b flex items-center justify-between transition-colors duration-200 ${
-            isDark ? "border-zinc-850 bg-zinc-950/40" : "border-zinc-200 bg-white"
-          }`}>
-            <div className="flex items-center gap-2">
-              <Sparkles className="h-4 w-4 text-amber-500" />
-              <span className={`text-xs font-semibold tracking-tight ${isDark ? "text-zinc-200" : "text-zinc-800"}`}>{aiName}</span>
-            </div>
+            <div className="h-4 w-px bg-zinc-800/60 mx-1 hidden sm:block" />
             
-            <button
-              onClick={handleClearChat}
-              className={`p-1 rounded-lg text-zinc-400 hover:text-rose-500 transition-all cursor-pointer ${
-                isDark ? "hover:bg-zinc-900" : "hover:bg-zinc-150"
-              }`}
-              title="Clear Chat History"
-            >
-              <Trash2 className="h-4 w-4" />
-            </button>
-          </div>
-
-          <div className={`px-4 py-2 border-b text-[10px] text-zinc-500 flex items-center justify-between font-mono shrink-0 transition-colors duration-200 ${
-            isDark ? "border-zinc-850/50 bg-zinc-950/20" : "border-zinc-200 bg-zinc-100/50"
-          }`}>
-            <span>{MODEL_OPTIONS.find(m => m.id === selectedModel)?.name || "AI Assistant"} • Ran successfully</span>
-            
+            {/* Top Header Model Switcher (Google AI Studio style) */}
             <div className="relative">
               <button
                 onClick={() => setShowModelDropdown(!showModelDropdown)}
-                className="text-[10px] text-amber-500 hover:text-amber-400 font-medium flex items-center gap-1 transition-all"
+                className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 border transition-all cursor-pointer ${
+                  isDark
+                    ? "bg-zinc-900 border-zinc-800 text-zinc-200 hover:bg-zinc-800"
+                    : "bg-white border-zinc-200 text-zinc-700 hover:bg-zinc-100"
+                }`}
+                title="Select active AI model"
               >
-                <span>Change Model</span>
-                <ChevronDown className="h-3 w-3" />
+                <Sparkles className="h-3.5 w-3.5 text-amber-500 animate-pulse" />
+                <span>{MODEL_OPTIONS.find(m => m.id === selectedModel)?.name || "Select Model"}</span>
+                <ChevronDown className="h-3 w-3 text-zinc-500" />
               </button>
 
               {showModelDropdown && (
-                <div className={`absolute top-full right-0 mt-1 z-50 w-64 rounded-xl border p-1 shadow-2xl max-h-64 overflow-y-auto ${
+                <div className={`absolute top-full left-1/2 -translate-x-1/2 mt-1.5 z-50 w-64 rounded-xl border p-1 shadow-2xl max-h-64 overflow-y-auto ${
                   isDark ? "bg-zinc-900 border-zinc-800 text-zinc-100" : "bg-white border-zinc-200 text-zinc-800"
                 }`}>
                   <div className={`px-2.5 py-1 mb-1 border-b ${isDark ? "border-zinc-800/20" : "border-zinc-100"}`}>
@@ -2112,6 +2237,72 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
                 </div>
               )}
             </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleUploadToSupabase}
+              className="px-3 py-1.5 rounded-xl text-xs font-normal bg-amber-500 hover:bg-amber-450 text-white flex items-center gap-1.5 transition-all shadow-md active:scale-95 cursor-pointer"
+              title="Save Project to Cloud"
+            >
+              <Upload className="h-3.5 w-3.5" />
+              <span>Save</span>
+            </button>
+
+            <button
+              onClick={() => setIsFullscreen(!isFullscreen)}
+              className={`p-1.5 rounded-xl border transition-all ${
+                isDark 
+                  ? "bg-zinc-900 border-zinc-800 text-zinc-300 hover:bg-zinc-800" 
+                  : "bg-white border-zinc-200 text-zinc-600 hover:bg-zinc-100"
+              }`}
+              title={isFullscreen ? "Show Chat Panel" : "Hide Chat Panel (Fullscreen)"}
+            >
+              {isFullscreen ? <Minimize2 className="h-4 w-4 text-zinc-400" /> : <Maximize2 className="h-4 w-4 text-zinc-400" />}
+            </button>
+          </div>
+        </div>
+      )}
+
+      <div className={`flex-1 flex flex-col md:flex-row overflow-hidden min-h-0 relative ${isDark ? "bg-zinc-950" : "bg-zinc-50"}`}>
+        
+        <div 
+          style={{ width: isMobileScreen ? "100%" : (isFullscreen ? "0px" : `${chatWidth}px`) }}
+          className={`${
+            isFullscreen 
+              ? "hidden" 
+              : `w-full h-1/2 md:h-full border-b md:border-b-0 md:border-r flex flex-col shrink-0 transition-colors duration-200 ${
+                  isDark ? "border-zinc-850 bg-[#121214]" : "border-zinc-200 bg-[#fafafa]"
+                }`
+          }`}
+        >
+          <div className={`p-4 border-b flex items-center justify-between transition-colors duration-200 ${
+            isDark ? "border-zinc-850 bg-zinc-950/40" : "border-zinc-200 bg-white"
+          }`}>
+            <div className="flex items-center gap-2">
+              <Sparkles className="h-4 w-4 text-amber-500" />
+              <span className={`text-xs font-semibold tracking-tight ${isDark ? "text-zinc-200" : "text-zinc-800"}`}>{aiName}</span>
+            </div>
+            
+            <button
+              onClick={handleClearChat}
+              className={`p-1 rounded-lg text-zinc-400 hover:text-rose-500 transition-all cursor-pointer ${
+                isDark ? "hover:bg-zinc-900" : "hover:bg-zinc-150"
+              }`}
+              title="Clear Chat History"
+            >
+              <Trash2 className="h-4 w-4" />
+            </button>
+          </div>
+
+          <div className={`px-4 py-2 border-b text-[10px] text-zinc-500 flex items-center justify-between font-mono shrink-0 transition-colors duration-200 ${
+            isDark ? "border-zinc-850/50 bg-zinc-950/20" : "border-zinc-200 bg-zinc-100/50"
+          }`}>
+            <span>{MODEL_OPTIONS.find(m => m.id === selectedModel)?.name || "AI Assistant"} • Ready</span>
+            <span className="text-emerald-500 flex items-center gap-1">
+              <span className="h-1 w-1 bg-emerald-500 rounded-full animate-ping" />
+              Connected
+            </span>
           </div>
 
           <div className="flex-1 overflow-y-auto p-4 space-y-4 flex flex-col">
@@ -2207,7 +2398,7 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
                   <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-[bounce_1s_infinite_300ms]" />
                 </div>
                 <span className="text-xs text-zinc-500 font-medium font-sans">
-                  AI is editing code...
+                  Applying code modifications...
                 </span>
               </div>
             )}
@@ -2295,10 +2486,21 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
           </div>
         </div>
 
+        {!isFullscreen && !isMobileScreen && (
+          <div
+            onMouseDown={startResizingChat}
+            className={`w-1 h-full cursor-col-resize hover:bg-amber-500/80 bg-zinc-800/20 hover:w-1.5 transition-all z-20 shrink-0 select-none flex items-center justify-center relative group ${
+              isResizingChat ? "bg-amber-500 w-1.5" : ""
+            }`}
+          >
+            <div className="absolute top-1/2 -translate-y-1/2 w-1.5 h-10 rounded bg-zinc-700/50 group-hover:bg-amber-500/80" />
+          </div>
+        )}
+
         {/* PANEL KANAN: WORKSPACE INTERACTIVE / CODE EDITOR PANE */}
         <div className={`flex-1 flex flex-col min-w-0 relative ${isDark ? "bg-zinc-950 text-zinc-100" : "bg-white text-zinc-800"}`}>
           
-          {/* Segmented controls Preview vs Code */}
+          {/* Segmented controls Preview vs Code vs Split */}
           {!isFullscreen && (
             <div className={`p-3 border-b flex items-center justify-between shrink-0 ${isDark ? "border-zinc-850 bg-zinc-950" : "border-zinc-200 bg-zinc-50"}`}>
               <div className={`flex items-center p-1 rounded-xl border ${isDark ? "bg-zinc-900 border-zinc-850" : "bg-zinc-100 border-zinc-200"}`}>
@@ -2309,7 +2511,7 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
                   }}
                   className={`px-3.5 py-1.5 rounded-lg text-xs font-normal flex items-center gap-1.5 transition-all ${
                     activeRightTab === "preview" 
-                      ? "bg-amber-500 text-white font-medium" 
+                      ? "bg-amber-500 text-white font-medium shadow-sm" 
                       : isDark ? "text-zinc-400 hover:text-zinc-200" : "text-zinc-500 hover:text-zinc-900"
                   }`}
                 >
@@ -2320,11 +2522,24 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
                   onClick={() => setActiveRightTab("code")}
                   className={`px-3.5 py-1.5 rounded-lg text-xs font-normal transition-all ${
                     activeRightTab === "code" 
-                      ? "bg-amber-500 text-white font-medium" 
+                      ? "bg-amber-500 text-white font-medium shadow-sm" 
                       : isDark ? "text-zinc-400 hover:text-zinc-200" : "text-zinc-500 hover:text-zinc-900"
                   }`}
                 >
                   Code
+                </button>
+                <button
+                  onClick={() => {
+                    setActiveRightTab("split");
+                    refreshPreview();
+                  }}
+                  className={`px-3.5 py-1.5 rounded-lg text-xs font-normal transition-all ${
+                    activeRightTab === "split" 
+                      ? "bg-amber-500 text-white font-medium shadow-sm" 
+                      : isDark ? "text-zinc-400 hover:text-zinc-200" : "text-zinc-500 hover:text-zinc-900"
+                  }`}
+                >
+                  Split View
                 </button>
               </div>
 
@@ -2659,15 +2874,37 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
                       <span className="text-[9px] text-zinc-500 font-mono hidden sm:inline">• Main Source Code</span>
                     </div>
                     <div className="flex items-center gap-2">
+                      {isEditingCode && (
+                        <>
+                          <button
+                            onClick={handleUndoEdit}
+                            className={`text-[10px] font-mono font-bold px-2.5 py-1 rounded-lg border transition-all cursor-pointer flex items-center gap-1 shadow-sm active:scale-95 ${
+                              isDark 
+                                ? "bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800" 
+                                : "bg-white border-zinc-200 text-zinc-600 hover:text-zinc-850 hover:bg-zinc-50"
+                            }`}
+                            title="Undo changes to backup"
+                          >
+                            <span>↩️ Undo</span>
+                          </button>
+                          <button
+                            onClick={handleSaveEdit}
+                            className="text-[10px] font-mono font-bold px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white border border-emerald-600 transition-all cursor-pointer flex items-center gap-1 shadow-sm active:scale-95"
+                            title="Save current code manually"
+                          >
+                            <span>💾 Save</span>
+                          </button>
+                        </>
+                      )}
                       <button
                         onClick={() => setIsEditingCode(!isEditingCode)}
                         className={`text-[10px] font-mono font-bold px-2.5 py-1 rounded-lg border transition-all cursor-pointer flex items-center gap-1 shadow-sm active:scale-95 ${
                           isEditingCode
-                            ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20"
-                            : "bg-amber-500/10 text-amber-500 border-amber-500/30 hover:bg-amber-500/20"
+                            ? "bg-amber-500/15 text-amber-500 border-amber-500/30 hover:bg-amber-500/25"
+                            : "bg-emerald-500/15 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/25"
                         }`}
                       >
-                        {isEditingCode ? "💾 View" : "✏️ Edit"}
+                        {isEditingCode ? "👁️ View" : "✏️ Edit"}
                       </button>
                       <span className="text-[9px] font-mono text-emerald-500 bg-emerald-500/10 px-2 py-1 rounded-full border border-emerald-500/25 flex items-center gap-1 shrink-0 hidden sm:flex">
                         <span className="h-1.5 w-1.5 bg-emerald-500 rounded-full animate-ping" />
@@ -2678,7 +2915,13 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
                 )}
 
                 <div className="flex-1 flex font-mono overflow-hidden relative">
-                  <div className={`w-10 select-none text-right pr-2 pt-4 text-xs font-mono border-r transition-colors duration-200 ${isDark ? "border-zinc-850 bg-zinc-950 text-zinc-600" : "border-zinc-200 bg-zinc-100 text-zinc-400"}`}>
+                  {/* Line numbers scrollbar synchronized */}
+                  <div 
+                    ref={lineNumbersScrollRef}
+                    className={`w-12 select-none text-right pr-3 pt-4 text-sm font-mono border-r transition-colors duration-200 overflow-y-hidden shrink-0 ${
+                      isDark ? "border-zinc-850 bg-zinc-950 text-zinc-600" : "border-zinc-200 bg-zinc-50/50 text-zinc-400"
+                    }`}
+                  >
                     {Array.from({ length: Math.max(activeFile.content.split("\n").length, 30) }).map((_, i) => (
                       <div key={i} className="h-6 leading-6 select-none">{i + 1}</div>
                     ))}
@@ -2686,23 +2929,224 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
 
                   {isEditingCode ? (
                     <textarea
+                      ref={editorScrollRef}
+                      onScroll={handleEditorScroll}
                       value={activeFile.content}
                       onChange={handleEditorChange}
-                      className={`flex-1 h-full p-4 text-xs font-mono focus:outline-none resize-none leading-6 leading-relaxed transition-colors duration-200 ${isDark ? "bg-zinc-950 text-zinc-200 focus:bg-zinc-950" : "bg-white text-zinc-850 focus:bg-white"}`}
+                      className={`flex-1 h-full p-4 text-sm font-mono focus:outline-none resize-none leading-6 transition-colors duration-200 ${isDark ? "bg-zinc-950 text-zinc-200 focus:bg-zinc-950" : "bg-white text-zinc-850 focus:bg-white"}`}
                       spellCheck="false"
                       placeholder="Write code here..."
                     />
                   ) : (
                     <div 
+                      ref={viewerScrollRef}
+                      onScroll={handleViewerScroll}
                       onClick={() => setIsEditingCode(true)}
-                      className={`flex-1 h-full overflow-y-auto pt-4 pb-12 text-xs font-mono transition-colors duration-200 cursor-text select-text scrollbar-thin ${
-                        isDark ? "bg-zinc-950 text-zinc-350" : "bg-white text-zinc-800"
+                      className={`flex-1 h-full overflow-y-auto pt-4 pb-12 px-4 text-sm font-mono transition-colors duration-200 cursor-text select-text scrollbar-thin ${
+                        isDark ? "bg-zinc-950 text-zinc-300" : "bg-white text-zinc-800"
                       }`}
                       title="Click to edit code"
                     >
                       {highlightCode(activeFile.content, activeFile.path)}
                     </div>
                   )}
+                </div>
+              </div>
+
+            </div>
+          )}
+
+          {activeRightTab === "split" && (
+            <div className="flex-1 flex overflow-hidden min-h-0">
+              
+              {/* Left Side: Code Editor (takes remaining width) */}
+              <div className="flex-1 flex overflow-hidden min-h-0">
+                {/* File List */}
+                {!isFullscreen && (
+                  <div className={`w-44 border-r flex flex-col shrink-0 transition-colors duration-200 ${isDark ? "border-zinc-850 bg-zinc-950/60" : "border-zinc-200 bg-zinc-50"}`}>
+                    <div className={`p-2.5 border-b flex items-center justify-between transition-colors duration-200 ${isDark ? "border-zinc-850 bg-zinc-950/25" : "border-zinc-200 bg-zinc-100/50"}`}>
+                      <span className="text-[9px] font-bold uppercase tracking-wider text-zinc-500">Files</span>
+                      <div className="flex items-center gap-1">
+                        <input
+                          ref={fileUploadRef}
+                          type="file"
+                          onChange={handleDeviceFileUpload}
+                          className="hidden"
+                          accept=".html,.js,.css,.json,.txt,.md,image/*"
+                        />
+                        <button
+                          onClick={() => fileUploadRef.current?.click()}
+                          className="p-1 rounded hover:bg-amber-500/10 text-amber-500 transition-colors"
+                          title="Upload File"
+                        >
+                          <FileUp className="h-3 w-3" />
+                        </button>
+                        <button
+                          onClick={() => setShowNewFileInput(!showNewFileInput)}
+                          className="p-1 rounded hover:bg-amber-500/10 text-amber-500 transition-colors"
+                          title="New File"
+                        >
+                          <Plus className="h-3 w-3" />
+                        </button>
+                      </div>
+                    </div>
+
+                    {showNewFileInput && (
+                      <div className={`p-2 border-b flex flex-col gap-1.5 transition-colors duration-200 ${isDark ? "border-zinc-850 bg-amber-500/5" : "border-zinc-200 bg-amber-500/5"}`}>
+                        <input
+                          type="text"
+                          value={newFileName}
+                          onChange={(e) => setNewFileName(e.target.value)}
+                          placeholder="style.css..."
+                          className={`w-full px-2 py-1 text-[10px] rounded border focus:outline-none focus:border-amber-500 font-mono transition-colors ${
+                            isDark ? "border-zinc-800 bg-zinc-900 text-zinc-200" : "border-zinc-200 bg-white text-zinc-800"
+                          }`}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") handleAddFile();
+                          }}
+                        />
+                        <div className="flex justify-end gap-1">
+                          <button
+                            onClick={() => setShowNewFileInput(false)}
+                            className="px-1.5 py-0.5 text-[9px] rounded text-zinc-400 hover:bg-zinc-200"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            onClick={handleAddFile}
+                            className="px-2 py-0.5 text-[9px] bg-amber-500 text-white rounded font-semibold"
+                          >
+                            Add
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="flex-1 overflow-y-auto p-1.5 space-y-0.5">
+                      {files.map(file => {
+                        const isActive = file.path === activeFilePath;
+                        const isHtml = file.path.endsWith(".html");
+                        const isJs = file.path.endsWith(".js");
+                        const isJson = file.path.endsWith(".json");
+                        
+                        return (
+                          <div
+                            key={file.path}
+                            className={`group w-full flex items-center justify-between px-2 py-1 rounded-lg text-[11px] font-mono cursor-pointer border ${
+                              isActive 
+                                ? "bg-amber-500/10 text-amber-400 border-amber-500/15" 
+                                : isDark 
+                                  ? "border-transparent text-zinc-400 hover:bg-zinc-900/60" 
+                                  : "border-transparent text-zinc-600 hover:bg-zinc-150"
+                            }`}
+                            onClick={() => setActiveFilePath(file.path)}
+                          >
+                            <span className="truncate">{file.path}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Code Editor */}
+                <div className="flex-1 flex flex-col min-w-0">
+                  <div className={`px-4 py-2 border-b flex items-center justify-between shrink-0 transition-colors duration-200 ${isDark ? "border-zinc-850 bg-zinc-950" : "border-zinc-200 bg-white"}`}>
+                    <span className="text-[11px] font-bold font-mono px-2 py-0.5 rounded bg-zinc-500/10 text-amber-500 border border-amber-500/20">
+                      {activeFilePath}
+                    </span>
+                    <div className="flex items-center gap-2">
+                      {isEditingCode && (
+                        <>
+                          <button
+                            onClick={handleUndoEdit}
+                            className={`text-[10px] font-mono font-bold px-2.5 py-1 rounded-lg border transition-all cursor-pointer flex items-center gap-1 ${
+                              isDark ? "bg-zinc-900 border-zinc-800 text-zinc-400 hover:bg-zinc-800" : "bg-white border-zinc-200 text-zinc-600 hover:bg-zinc-50"
+                            }`}
+                          >
+                            <span>Undo</span>
+                          </button>
+                          <button
+                            onClick={handleSaveEdit}
+                            className="text-[10px] font-mono font-bold px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 text-white border border-emerald-600 rounded-lg transition-all"
+                          >
+                            <span>Save</span>
+                          </button>
+                        </>
+                      )}
+                      <button
+                        onClick={() => setIsEditingCode(!isEditingCode)}
+                        className={`text-[10px] font-mono font-bold px-2.5 py-1 rounded-lg border transition-all ${
+                          isEditingCode ? "bg-amber-500/15 text-amber-500 border-amber-500/30" : "bg-emerald-500/15 text-emerald-400 border-emerald-500/30"
+                        }`}
+                      >
+                        {isEditingCode ? "👁️ View" : "✏️ Edit"}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="flex-1 flex font-mono overflow-hidden relative">
+                    <div 
+                      ref={lineNumbersScrollRef}
+                      className={`w-12 select-none text-right pr-3 pt-4 text-sm font-mono border-r transition-colors duration-200 overflow-y-hidden shrink-0 ${
+                        isDark ? "border-zinc-850 bg-zinc-950 text-zinc-600" : "border-zinc-200 bg-zinc-50/50 text-zinc-400"
+                      }`}
+                    >
+                      {Array.from({ length: Math.max(activeFile.content.split("\n").length, 30) }).map((_, i) => (
+                        <div key={i} className="h-6 leading-6 select-none">{i + 1}</div>
+                      ))}
+                    </div>
+
+                    {isEditingCode ? (
+                      <textarea
+                        ref={editorScrollRef}
+                        onScroll={handleEditorScroll}
+                        value={activeFile.content}
+                        onChange={handleEditorChange}
+                        className={`flex-1 h-full p-4 text-sm font-mono focus:outline-none resize-none leading-6 transition-colors duration-200 ${isDark ? "bg-zinc-950 text-zinc-200" : "bg-white text-zinc-850"}`}
+                        spellCheck="false"
+                      />
+                    ) : (
+                      <div 
+                        ref={viewerScrollRef}
+                        onScroll={handleViewerScroll}
+                        onClick={() => setIsEditingCode(true)}
+                        className={`flex-1 h-full overflow-y-auto pt-4 pb-12 px-4 text-sm font-mono transition-colors duration-200 cursor-text select-text scrollbar-thin ${
+                          isDark ? "bg-zinc-950 text-zinc-300" : "bg-white text-zinc-800"
+                        }`}
+                      >
+                        {highlightCode(activeFile.content, activeFile.path)}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Resizable handle */}
+              <div
+                onMouseDown={startResizingPreview}
+                className={`w-1 h-full cursor-col-resize hover:bg-amber-500/80 bg-zinc-800/20 hover:w-1.5 transition-all z-20 shrink-0 select-none flex items-center justify-center relative group ${
+                  isResizingPreview ? "bg-amber-500 w-1.5" : ""
+                }`}
+              >
+                <div className="absolute top-1/2 -translate-y-1/2 w-1.5 h-10 rounded bg-zinc-700/50 group-hover:bg-amber-500/80" />
+              </div>
+
+              {/* Right Side: Live Preview (takes previewWidth px) */}
+              <div 
+                style={{ width: `${previewWidth}px` }}
+                className="h-full shrink-0 flex flex-col relative border-l border-zinc-800/25 bg-[#0d0d10] min-w-[280px]"
+              >
+                <div className="flex-1 flex items-center justify-center p-4 overflow-hidden relative">
+                  <div className="w-full h-full rounded-xl bg-slate-950 border border-zinc-850 shadow-2xl overflow-hidden flex flex-col">
+                    <iframe
+                      key={previewKey}
+                      src={getCombinedPreviewBlob()}
+                      className="w-full h-full border-none bg-slate-950"
+                      sandbox="allow-scripts allow-same-origin allow-popups"
+                      title="Split Preview"
+                    />
+                  </div>
                 </div>
               </div>
 
