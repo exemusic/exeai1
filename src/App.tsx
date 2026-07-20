@@ -58,43 +58,13 @@ import { ExeCodeWorkspace } from "./components/ExeCodeWorkspace";
 import { PublicProjectView } from "./components/PublicProjectView";
 
 const ExeChatLogo = ({ className = "h-8 w-8", size = 32 }: { className?: string; size?: number }) => (
-  <svg 
-    width={size} 
-    height={size} 
-    viewBox="0 0 100 100" 
-    className={className}
-    fill="none" 
-    xmlns="http://www.w3.org/2000/svg"
-    style={{ display: "inline-block", verticalAlign: "middle" }}
-  >
-    <defs>
-      <linearGradient id="exeGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-        <stop offset="0%" stopColor="#0f172a" />
-        <stop offset="100%" stopColor="#020617" />
-      </linearGradient>
-      <linearGradient id="glowGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-        <stop offset="0%" stopColor="#4f46e5" />
-        <stop offset="50%" stopColor="#06b6d4" />
-        <stop offset="100%" stopColor="#10b981" />
-      </linearGradient>
-    </defs>
-    <rect x="2" y="2" width="96" height="96" rx="24" fill="url(#exeGrad)" stroke="#1e293b" strokeWidth="4" />
-    <path d="M40 76 L32 88 L52 82 Z" fill="url(#glowGrad)" />
-    <rect x="20" y="20" width="60" height="52" rx="14" fill="url(#glowGrad)" />
-    <path 
-      d="M34 36L46 46L34 56" 
-      stroke="#ffffff" 
-      strokeWidth="7" 
-      strokeLinecap="round" 
-      strokeLinejoin="round" 
-    />
-    <path 
-      d="M52 56H66" 
-      stroke="#ffffff" 
-      strokeWidth="7" 
-      strokeLinecap="round" 
-    />
-  </svg>
+  <img 
+    src="/exechat.png" 
+    alt="ExeChat Logo" 
+    className={`${className} object-contain`} 
+    style={{ width: size, height: size, display: "inline-block", verticalAlign: "middle" }}
+    referrerPolicy="no-referrer"
+  />
 );
 
 const notifySoundUrl = new URL("../Sound/notify.mp3", import.meta.url).href;
@@ -2508,12 +2478,7 @@ export default function App() {
           }}
           className="w-full max-w-[400px] rounded-2xl border border-zinc-800 bg-zinc-900/40 p-8 sm:p-10 shadow-xl z-10 mx-4 flex flex-col items-center text-center"
         >
-          <div className="mb-6 select-none flex justify-center">
-            <div className="h-16 w-16 rounded-2xl bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-200 shadow-md relative overflow-hidden group">
-              <div className="absolute inset-0 bg-gradient-to-tr from-indigo-500/10 to-emerald-500/10 opacity-50" />
-              <ExeChatLogo className="h-10 w-10 relative z-10 transition-transform duration-300 group-hover:scale-105" size={40} />
-            </div>
-          </div>
+
 
           <div className="mb-8 select-none">
             <h2 className="text-xl font-semibold tracking-tight text-white">
