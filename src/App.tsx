@@ -5524,6 +5524,8 @@ export default function App() {
                 curTheme={curTheme}
                 onClose={() => setShowExeCode(false)}
                 defaultModelId={selectedModelId}
+                userEmail={userEmail}
+                userId={userId}
               />
             )}
           </AnimatePresence>

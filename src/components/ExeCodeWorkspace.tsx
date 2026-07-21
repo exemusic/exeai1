@@ -85,99 +85,23 @@ const DEFAULT_FILES: VirtualFile[] = [
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Hello World!</title>
-  <!-- Tailwind CSS CDN -->
-  <script src="https://cdn.tailwindcss.com"></script>
-  <!-- Google Fonts -->
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;600;800&display=swap" rel="stylesheet">
-  <style>
-    body {
-      font-family: 'Plus Jakarta Sans', sans-serif;
-    }
-    @keyframes gradient {
-      0% { background-position: 0% 50%; }
-      50% { background-position: 100% 50%; }
-      100% { background-position: 0% 50%; }
-    }
-    .animate-gradient {
-      background-size: 200% 200%;
-      animation: gradient 6s ease infinite;
-    }
-  </style>
+  <title>Hello World</title>
 </head>
-<body class="bg-[#0b0f19] text-slate-100 min-h-screen flex flex-col justify-between overflow-hidden relative">
-
-  <!-- Glow effects -->
-  <div class="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/3 w-[500px] h-[500px] bg-gradient-to-tr from-sky-500/10 to-indigo-500/10 rounded-full blur-3xl pointer-events-none"></div>
-
-  <!-- Header -->
-  <header class="p-6 flex justify-between items-center z-10 max-w-7xl mx-auto w-full">
-    <div class="flex items-center gap-2">
-      <div class="w-6 h-6 rounded-full bg-gradient-to-tr from-sky-400 to-indigo-500 animate-pulse"></div>
-      <span class="font-bold tracking-tight text-sm text-slate-300">ExeCode Starter</span>
-    </div>
-    <span class="text-[10px] font-mono px-2.5 py-1 bg-sky-500/10 text-sky-400 rounded-full border border-sky-500/20">
-      Template Loaded
-    </span>
-  </header>
-
-  <!-- Main Content -->
-  <main class="flex-1 flex flex-col items-center justify-center p-8 z-10">
-    <div class="max-w-md text-center space-y-6">
-      <h1 class="text-4xl md:text-5xl font-extrabold tracking-tight animate-fade-in">
-        <span class="bg-gradient-to-r from-sky-400 via-indigo-400 to-purple-400 bg-clip-text text-transparent animate-gradient">
-          Hello, World!
-        </span>
-      </h1>
-      
-      <p class="text-slate-400 text-sm leading-relaxed max-w-sm mx-auto">
-        A clean, beautiful starter web template with high-contrast colors, modern gradients, and smooth responsiveness.
-      </p>
-
-      <div class="pt-4">
-        <button id="clickBtn" class="px-5 py-2.5 bg-gradient-to-r from-sky-500 to-indigo-500 hover:from-sky-400 hover:to-indigo-400 text-white rounded-xl text-xs font-semibold tracking-wider transition-all duration-300 shadow-lg shadow-indigo-500/20 hover:shadow-indigo-500/30 active:scale-95">
-          Explore Universe
-        </button>
-      </div>
-    </div>
-  </main>
-
-  <!-- Footer -->
-  <footer class="p-6 text-center text-[10px] text-slate-500 z-10 max-w-7xl mx-auto w-full">
-    &copy; 2026 Hello World Project. Built with ExeCode.
-  </footer>
-
+<body>
+  <h1>Hello, World!</h1>
+  <button id="clickBtn">Click Me</button>
   <script src="app.js"></script>
 </body>
 </html>`
   },
   {
     path: "app.js",
-    content: `console.log("Welcome to your Hello World App!");
+    content: `console.log("Hello World app loaded!");
 
 const button = document.getElementById("clickBtn");
 if (button) {
   button.addEventListener("click", () => {
-    // Elegant floating greeting ripple effect
-    const banner = document.createElement("div");
-    banner.className = "fixed top-8 left-1/2 transform -translate-x-1/2 bg-slate-900/90 border border-slate-800 backdrop-blur-md px-6 py-3 rounded-2xl text-xs font-semibold text-sky-400 shadow-2xl flex items-center gap-2 transition-all duration-500 opacity-0 -translate-y-2";
-    banner.innerHTML = \`
-      <span class="w-2 h-2 bg-sky-400 rounded-full animate-ping"></span>
-      <span>Greetings from the ExeCode Universe! 🚀</span>
-    \`;
-    
-    document.body.appendChild(banner);
-    
-    // Trigger entry transition
-    setTimeout(() => {
-      banner.classList.remove("opacity-0", "-translate-y-2");
-    }, 50);
-    
-    // Dismiss after 3 seconds
-    setTimeout(() => {
-      banner.classList.add("opacity-0", "-translate-y-2");
-      setTimeout(() => banner.remove(), 500);
-    }, 3000);
+    alert("Button clicked!");
   });
 }`
   }
@@ -1631,8 +1555,8 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId, us
       const headers: Record<string, string> = {
         "Content-Type": "application/json"
       };
-      if (supabaseUrl) headers["x-supabase-url"] = supabaseUrl;
-      if (supabaseAnonKey) headers["x-supabase-key"] = supabaseAnonKey;
+      if (supabaseUrl && supabaseUrl.trim()) headers["x-supabase-url"] = supabaseUrl.trim();
+      if (supabaseAnonKey && supabaseAnonKey.trim()) headers["x-supabase-key"] = supabaseAnonKey.trim();
 
       const response = await fetch("/api/supabase/upload", {
         method: "POST",
@@ -1661,8 +1585,8 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId, us
       const headers: Record<string, string> = {
         "Content-Type": "application/json"
       };
-      if (supabaseUrl) headers["x-supabase-url"] = supabaseUrl;
-      if (supabaseAnonKey) headers["x-supabase-key"] = supabaseAnonKey;
+      if (supabaseUrl && supabaseUrl.trim()) headers["x-supabase-url"] = supabaseUrl.trim();
+      if (supabaseAnonKey && supabaseAnonKey.trim()) headers["x-supabase-key"] = supabaseAnonKey.trim();
 
       const response = await fetch("/api/supabase/load", {
         method: "POST",
@@ -1709,8 +1633,8 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId, us
     const headers: Record<string, string> = {
       "Content-Type": "application/json"
     };
-    if (supabaseUrl) headers["x-supabase-url"] = supabaseUrl;
-    if (supabaseAnonKey) headers["x-supabase-key"] = supabaseAnonKey;
+    if (supabaseUrl && supabaseUrl.trim()) headers["x-supabase-url"] = supabaseUrl.trim();
+    if (supabaseAnonKey && supabaseAnonKey.trim()) headers["x-supabase-key"] = supabaseAnonKey.trim();
 
     const response = await fetch("/api/supabase/delete", {
       method: "POST",
@@ -1731,8 +1655,8 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId, us
       const headers: Record<string, string> = {
         "Content-Type": "application/json"
       };
-      if (supabaseUrl) headers["x-supabase-url"] = supabaseUrl;
-      if (supabaseAnonKey) headers["x-supabase-key"] = supabaseAnonKey;
+      if (supabaseUrl && supabaseUrl.trim()) headers["x-supabase-url"] = supabaseUrl.trim();
+      if (supabaseAnonKey && supabaseAnonKey.trim()) headers["x-supabase-key"] = supabaseAnonKey.trim();
 
       await fetch("/api/supabase/delete", {
         method: "POST",

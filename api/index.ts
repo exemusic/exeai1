@@ -628,18 +628,38 @@ app.post("/api/supabase/upload", async (req, res) => {
 
     const supabase = createClient(url, key);
 
+    // Save the combined project files as a single JSON file first for ultimate speed and reliability on reload!
+    try {
+      const jsonPath = `projects/${projectName}/project.json`;
+      const jsonBuffer = Buffer.from(JSON.stringify({ files }), "utf-8");
+      await supabase.storage
+        .from(bucket)
+        .upload(jsonPath, jsonBuffer, {
+          contentType: "application/json",
+          upsert: true
+        });
+    } catch (jsonErr) {
+      console.warn("Supabase combined json upload step warning:", jsonErr);
+    }
+
     try {
       const folderPath = `projects/${projectName}`;
       const { data: existingFiles } = await supabase.storage.from(bucket).list(folderPath);
       if (existingFiles && existingFiles.length > 0) {
-        const filesToDelete = existingFiles.map(f => `${folderPath}/${f.name}`);
-        await supabase.storage.from(bucket).remove(filesToDelete);
+        // Exclude the project.json we just uploaded from deletion
+        const filesToDelete = existingFiles
+          .filter(f => f.name !== "project.json")
+          .map(f => `${folderPath}/${f.name}`);
+        if (filesToDelete.length > 0) {
+          await supabase.storage.from(bucket).remove(filesToDelete);
+        }
       }
     } catch (cleanErr) {
       console.warn("Supabase clean up step warning:", cleanErr);
     }
 
     for (const file of files) {
+      if (file.path === "project.json") continue; // Avoid conflicts
       const filePath = `projects/${projectName}/${file.path}`;
       const buffer = Buffer.from(file.content, "utf-8");
       
@@ -678,6 +698,24 @@ app.post("/api/supabase/load", async (req, res) => {
     const supabase = createClient(url, key);
     const folderPath = `projects/${projectName}`;
     
+    // 1. Try loading from the atomic project.json file first
+    try {
+      const { data, error: downloadError } = await supabase.storage
+        .from(bucket)
+        .download(`${folderPath}/project.json`);
+
+      if (!downloadError && data) {
+        const jsonContent = await data.text();
+        const parsed = JSON.parse(jsonContent);
+        if (parsed && Array.isArray(parsed.files) && parsed.files.length > 0) {
+          return res.json({ success: true, files: parsed.files });
+        }
+      }
+    } catch (err) {
+      console.warn("Failed to load from single project.json file, falling back to multi-file download:", err);
+    }
+
+    // 2. Fallback: List and download individual files (backward-compatible)
     const { data: fileList, error: listError } = await supabase.storage
       .from(bucket)
       .list(folderPath);
@@ -689,6 +727,7 @@ app.post("/api/supabase/load", async (req, res) => {
 
     const loadedFiles = [];
     for (const item of fileList) {
+      if (item.name === "project.json") continue; // Skip project.json metadata in fallback download
       const filePath = `${folderPath}/${item.name}`;
       const { data, error: downloadError } = await supabase.storage
         .from(bucket)
