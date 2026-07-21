@@ -38,13 +38,13 @@ html {
 
 @media (min-width: 1024px) {
   html {
-    font-size: 15px; /* Slightly smaller layout sizing on PC so it is more compact */
+    font-size: 13.8px; /* Slightly smaller layout sizing on PC so it is more compact */
   }
 }
 
 @media (min-width: 1440px) {
   html {
-    font-size: 15.5px;
+    font-size: 14.2px;
   }
 }
 

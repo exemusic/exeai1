@@ -52,7 +52,9 @@ import {
   EyeOff,
   ShieldCheck,
   Upload,
-  Loader2
+  Loader2,
+  Bug,
+  Lightbulb
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { Message, ChatSession, SystemPreset, ModelOption } from "./types";
@@ -487,6 +489,7 @@ export default function App() {
 
   // --- FEEDBACK & ADMIN SYSTEM STATES ---
   const [feedbackMessage, setFeedbackMessage] = useState("");
+  const [feedbackCategory, setFeedbackCategory] = useState("Suggestion");
   const [feedbackFile, setFeedbackFile] = useState<File | null>(null);
   const [feedbackSubmitting, setFeedbackSubmitting] = useState(false);
   const [feedbackSuccess, setFeedbackSuccess] = useState<string | null>(null);
@@ -1106,6 +1109,22 @@ export default function App() {
     };
   }, []);
 
+  useEffect(() => {
+    if (userEmail) {
+      fetch("/api/cookie/set", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: "session_user_email", value: userEmail, maxAgeDays: 30 })
+      }).catch(err => console.warn("Failed to set encrypted session cookie:", err));
+    } else {
+      fetch("/api/cookie/clear", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: "session_user_email" })
+      }).catch(err => console.warn("Failed to clear encrypted session cookie:", err));
+    }
+  }, [userEmail]);
+
   const scrollToBottom = (behavior: ScrollBehavior = "smooth") => {
     setTimeout(() => {
       chatBottomRef.current?.scrollIntoView({ behavior });
@@ -1521,6 +1540,7 @@ export default function App() {
         };
       }
 
+      const formattedMessage = `[Category: ${feedbackCategory}] ${feedbackMessage}`;
       const res = await fetch("/api/feedback/submit", {
         method: "POST",
         headers: {
@@ -1528,7 +1548,7 @@ export default function App() {
         },
         body: JSON.stringify({
           email: userEmail || "anonymous@gmail.com",
-          message: feedbackMessage,
+          message: formattedMessage,
           attachment: attachmentPayload
         })
       });
@@ -1574,6 +1594,31 @@ export default function App() {
     }
   };
 
+  const handleFeedbackDelete = async (feedbackId: string) => {
+    if (!window.confirm("Are you sure you want to permanently delete this feedback and its associated files from Supabase?")) {
+      return;
+    }
+    try {
+      const res = await fetch("/api/feedback/delete", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          email: userEmail,
+          feedbackId
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to delete feedback.");
+      }
+      loadAdminFeedbacks();
+    } catch (err: any) {
+      alert(err.message || "Failed to delete feedback.");
+    }
+  };
+
   const handleCompleteRegistrationWithChosenName = (finalChosenName: string) => {
     const finalName = finalChosenName.trim() || googleDefaultName || "User";
     setUserName(finalName);
@@ -1615,7 +1660,7 @@ export default function App() {
   };
 
   const handleClaimDailyCredits = async () => {
-    setErrorText("Daily credits are not required in the ExeChat Premium version (Unlimited Credits).");
+    setErrorText("You currently have unlimited daily credits.");
   };
 
   const handleSaveUsername = () => {
@@ -2673,6 +2718,20 @@ export default function App() {
   };
 
   const renderFeedbackForm = () => {
+    const categories = [
+      { id: "Suggestion", label: "Suggestion", icon: Lightbulb, color: "text-amber-500 bg-amber-500/10 border-amber-500/20" },
+      { id: "Bug Report", label: "Bug Report", icon: Bug, color: "text-red-500 bg-red-500/10 border-red-500/20" },
+      { id: "Question", label: "Question", icon: HelpCircle, color: "text-blue-500 bg-blue-500/10 border-blue-500/20" },
+      { id: "Other", label: "Other", icon: MessageSquare, color: "text-zinc-500 bg-zinc-500/10 border-zinc-500/20" }
+    ];
+
+    const placeholders: Record<string, string> = {
+      "Suggestion": "What is your idea or custom feature request? Write here...",
+      "Bug Report": "What went wrong? Describe the bug, steps to reproduce, or attach a screenshot/log...",
+      "Question": "What would you like to ask or clarify about ExeChat?...",
+      "Other": "Tell us what you're thinking..."
+    };
+
     return (
       <div className="space-y-6 md:space-y-8 max-h-[75vh] overflow-y-auto pr-1">
         <div>
@@ -2700,14 +2759,53 @@ export default function App() {
             </div>
           )}
 
-          <div className="space-y-2">
+          {/* Category Toggle Cards */}
+          <div className="space-y-2.5">
             <label className="text-xs font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-              Message <span className="text-red-500">*</span>
+              Select Category <span className="text-red-500">*</span>
             </label>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {categories.map((cat) => {
+                const IconComp = cat.icon;
+                const isActive = feedbackCategory === cat.id;
+                return (
+                  <button
+                    key={cat.id}
+                    type="button"
+                    onClick={() => setFeedbackCategory(cat.id)}
+                    className={`p-3.5 rounded-2xl border flex flex-col items-center justify-center gap-2 text-center transition-all duration-300 cursor-pointer ${
+                      isActive
+                        ? `${cat.color} scale-[1.03] ring-2 ring-amber-500/10`
+                        : isDark
+                          ? "bg-zinc-950 border-zinc-900 text-zinc-400 hover:border-zinc-800 hover:text-zinc-200"
+                          : "bg-zinc-50 border-zinc-200 text-zinc-600 hover:border-zinc-300 hover:text-zinc-800"
+                    }`}
+                  >
+                    <IconComp className="h-5 w-5" />
+                    <span className="text-xs font-bold">{cat.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+                Message <span className="text-red-500">*</span>
+              </label>
+              <span className={`text-[10px] font-mono ${feedbackMessage.length > 1800 ? "text-red-500 font-bold" : "text-zinc-500"}`}>
+                {feedbackMessage.length} / 2000
+              </span>
+            </div>
             <textarea
               value={feedbackMessage}
-              onChange={(e) => setFeedbackMessage(e.target.value)}
-              placeholder="Tell us what you're thinking..."
+              onChange={(e) => {
+                if (e.target.value.length <= 2000) {
+                  setFeedbackMessage(e.target.value);
+                }
+              }}
+              placeholder={placeholders[feedbackCategory]}
               rows={4}
               className={`w-full rounded-2xl px-4 py-3.5 text-sm focus:outline-none border focus:ring-2 focus:ring-amber-500/20 ${
                 isDark 
@@ -2793,16 +2891,20 @@ export default function App() {
             <button
               onClick={handleSendFeedback}
               disabled={feedbackSubmitting || !feedbackMessage.trim()}
-              className="px-6 py-3.5 rounded-2xl text-sm font-bold bg-amber-500 text-zinc-950 hover:bg-amber-400 active:scale-98 transition-all flex items-center gap-2 cursor-pointer disabled:opacity-40 disabled:pointer-events-none"
+              className={`px-6 py-3 rounded-2xl text-xs font-bold flex items-center gap-2 transition-all duration-300 cursor-pointer ${
+                feedbackSubmitting || !feedbackMessage.trim()
+                  ? "bg-zinc-500/10 text-zinc-500 cursor-not-allowed"
+                  : "bg-amber-500 hover:bg-amber-400 text-zinc-950 active:scale-95 shadow-md hover:shadow-lg"
+              }`}
             >
               {feedbackSubmitting ? (
                 <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Sending...
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  Submitting...
                 </>
               ) : (
                 <>
-                  <Send className="h-4 w-4" />
+                  <Send className="h-3.5 w-3.5" />
                   Submit Feedback
                 </>
               )}
@@ -3353,13 +3455,15 @@ export default function App() {
         {/* UNIFIED DESKTOP SIDEBAR (GEMINI-LIKE EXPANDED/COLLAPSED) */}
         <motion.aside 
           animate={{ 
-            width: isDesktopSidebarOpen ? 210 : 54
+            width: isDesktopSidebarOpen ? 240 : 54
           }}
           transition={{ type: "spring", stiffness: 260, damping: 26 }}
-          className={`hidden md:flex flex-col h-full shrink-0 ${curTheme.sidebarBg} select-none z-20 overflow-hidden border-r ${curTheme.border}`}
+          className={`hidden md:flex flex-col h-full shrink-0 ${
+            isDesktopSidebarOpen ? curTheme.sidebarBg : isDark ? "bg-black" : "bg-zinc-100"
+          } select-none z-20 overflow-hidden border-r ${curTheme.border}`}
         >
           {isDesktopSidebarOpen ? (
-            <div className="w-[210px] h-full flex flex-col overflow-hidden">
+            <div className="w-[240px] h-full flex flex-col overflow-hidden">
               {renderSidebarContent(false)}
             </div>
           ) : (
@@ -4378,7 +4482,7 @@ export default function App() {
                         </button>
                         <div>
                           <h2 className="text-lg font-bold tracking-tight">Settings</h2>
-                          <p className={`text-[11px] ${isDark ? "text-zinc-550" : "text-teal-100"}`}>ExeChat Premium Account</p>
+                          <p className={`text-[11px] ${isDark ? "text-zinc-550" : "text-teal-100"}`}>ExeChat Account</p>
                         </div>
                       </div>
 
@@ -4399,9 +4503,6 @@ export default function App() {
                           <div className="flex-1 min-w-0">
                             <h3 className={`text-base font-bold truncate ${isDark ? "text-zinc-100" : "text-zinc-900"}`}>{userDisplayName || "Guest Profile"}</h3>
                             <p className="text-xs text-zinc-500 truncate mt-0.5">{userEmail || "Connected as guest offline"}</p>
-                            <span className="inline-flex items-center gap-1 text-[10px] text-amber-500 font-bold bg-amber-500/10 px-2 py-0.5 rounded-full mt-1.5">
-                              ★ Premium Member
-                            </span>
                           </div>
                           <ChevronRight className="h-5 w-5 text-zinc-500 shrink-0" />
                         </div>
@@ -4893,7 +4994,7 @@ export default function App() {
                                 <div>
                                   <div className="flex items-center gap-2">
                                     <span className="h-2.5 w-2.5 rounded-full bg-emerald-500 animate-pulse" />
-                                    <span className="text-base font-bold text-zinc-800 dark:text-zinc-200">Active Premium Connection</span>
+                                    <span className="text-base font-bold text-zinc-800 dark:text-zinc-200">Active Secure Connection</span>
                                   </div>
                                   <p className="text-sm text-zinc-500 mt-1 font-mono">{userEmail || "Offline Local Storage Mode"}</p>
                                 </div>

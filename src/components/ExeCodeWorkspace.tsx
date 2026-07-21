@@ -73,6 +73,8 @@ interface ExeCodeWorkspaceProps {
   curTheme: any;
   onClose: () => void;
   defaultModelId?: string;
+  userEmail?: string | null;
+  userId?: string | null;
 }
 
 const DEFAULT_FILES: VirtualFile[] = [
@@ -181,7 +183,7 @@ if (button) {
   }
 ];
 
-export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: ExeCodeWorkspaceProps) {
+export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId, userEmail, userId }: ExeCodeWorkspaceProps) {
   const [files, setFiles] = useState<VirtualFile[]>(() => {
     const saved = localStorage.getItem("execode_files");
     return saved ? JSON.parse(saved) : DEFAULT_FILES;
@@ -189,6 +191,9 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
   
   const [activeFilePath, setActiveFilePath] = useState<string>("index.html");
   const [projectName, setProjectName] = useState<string>(() => {
+    if (userEmail && !userEmail.includes("guest@exechat.local")) {
+      return "proj-" + userEmail.toLowerCase().replace(/[^a-zA-Z0-9]/g, "");
+    }
     let persistentId = localStorage.getItem("execode_persistent_project_id");
     if (!persistentId) {
       const existingName = localStorage.getItem("execode_project_name");
@@ -742,10 +747,13 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId }: 
     localStorage.setItem("execode_project_name", persistentId);
 
     const match = window.location.pathname.match(/^\/project\/([^/]+)/);
-    const targetProjectName = match ? decodeURIComponent(match[1]) : persistentId;
+    let targetProjectName = match ? decodeURIComponent(match[1]) : persistentId;
+    if (userEmail && !userEmail.includes("guest@exechat.local")) {
+      targetProjectName = "proj-" + userEmail.toLowerCase().replace(/[^a-zA-Z0-9]/g, "");
+    }
 
     setProjectName(targetProjectName);
-    if (!match) {
+    if (!match || (userEmail && !userEmail.includes("guest@exechat.local") && decodeURIComponent(match[1]) !== targetProjectName)) {
       window.history.pushState(null, "", `/project/${targetProjectName}`);
     }
 
