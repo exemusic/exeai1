@@ -65,6 +65,18 @@ import { MODEL_OPTIONS, SYSTEM_PRESETS, SUGGESTED_PROMPTS, GEMMA_TEMP_PRESETS } 
 import { ExeCodeWorkspace } from "./components/ExeCodeWorkspace";
 import { PublicProjectView } from "./components/PublicProjectView";
 
+const LANGUAGES = [
+  { code: "en", name: "English", nativeName: "English", flag: "🇺🇸" },
+  { code: "id", name: "Indonesian", nativeName: "Bahasa Indonesia", flag: "🇮🇩" },
+  { code: "ja", name: "Japanese", nativeName: "日本語", flag: "🇯🇵" },
+  { code: "ko", name: "Korean", nativeName: "한국어", flag: "🇰🇷" },
+  { code: "es", name: "Spanish", nativeName: "Español", flag: "🇪🇸" },
+  { code: "zh", name: "Mandarin Chinese", nativeName: "中文 (简体)", flag: "🇨🇳" },
+  { code: "fr", name: "French", nativeName: "Français", flag: "🇫🇷" },
+  { code: "de", name: "German", nativeName: "Deutsch", flag: "🇩🇪" },
+  { code: "ar", name: "Arabic", nativeName: "العربية", flag: "🇸🇦" }
+];
+
 const ExeChatLogo = ({ className = "h-8 w-8", size = 32 }: { className?: string; size?: number }) => (
   <img 
     src="/exechat.png" 
@@ -488,6 +500,12 @@ export default function App() {
   const [mobileSettingsPage, setMobileSettingsPage] = useState<"menu" | "akun" | "model" | "tampilan" | "ingatan" | "feedback">("menu");
 
   // --- FEEDBACK & ADMIN SYSTEM STATES ---
+  // --- LANGUAGE STATES ---
+  const [userLanguage, setUserLanguage] = useState<string>(() => {
+    return localStorage.getItem("exechat_user_language") || "";
+  });
+  const [showLanguagePopup, setShowLanguagePopup] = useState(false);
+
   const [feedbackMessage, setFeedbackMessage] = useState("");
   const [feedbackCategory, setFeedbackCategory] = useState("Suggestion");
   const [feedbackFile, setFeedbackFile] = useState<File | null>(null);
@@ -982,6 +1000,12 @@ export default function App() {
   }, [lastClaimAt]);
 
   useEffect(() => {
+    if (!authLoading && isLoggedIn && !userLanguage) {
+      setShowLanguagePopup(true);
+    }
+  }, [authLoading, isLoggedIn, userLanguage]);
+
+  useEffect(() => {
     if (currentSessionId) {
       localStorage.setItem("exeai_current_session_id", currentSessionId);
       const currentPath = window.location.pathname;
@@ -1076,6 +1100,10 @@ export default function App() {
               const userDb = loadData.data;
               setUserName(userDb.username || localStorage.getItem("exechat_username") || "");
               setUserDisplayName(userDb.displayName || localStorage.getItem("exechat_display_name") || "");
+              if (userDb.language) {
+                setUserLanguage(userDb.language);
+                localStorage.setItem("exechat_user_language", userDb.language);
+              }
               if (userDb.sessions && Array.isArray(userDb.sessions)) {
                 setSessions(userDb.sessions);
               }
@@ -1401,6 +1429,11 @@ export default function App() {
           localStorage.setItem("exechat_username", finalUsername);
           localStorage.setItem("exechat_display_name", finalDisplayName);
 
+          if (userDb.language) {
+            setUserLanguage(userDb.language);
+            localStorage.setItem("exechat_user_language", userDb.language);
+          }
+
           if (userDb.sessions && Array.isArray(userDb.sessions)) {
             setSessions(userDb.sessions);
           }
@@ -1490,7 +1523,8 @@ export default function App() {
     currentEmail: string | null = userEmail,
     currentName: string | null = userName,
     currentDisplayName: string | null = userDisplayName,
-    currentSessions: ChatSession[] = sessions
+    currentSessions: ChatSession[] = sessions,
+    currentLanguage: string = userLanguage
   ) => {
     if (!currentUid || currentUid.startsWith("guest_") || currentUid.startsWith("guest-")) return;
     try {
@@ -1502,11 +1536,21 @@ export default function App() {
           email: currentEmail,
           username: currentName,
           displayName: currentDisplayName,
-          sessions: currentSessions
+          sessions: currentSessions,
+          language: currentLanguage
         })
       });
     } catch (err) {
       console.error("Failed to automatically save to Supabase:", err);
+    }
+  };
+
+  const handleSelectLanguage = async (langCode: string) => {
+    setUserLanguage(langCode);
+    localStorage.setItem("exechat_user_language", langCode);
+    setShowLanguagePopup(false);
+    if (userId && !userId.startsWith("guest_")) {
+      await saveToSupabase(userId, userEmail, userName, userDisplayName, sessions, langCode);
     }
   };
 
@@ -1518,14 +1562,14 @@ export default function App() {
     const isImage = file.type.startsWith("image/");
     const isVideo = file.type.startsWith("video/");
     if (!isImage && !isVideo) {
-      setFeedbackError("Hanya file foto (gambar) atau video yang diperbolehkan.");
+      setFeedbackError("Only image (photo) or video files are allowed.");
       return false;
     }
     
     // Max size 50MB
     const maxSize = 50 * 1024 * 1024; // 52,428,800 bytes
     if (file.size > maxSize) {
-      setFeedbackError("Ukuran file maksimal adalah 50MB.");
+      setFeedbackError("Maximum file size is 50MB.");
       return false;
     }
     
@@ -1536,17 +1580,17 @@ export default function App() {
   const handleSendFeedback = async () => {
     const trimmedMsg = feedbackMessage.trim();
     if (!trimmedMsg) {
-      setFeedbackError("Silakan ketik pesan feedback sebelum mengirim.");
+      setFeedbackError("Please enter a feedback message before sending.");
       return;
     }
 
     if (trimmedMsg.length < 10) {
-      setFeedbackError("Pesan feedback minimal harus 10 karakter.");
+      setFeedbackError("Feedback message must be at least 10 characters.");
       return;
     }
 
     if (trimmedMsg.length > 2500) {
-      setFeedbackError("Pesan feedback maksimal adalah 2,500 karakter.");
+      setFeedbackError("Feedback message cannot exceed 2,500 characters.");
       return;
     }
 
@@ -1554,11 +1598,11 @@ export default function App() {
       const isImage = feedbackFile.type.startsWith("image/");
       const isVideo = feedbackFile.type.startsWith("video/");
       if (!isImage && !isVideo) {
-        setFeedbackError("Hanya file foto (gambar) atau video yang diperbolehkan.");
+        setFeedbackError("Only image (photo) or video files are allowed.");
         return;
       }
       if (feedbackFile.size > 50 * 1024 * 1024) {
-        setFeedbackError("Ukuran file maksimal adalah 50MB.");
+        setFeedbackError("Maximum file size is 50MB.");
         return;
       }
     }
@@ -2787,7 +2831,7 @@ export default function App() {
             Send Feedback & Suggestions
           </h3>
           <p className="text-sm text-zinc-500 mt-1 font-medium font-sans">
-            Kirimkan masukan Anda. Pesan minimal 10 karakter, maksimal 2,500 karakter. Anda hanya dapat melampirkan file foto atau video dengan ukuran maksimal 50MB.
+            Please submit your feedback. Your message must be between 10 and 2,500 characters. You may attach a photo or video file up to 50MB in size.
           </p>
         </div>
 
@@ -5085,6 +5129,42 @@ export default function App() {
                               )}
                             </div>
                           </div>
+
+                          <div className={`rounded-3xl p-6 md:p-8 border space-y-6 ${isDark ? "bg-zinc-900/10 border-transparent shadow-none" : "bg-white border-zinc-200/80 shadow-md"}`}>
+                            <div>
+                              <h4 className="text-base font-bold text-zinc-800 dark:text-zinc-200 flex items-center gap-2">
+                                <Globe className="h-5 w-5 text-amber-500" />
+                                Preferred Cognitive Language
+                              </h4>
+                              <p className="text-xs text-zinc-500 mt-1 font-medium">Select your preferred language. The system and AI responses will prioritize this choice.</p>
+                            </div>
+
+                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                              {LANGUAGES.map((lang) => {
+                                const isSelected = userLanguage === lang.code;
+                                return (
+                                  <button
+                                    key={lang.code}
+                                    type="button"
+                                    onClick={() => handleSelectLanguage(lang.code)}
+                                    className={`p-3 rounded-2xl border flex items-center gap-3 text-left transition-all duration-300 cursor-pointer ${
+                                      isSelected
+                                        ? "bg-amber-500/10 border-amber-500 text-amber-500 font-bold shadow-sm scale-[1.02]"
+                                        : isDark
+                                          ? "bg-black border-zinc-900 text-zinc-400 hover:border-zinc-850 hover:text-zinc-200"
+                                          : "bg-zinc-50 border-zinc-200 text-zinc-600 hover:border-zinc-300 hover:text-zinc-800"
+                                    }`}
+                                  >
+                                    <span className="text-xl shrink-0">{lang.flag}</span>
+                                    <div className="min-w-0">
+                                      <p className="text-xs font-bold truncate">{lang.name}</p>
+                                      <p className="text-[10px] text-zinc-500 truncate font-medium">{lang.nativeName}</p>
+                                    </div>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
                         </div>
                       )}
 
@@ -5769,6 +5849,65 @@ export default function App() {
                     >
                       Skip (Use Google Name)
                     </button>
+                  </div>
+                </motion.div>
+              </div>
+            )}
+          </AnimatePresence>
+
+          {/* LANGUAGE SELECTION POPUP - SYSTEM SELECT BAHASA */}
+          <AnimatePresence>
+            {showLanguagePopup && (
+              <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
+                {/* Backdrop overlay */}
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="absolute inset-0 bg-black/80 backdrop-blur-md"
+                />
+
+                {/* Modal Container */}
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.95, y: 15 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.95, y: 15 }}
+                  transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+                  className={`relative w-full max-w-lg rounded-3xl border p-6 md:p-8 shadow-2xl z-10 transition-all ${
+                    isDark ? "bg-zinc-950 border-zinc-900 text-zinc-100" : "bg-white border-zinc-200 text-zinc-900"
+                  }`}
+                >
+                  <div className="text-center space-y-3 mb-6">
+                    <div className="mx-auto h-12 w-12 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-500">
+                      <Globe className="h-6 w-6" />
+                    </div>
+                    <h3 className="text-xl font-display font-bold tracking-tight">Select Language / Pilih Bahasa</h3>
+                    <p className={`text-xs max-w-sm mx-auto leading-relaxed ${isDark ? "text-zinc-400" : "text-zinc-500"}`}>
+                      Please select your preferred language to continue.
+                      <br />
+                      Silakan pilih bahasa preferensi Anda untuk melanjutkan.
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3 max-h-[320px] overflow-y-auto pr-1">
+                    {LANGUAGES.map((lang) => (
+                      <button
+                        key={lang.code}
+                        type="button"
+                        onClick={() => handleSelectLanguage(lang.code)}
+                        className={`p-3.5 rounded-2xl border flex items-center gap-3 text-left transition-all duration-300 hover:scale-[1.02] cursor-pointer ${
+                          isDark
+                            ? "bg-black border-zinc-900 text-zinc-300 hover:border-amber-500/50 hover:bg-zinc-900/40"
+                            : "bg-zinc-50 border-zinc-200 text-zinc-700 hover:border-amber-500 hover:bg-zinc-100"
+                        }`}
+                      >
+                        <span className="text-2xl shrink-0">{lang.flag}</span>
+                        <div className="min-w-0">
+                          <p className="text-xs font-bold truncate">{lang.name}</p>
+                          <p className="text-[10px] text-zinc-500 truncate font-medium">{lang.nativeName}</p>
+                        </div>
+                      </button>
+                    ))}
                   </div>
                 </motion.div>
               </div>

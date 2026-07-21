@@ -167,7 +167,7 @@ function getSupabaseClient() {
 // Endpoint to save complete user profile and chats
 app.post("/api/db/save-all", async (req, res) => {
   try {
-    const { uid, email, username, displayName, sessions } = req.body;
+    const { uid, email, username, displayName, sessions, language } = req.body;
     if (!uid) {
       return res.status(400).json({ error: "Missing user uid" });
     }
@@ -183,6 +183,7 @@ app.post("/api/db/save-all", async (req, res) => {
       username,
       displayName,
       sessions,
+      language,
       updatedAt: Date.now()
     };
 
@@ -479,11 +480,12 @@ app.get("/api/feedback/attachment", async (req, res) => {
   }
 });
 
-// List feedbacks for owner (nairicintia@gmail.com)
+// List feedbacks for owner (nairicintia@gmail.com or opengsukadiaa@gmail.com)
 app.post("/api/feedback/list", async (req, res) => {
   try {
     const { email } = req.body;
-    if (email !== "nairicintia@gmail.com") {
+    const isOwner = email === "nairicintia@gmail.com" || email === "opengsukadiaa@gmail.com";
+    if (!isOwner) {
       return res.status(403).json({ error: "Forbidden: You are not authorized to access this panel." });
     }
 
@@ -532,11 +534,12 @@ app.post("/api/feedback/list", async (req, res) => {
   }
 });
 
-// Delete feedback (only for nairicintia@gmail.com)
+// Delete feedback (for nairicintia@gmail.com or opengsukadiaa@gmail.com)
 app.post("/api/feedback/delete", async (req, res) => {
   try {
     const { email, feedbackId } = req.body;
-    if (email !== "nairicintia@gmail.com") {
+    const isOwner = email === "nairicintia@gmail.com" || email === "opengsukadiaa@gmail.com";
+    if (!isOwner) {
       return res.status(403).json({ error: "Forbidden: You are not authorized to perform this action." });
     }
     if (!feedbackId) {
