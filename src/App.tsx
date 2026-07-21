@@ -1187,19 +1187,19 @@ export default function App() {
   }> = {
     dark: {
       name: "Dark (Black)",
-      outerBg: "bg-zinc-950",
-      mainBg: "bg-zinc-950",
-      sidebarBg: "bg-zinc-900",
-      sectionBg: "bg-zinc-900/60",
-      border: "border-zinc-800/80",
-      bubbleUser: "bg-zinc-900 border border-zinc-800 text-zinc-100",
+      outerBg: "bg-black",
+      mainBg: "bg-black",
+      sidebarBg: "bg-zinc-950",
+      sectionBg: "bg-zinc-950/60",
+      border: "border-zinc-900/80",
+      bubbleUser: "bg-zinc-900 border border-zinc-850 text-zinc-100",
       bubbleAssistant: "bg-transparent border-transparent text-zinc-200",
       textMuted: "text-zinc-500",
       textBase: "text-zinc-350",
       textTitle: "text-zinc-100",
-      accentColor: "bg-zinc-800 hover:bg-zinc-750 text-white",
-      scrollbarClass: "scrollbar-thin scrollbar-thumb-zinc-800",
-      gradient: "from-zinc-950/25 via-transparent to-transparent",
+      accentColor: "bg-zinc-900 hover:bg-zinc-850 text-white",
+      scrollbarClass: "scrollbar-thin scrollbar-thumb-zinc-900",
+      gradient: "from-black/40 via-transparent to-transparent",
     },
     light: {
       name: "Light (White)",
@@ -3318,7 +3318,7 @@ export default function App() {
         style={{ 
           height: viewportHeight,
           minHeight: "100vh",
-          backgroundColor: "#09090b",
+          backgroundColor: "#000000",
           color: "#f4f4f5",
           display: "flex",
           width: "100%",
@@ -3327,7 +3327,7 @@ export default function App() {
           justifyContent: "center",
           fontFamily: "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif"
         }} 
-        className="flex w-full flex-col items-center justify-center bg-zinc-950 font-sans text-zinc-100 antialiased"
+        className="flex w-full flex-col items-center justify-center bg-black font-sans text-zinc-100 antialiased"
       >
         <div className="relative flex flex-col items-center">
           <div className="relative mb-6 flex items-center justify-center">
@@ -3357,7 +3357,7 @@ export default function App() {
         style={{ 
           height: viewportHeight,
           minHeight: "100vh",
-          backgroundColor: "#09090b",
+          backgroundColor: "#000000",
           color: "#f4f4f5",
           display: "flex",
           width: "100%",
@@ -3367,7 +3367,7 @@ export default function App() {
           position: "relative",
           overflow: "hidden"
         }} 
-        className="flex w-full items-center justify-center bg-zinc-950 font-sans text-zinc-100 antialiased selection:bg-zinc-800 relative overflow-hidden"
+        className="flex w-full items-center justify-center bg-black font-sans text-zinc-100 antialiased selection:bg-zinc-800 relative overflow-hidden"
       >
         <div className="absolute inset-0 bg-radial-[circle_at_center,rgba(39,39,42,0.15),transparent_70%] pointer-events-none" />
 
@@ -3437,7 +3437,7 @@ export default function App() {
   }
 
   return (
-    <div style={{ height: viewportHeight }} className="flex w-full overflow-hidden bg-zinc-950 font-sans text-zinc-100 antialiased selection:bg-zinc-700/80">
+    <div style={{ height: viewportHeight }} className="flex w-full overflow-hidden bg-black font-sans text-zinc-100 antialiased selection:bg-zinc-700/80">
       <input
         ref={fileInputRef}
         type="file"
