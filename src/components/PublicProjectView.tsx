@@ -92,7 +92,7 @@ export function PublicProjectView({ projectId }: PublicProjectViewProps) {
 
   if (loading) {
     return (
-      <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-zinc-950 text-zinc-100 font-sans">
+      <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black text-zinc-100 font-sans">
         <div className="flex flex-col items-center space-y-4">
           <Loader2 className="h-10 w-10 text-amber-500 animate-spin" />
           <p className="text-sm font-mono text-zinc-400">Loading public project '{projectId}'...</p>
@@ -103,7 +103,7 @@ export function PublicProjectView({ projectId }: PublicProjectViewProps) {
 
   if (error) {
     return (
-      <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-zinc-950 text-zinc-100 font-sans p-6 text-center">
+      <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black text-zinc-100 font-sans p-6 text-center">
         <div className="max-w-md space-y-6">
           <div className="inline-flex p-4 bg-rose-500/10 border border-rose-500/20 text-rose-500 rounded-full">
             <AlertCircle className="h-12 w-12" />

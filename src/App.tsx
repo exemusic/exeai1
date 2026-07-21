@@ -1189,8 +1189,8 @@ export default function App() {
       name: "Dark (Black)",
       outerBg: "bg-black",
       mainBg: "bg-black",
-      sidebarBg: "bg-zinc-950",
-      sectionBg: "bg-zinc-950/60",
+      sidebarBg: "bg-black",
+      sectionBg: "bg-black/60",
       border: "border-zinc-900/80",
       bubbleUser: "bg-zinc-900 border border-zinc-850 text-zinc-100",
       bubbleAssistant: "bg-transparent border-transparent text-zinc-200",
@@ -2747,7 +2747,6 @@ export default function App() {
         <div className={`rounded-3xl p-6 md:p-8 border space-y-6 ${isDark ? "bg-zinc-900/10 border-transparent shadow-none" : "bg-white border-zinc-200/80 shadow-md"}`}>
           {feedbackSuccess && (
             <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 text-sm font-medium flex items-start gap-3">
-              <span className="h-2 w-2 rounded-full bg-emerald-500 mt-1.5 shrink-0 animate-pulse" />
               <span>{feedbackSuccess}</span>
             </div>
           )}
@@ -2777,7 +2776,7 @@ export default function App() {
                       isActive
                         ? `${cat.color} scale-[1.03] ring-2 ring-amber-500/10`
                         : isDark
-                          ? "bg-zinc-950 border-zinc-900 text-zinc-400 hover:border-zinc-800 hover:text-zinc-200"
+                          ? "bg-black border-zinc-900 text-zinc-400 hover:border-zinc-800 hover:text-zinc-200"
                           : "bg-zinc-50 border-zinc-200 text-zinc-600 hover:border-zinc-300 hover:text-zinc-800"
                     }`}
                   >
@@ -2809,7 +2808,7 @@ export default function App() {
               rows={4}
               className={`w-full rounded-2xl px-4 py-3.5 text-sm focus:outline-none border focus:ring-2 focus:ring-amber-500/20 ${
                 isDark 
-                  ? "bg-zinc-950 border-zinc-900 text-zinc-100 placeholder-zinc-650 focus:border-amber-500/50" 
+                  ? "bg-black border-zinc-900 text-zinc-100 placeholder-zinc-650 focus:border-amber-500/50" 
                   : "bg-zinc-50 border-zinc-200 text-zinc-900 placeholder-zinc-400 focus:border-amber-500"
               }`}
             />
@@ -2833,7 +2832,7 @@ export default function App() {
                 feedbackFile 
                   ? "border-amber-500 bg-amber-500/5" 
                   : isDark 
-                    ? "border-zinc-850 bg-zinc-950/20 hover:border-zinc-700 hover:bg-zinc-900/10" 
+                    ? "border-zinc-850 bg-black/20 hover:border-zinc-700 hover:bg-zinc-900/10" 
                     : "border-zinc-250 bg-zinc-50/50 hover:border-zinc-350 hover:bg-zinc-100/30"
               }`}
             >
@@ -3001,7 +3000,7 @@ export default function App() {
             placeholder="Search conversations..."
             className={`w-full pl-10 pr-4 py-2.5 rounded-xl text-sm transition-all duration-200 focus:outline-none border ${
               isDark 
-                ? "border-zinc-800/80 bg-zinc-950/40 text-zinc-300 placeholder-zinc-600 focus:border-zinc-700 focus:bg-zinc-950/70" 
+                ? "border-zinc-800/80 bg-black/40 text-zinc-300 placeholder-zinc-600 focus:border-zinc-700 focus:bg-black/70" 
                 : "border-zinc-200 bg-zinc-100/50 text-zinc-850 placeholder-zinc-400 focus:border-zinc-300 focus:bg-white"
             }`}
           />
@@ -3128,7 +3127,7 @@ export default function App() {
                                         autoFocus
                                         className={`w-full rounded px-2 py-1 text-sm focus:outline-none border ${
                                           isDark 
-                                            ? "bg-zinc-950 border-zinc-800 text-zinc-100 focus:border-zinc-750" 
+                                            ? "bg-black border-zinc-800 text-zinc-100 focus:border-zinc-750" 
                                             : "bg-white border-zinc-300 text-zinc-900 focus:border-zinc-400"
                                         }`}
                                       />
@@ -3337,7 +3336,7 @@ export default function App() {
               <ExeChatLogo className="h-10 w-10 animate-pulse" size={40} />
             </div>
             {/* Spinning mini indicator loader */}
-            <div className="absolute -bottom-1 -right-1 bg-zinc-950 p-1 rounded-full border border-zinc-800 z-20">
+            <div className="absolute -bottom-1 -right-1 bg-black p-1 rounded-full border border-zinc-800 z-20">
               <svg className="animate-spin h-3.5 w-3.5 text-indigo-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
@@ -3600,7 +3599,7 @@ export default function App() {
                           initial={{ opacity: 0, scale: 0.95, y: 10 }}
                           animate={{ opacity: 1, scale: 1, y: 0 }}
                           exit={{ opacity: 0, scale: 0.95, y: 10 }}
-                          className={`absolute bottom-12 left-4 w-48 rounded-2xl border p-1.5 shadow-2xl z-50 transition-all ${
+                          className={`fixed bottom-6 left-16 w-48 rounded-2xl border p-1.5 shadow-2xl z-50 transition-all ${
                             isDark 
                               ? "bg-zinc-900/95 border-zinc-800 text-zinc-100 backdrop-blur-md" 
                               : "bg-white/95 border-zinc-250 text-zinc-900 backdrop-blur-md"
@@ -3756,7 +3755,7 @@ export default function App() {
 
                       {selectedFile && (
                         <div className={`mb-3.5 p-2 px-3 rounded-2xl border flex items-center gap-2.5 text-xs animate-fadeIn ${
-                          isDark ? "bg-zinc-950 border-zinc-850 text-zinc-300" : "bg-white border-zinc-200 text-zinc-700"
+                          isDark ? "bg-black border-zinc-850 text-zinc-300" : "bg-white border-zinc-200 text-zinc-700"
                         }`}>
                           <Paperclip className="h-3.5 w-3.5 text-amber-500 animate-bounce" />
                           <span className="truncate max-w-[180px] sm:max-w-[280px] font-medium">{selectedFile.name}</span>
@@ -3857,7 +3856,7 @@ export default function App() {
                             onClick={() => setShowModelModal(true)}
                             className={`flex items-center gap-1.5 text-[10px] md:text-[11px] rounded-full py-1.5 px-3 max-w-[120px] sm:max-w-none truncate font-semibold font-sans cursor-pointer focus:outline-none transition-all border ${
                               isDark 
-                                ? "bg-zinc-950 hover:bg-zinc-900 text-zinc-400 border-zinc-900 hover:border-zinc-800" 
+                                ? "bg-black hover:bg-zinc-900 text-zinc-400 border-zinc-900 hover:border-zinc-800" 
                                : "bg-white hover:bg-zinc-100 text-zinc-600 border-zinc-200 hover:border-zinc-350"
                             }`}
                             title="Select AI Model"
@@ -3872,7 +3871,7 @@ export default function App() {
                             onClick={() => setShowPresetModal(true)}
                             className={`flex items-center gap-1.5 text-[10px] md:text-[11px] rounded-full py-1.5 px-3 max-w-[120px] sm:max-w-none truncate font-semibold font-sans cursor-pointer focus:outline-none transition-all border ${
                               isDark 
-                                ? "bg-zinc-950 hover:bg-zinc-900 text-zinc-400 border-zinc-900 hover:border-zinc-800" 
+                                ? "bg-black hover:bg-zinc-900 text-zinc-400 border-zinc-900 hover:border-zinc-800" 
                                 : "bg-white hover:bg-zinc-100 text-zinc-600 border-zinc-200 hover:border-zinc-350"
                             }`}
                             title="Select Topic"
@@ -3947,7 +3946,7 @@ export default function App() {
                                      rows={Math.max(2, editingMessageText.split("\n").length)}
                                      className={`w-full rounded-xl p-3 text-sm focus:outline-none border font-sans resize-y leading-relaxed transition-all ${
                                        isDark 
-                                         ? "bg-zinc-950 border-zinc-800 text-zinc-100 focus:border-zinc-700" 
+                                         ? "bg-black border-zinc-800 text-zinc-100 focus:border-zinc-700" 
                                          : "bg-white border-zinc-200 text-zinc-900 focus:border-zinc-400"
                                      }`}
                                      autoFocus
@@ -3980,7 +3979,7 @@ export default function App() {
                                    {msg.attachment && (
                                      <div className={`flex items-center gap-3 p-3 rounded-xl border max-w-sm transition-all duration-300 ${
                                        isDark 
-                                         ? "bg-zinc-950/70 border-zinc-800/80 hover:border-zinc-700/80" 
+                                         ? "bg-black/70 border-zinc-800/80 hover:border-zinc-700/80" 
                                          : "bg-zinc-50 border-zinc-200 hover:border-zinc-350"
                                      }`}>
                                        <div className={`p-2.5 rounded-lg border text-amber-500 shrink-0 shadow-inner ${
@@ -4273,7 +4272,7 @@ export default function App() {
             {/* CHAT INPUT FORM AREA */}
             {currentSession && currentSession.messages.length > 0 && (
               <div className={`p-2.5 md:p-4 border-t shrink-0 z-10 transition-colors duration-200 ${
-                isDark ? "border-zinc-900 bg-zinc-950/80" : "border-zinc-200 bg-white"
+                isDark ? "border-zinc-900 bg-black/80" : "border-zinc-200 bg-white"
               }`}>
                 <div className="max-w-3xl mx-auto relative">
 
@@ -4321,7 +4320,7 @@ export default function App() {
                     {/* Selected File Preview inside input block */}
                     {selectedFile && (
                       <div className={`mx-1 mb-2.5 p-2 px-3 rounded-2xl border flex items-center gap-2.5 text-xs animate-fadeIn ${
-                        isDark ? "bg-zinc-950 border-zinc-850 text-zinc-300" : "bg-zinc-100 border-zinc-250/60 text-zinc-700"
+                        isDark ? "bg-black border-zinc-850 text-zinc-300" : "bg-zinc-100 border-zinc-250/60 text-zinc-700"
                       }`}>
                         <Paperclip className="h-3.5 w-3.5 text-amber-500 animate-bounce" />
                         <span className="truncate max-w-[180px] sm:max-w-[280px] font-medium">{selectedFile.name}</span>
@@ -4466,14 +4465,14 @@ export default function App() {
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.98 }}
                 transition={{ duration: 0.2 }}
-                className={`absolute inset-0 backdrop-blur-xl flex flex-col z-40 ${isDark ? "bg-zinc-950/98 text-zinc-100" : "bg-zinc-50/98 text-zinc-850"}`}
+                className={`fixed inset-0 backdrop-blur-xl flex flex-col z-[100] ${isDark ? "bg-black text-zinc-100" : "bg-zinc-50/98 text-zinc-850"}`}
               >
                 {/* 1. MOBILE VIEW (WHATSAPP-STYLE) */}
                 <div className="flex md:hidden flex-col h-full w-full overflow-hidden">
                   {mobileSettingsPage === "menu" ? (
                     <div className="flex flex-col h-full w-full">
                       {/* WhatsApp Header */}
-                      <div className={`p-4 px-5 flex items-center gap-4 shrink-0 border-b ${curTheme.border} ${isDark ? "bg-zinc-900" : "bg-[#075e54] text-white"}`}>
+                      <div className={`p-4 px-5 flex items-center gap-4 shrink-0 border-b ${curTheme.border} ${isDark ? "bg-black" : "bg-[#075e54] text-white"}`}>
                         <button
                           onClick={() => setShowSettings(false)}
                           className={`p-1.5 rounded-full transition-colors ${isDark ? "hover:bg-zinc-800 text-zinc-300" : "hover:bg-teal-700 text-white"}`}
@@ -4540,7 +4539,7 @@ export default function App() {
                   ) : (
                     <div className="flex flex-col h-full w-full">
                       {/* WhatsApp Subpage Header */}
-                      <div className={`p-4 px-5 flex items-center gap-4 shrink-0 border-b ${curTheme.border} ${isDark ? "bg-zinc-900" : "bg-[#075e54] text-white"}`}>
+                      <div className={`p-4 px-5 flex items-center gap-4 shrink-0 border-b ${curTheme.border} ${isDark ? "bg-black" : "bg-[#075e54] text-white"}`}>
                         <button
                           onClick={() => setMobileSettingsPage("menu")}
                           className={`p-1.5 rounded-full transition-colors ${isDark ? "hover:bg-zinc-800 text-zinc-300" : "hover:bg-teal-700 text-white"}`}
@@ -4599,7 +4598,7 @@ export default function App() {
                                   onChange={(e) => setUserName(e.target.value)}
                                   placeholder="Enter nickname..."
                                   className={`w-full rounded-xl px-4 py-3 text-sm md:text-base focus:outline-none border ${
-                                    isDark ? "bg-zinc-950 border-zinc-900 text-zinc-100" : "bg-zinc-50 border-zinc-200"
+                                    isDark ? "bg-black border-zinc-900 text-zinc-100" : "bg-zinc-50 border-zinc-200"
                                   }`}
                                 />
                                 <button
@@ -4660,7 +4659,7 @@ export default function App() {
                                     <Sliders className="h-4 w-4 text-amber-500" />
                                     <h4 className="text-xs font-bold uppercase tracking-wider text-zinc-500">Preset Temperature</h4>
                                   </div>
-                                  <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-zinc-950 border border-zinc-800 text-amber-400">
+                                  <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-black border border-zinc-800 text-amber-400">
                                     {activeTemp.toFixed(2)}
                                   </span>
                                 </div>
@@ -4680,7 +4679,7 @@ export default function App() {
                                         setTemperature(val);
                                       }
                                     }}
-                                    className="w-full h-1.5 bg-zinc-850 dark:bg-zinc-950 rounded-lg appearance-none cursor-pointer accent-amber-500"
+                                    className="w-full h-1.5 bg-zinc-850 dark:bg-black rounded-lg appearance-none cursor-pointer accent-amber-500"
                                   />
                                   <div className="flex justify-between text-[8px] text-zinc-550 font-mono">
                                     <span>Konsisten (0.10)</span>
@@ -4861,7 +4860,7 @@ export default function App() {
                                   placeholder={memories.length >= 5 ? "Limit reached" : "Enter personal preference..."}
                                   disabled={memories.length >= 5}
                                   className={`flex-1 rounded-xl px-4 py-3 text-sm md:text-base focus:outline-none border ${
-                                    isDark ? "bg-zinc-950 border-zinc-900 text-zinc-150" : "bg-white border-zinc-200 text-zinc-900"
+                                    isDark ? "bg-black border-zinc-900 text-zinc-150" : "bg-white border-zinc-200 text-zinc-900"
                                   }`}
                                 />
                                 <button
@@ -4916,7 +4915,7 @@ export default function App() {
                 {/* 2. DESKTOP VIEW (PREMIUM DUAL COLUMN PANELS WITH SPACIOUS TYPOGRAPHY) */}
                 <div className="hidden md:flex flex-row h-full w-full overflow-hidden">
                   {/* Left categories sidebar panel */}
-                  <div className={`w-80 shrink-0 ${isDark ? "border-transparent bg-zinc-950" : `border-r ${curTheme.border} bg-zinc-100/50`} flex flex-col justify-between p-6`}>
+                  <div className={`w-80 shrink-0 ${isDark ? "border-transparent bg-black" : `border-r ${curTheme.border} bg-zinc-100/50`} flex flex-col justify-between p-6`}>
                     <div className="space-y-8">
                       {/* Navigation categories */}
                       <nav className="space-y-2">
@@ -4939,13 +4938,13 @@ export default function App() {
                                     ? "bg-zinc-900 border-transparent text-white shadow-xl ring-1 ring-amber-500/10"
                                     : "bg-white border-zinc-250 text-zinc-900 shadow-md ring-1 ring-blue-500/10"
                                   : isDark
-                                    ? "border-transparent text-zinc-400 hover:bg-zinc-950/40 hover:text-zinc-200"
+                                    ? "border-transparent text-zinc-400 hover:bg-black/40 hover:text-zinc-200"
                                     : "border-transparent text-zinc-600 hover:bg-zinc-150/50 hover:text-zinc-900"
                               }`}
                             >
                               <div className={`p-2.5 rounded-xl border transition-colors ${
                                 isActive 
-                                  ? isDark ? "bg-zinc-950 border-transparent text-amber-400" : "bg-zinc-100 border-blue-250 text-[#1a73e8]" 
+                                  ? isDark ? "bg-black border-transparent text-amber-400" : "bg-zinc-100 border-blue-250 text-[#1a73e8]" 
                                   : isDark ? "bg-zinc-900 border-transparent text-zinc-500" : "bg-white border-zinc-200 text-zinc-500"
                               }`}>
                                 <IconComp className="h-5 w-5" />
@@ -5021,7 +5020,7 @@ export default function App() {
                                   onChange={(e) => setUserName(e.target.value)}
                                   placeholder="Enter custom name..."
                                   className={`flex-1 rounded-2xl px-4 py-3.5 text-sm focus:outline-none border ${
-                                    isDark ? "bg-zinc-950 border-zinc-900 text-zinc-100" : "bg-zinc-50 border-zinc-200"
+                                    isDark ? "bg-black border-zinc-900 text-zinc-100" : "bg-zinc-50 border-zinc-200"
                                   }`}
                                 />
                                 <button
@@ -5104,7 +5103,7 @@ export default function App() {
                                   <p className="text-xs text-zinc-550 mt-1 font-medium">Suhu mempengaruhi tingkat kreativitas dan konsistensi jawaban model Gemma-4.</p>
                                 </div>
                                 <div className="flex items-center gap-3 self-start sm:self-center">
-                                  <span className="text-xs font-mono font-bold px-3 py-1.5 rounded-xl bg-zinc-950 border border-zinc-800 text-amber-400 shadow-inner">
+                                  <span className="text-xs font-mono font-bold px-3 py-1.5 rounded-xl bg-black border border-zinc-800 text-amber-400 shadow-inner">
                                     Active Temp: {activeTemp.toFixed(2)}
                                   </span>
                                 </div>
@@ -5125,7 +5124,7 @@ export default function App() {
                                       setTemperature(val);
                                     }
                                   }}
-                                  className="w-full h-2 bg-zinc-850 dark:bg-zinc-950 rounded-lg appearance-none cursor-pointer accent-amber-500"
+                                  className="w-full h-2 bg-zinc-850 dark:bg-black rounded-lg appearance-none cursor-pointer accent-amber-500"
                                 />
                                 <div className="flex justify-between text-[10px] text-zinc-550 font-mono font-bold px-1">
                                   <span>Konsisten (0.10)</span>
@@ -5211,7 +5210,7 @@ export default function App() {
                                     }`}
                                   >
                                     <div className="flex items-center gap-3.5 mb-3">
-                                      <div className={`p-2 rounded-xl border ${isSelected ? "text-amber-500 border-amber-500/25 bg-zinc-950" : "text-zinc-500 border-zinc-200 bg-zinc-50"}`}>
+                                      <div className={`p-2 rounded-xl border ${isSelected ? "text-amber-500 border-amber-500/25 bg-black" : "text-zinc-500 border-zinc-200 bg-zinc-50"}`}>
                                         {getPresetIcon(preset.icon, "h-5 w-5")}
                                       </div>
                                       <span className="text-sm font-bold text-zinc-800 dark:text-zinc-200">{preset.name}</span>
@@ -5331,7 +5330,7 @@ export default function App() {
                                 placeholder={memories.length >= 5 ? "Maximum limit of 5 preferences reached" : "Example: I prefer codes written in React TSX style..."}
                                 disabled={memories.length >= 5}
                                 className={`flex-1 rounded-2xl px-4 py-3.5 text-sm focus:outline-none border ${
-                                  isDark ? "bg-zinc-950 border-zinc-900 text-zinc-100" : "bg-zinc-50 border-zinc-200"
+                                  isDark ? "bg-black border-zinc-900 text-zinc-100" : "bg-zinc-50 border-zinc-200"
                                 }`}
                               />
                               <button
@@ -5695,7 +5694,7 @@ export default function App() {
                       maxLength={30}
                       className={`w-full rounded-xl border px-4 py-2.5 text-sm outline-none transition-colors font-sans ${
                         isDark 
-                          ? "bg-zinc-950 border-zinc-850 text-zinc-100 focus:border-zinc-700 placeholder-zinc-700" 
+                          ? "bg-black border-zinc-850 text-zinc-100 focus:border-zinc-700 placeholder-zinc-700" 
                           : "bg-white border-zinc-200 text-zinc-900 focus:border-zinc-350 placeholder-zinc-450"
                       }`}
                     />
@@ -5831,7 +5830,7 @@ export default function App() {
                       placeholder="Search for conversations..."
                       className={`w-full pl-11 pr-10 py-3 rounded-xl text-base transition-all duration-200 focus:outline-none border ${
                         isDark 
-                          ? "border-zinc-800 bg-zinc-950/45 text-zinc-100 placeholder-zinc-600 focus:border-zinc-700 focus:bg-zinc-950/70" 
+                          ? "border-zinc-800 bg-black/45 text-zinc-100 placeholder-zinc-600 focus:border-zinc-700 focus:bg-black/70" 
                           : "border-zinc-200 bg-zinc-50 text-zinc-900 placeholder-zinc-400 focus:border-zinc-300 focus:bg-white"
                       }`}
                       autoFocus
@@ -6093,7 +6092,7 @@ export default function App() {
                         placeholder="Search feedback message or email..."
                         className={`w-full pl-9 pr-4 py-2 text-xs rounded-xl transition-all duration-200 focus:outline-none border ${
                           isDark 
-                            ? "border-zinc-800 bg-zinc-950/40 text-zinc-200 placeholder-zinc-650 focus:border-zinc-700" 
+                            ? "border-zinc-800 bg-black/40 text-zinc-200 placeholder-zinc-650 focus:border-zinc-700" 
                             : "border-zinc-200 bg-zinc-50 text-zinc-800 placeholder-zinc-400 focus:border-zinc-300"
                         }`}
                       />
@@ -6156,10 +6155,19 @@ export default function App() {
                                   </div>
                                   <span className="text-xs font-bold text-zinc-850 dark:text-zinc-250">{feed.email}</span>
                                 </div>
-                                <span className="text-[10px] font-mono text-zinc-500 font-semibold flex items-center gap-1">
-                                  <Clock className="h-3 w-3 text-zinc-400" />
-                                  {new Date(feed.timestamp).toLocaleString()}
-                                </span>
+                                <div className="flex items-center gap-3">
+                                  <span className="text-[10px] font-mono text-zinc-500 font-semibold flex items-center gap-1">
+                                    <Clock className="h-3 w-3 text-zinc-400" />
+                                    {new Date(feed.timestamp).toLocaleString()}
+                                  </span>
+                                  <button
+                                    onClick={() => handleFeedbackDelete(feed.id)}
+                                    className="p-1 rounded-md text-zinc-400 hover:text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer"
+                                    title="Delete Feedback"
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  </button>
+                                </div>
                               </div>
 
                               <p className="text-sm text-zinc-700 dark:text-zinc-300 whitespace-pre-wrap leading-relaxed select-text pr-2">
@@ -6222,7 +6230,7 @@ export default function App() {
                   exit={{ scale: 0.95, opacity: 0 }}
                   transition={{ type: "spring", damping: 25, stiffness: 350 }}
                   onClick={(e) => e.stopPropagation()}
-                  className="relative max-w-5xl max-h-[90vh] rounded-2xl overflow-hidden bg-zinc-950/40 border border-zinc-800/80 shadow-2xl flex flex-col cursor-default"
+                  className="relative max-w-5xl max-h-[90vh] rounded-2xl overflow-hidden bg-black/40 border border-zinc-800/80 shadow-2xl flex flex-col cursor-default"
                 >
                   <div className="absolute top-4 right-4 z-50">
                     <button

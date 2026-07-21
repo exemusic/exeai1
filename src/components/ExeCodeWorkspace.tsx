@@ -2097,7 +2097,7 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId, us
                             {step.content && expandedThoughts[msgId] && (
                               <div className={`mt-2 w-full border p-3 rounded-lg font-mono text-[10.5px] leading-relaxed whitespace-pre-wrap max-h-[160px] overflow-y-auto scrollbar-thin border-l-2 pl-3 ${
                                 isDark 
-                                  ? "bg-zinc-950/40 border-zinc-900/60 border-l-amber-500/40 text-zinc-400" 
+                                  ? "bg-black/40 border-zinc-900/60 border-l-amber-500/40 text-zinc-400" 
                                   : "bg-zinc-50 border-zinc-250 border-l-amber-500/60 text-zinc-600"
                               }`}>
                                 {step.content}
@@ -2143,8 +2143,8 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId, us
 
   if (isMobileScreen) {
     return (
-      <div className={`fixed inset-0 z-50 flex flex-col items-center justify-center p-6 text-center backdrop-blur-xl ${isDark ? "bg-zinc-950 text-zinc-100 font-sans" : "bg-zinc-50 text-zinc-900 font-sans"}`}>
-        <div className={`max-w-sm w-full p-8 rounded-2xl border flex flex-col items-center space-y-6 shadow-2xl animate-fade-in ${isDark ? "bg-zinc-900/80 border-zinc-800" : "bg-white border-zinc-200"}`}>
+      <div className={`fixed inset-0 z-50 flex flex-col items-center justify-center p-6 text-center backdrop-blur-xl ${isDark ? "bg-black text-zinc-100 font-sans" : "bg-zinc-50 text-zinc-900 font-sans"}`}>
+        <div className={`max-w-sm w-full p-8 rounded-2xl border flex flex-col items-center space-y-6 shadow-2xl animate-fade-in ${isDark ? "bg-black/80 border-zinc-900" : "bg-white border-zinc-200"}`}>
           <div className="relative">
             <div className="w-16 h-16 rounded-full bg-rose-500/10 flex items-center justify-center border border-rose-500/20 text-rose-500 animate-pulse">
               <Smartphone className="h-8 w-8" />
@@ -2183,10 +2183,10 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId, us
   }
 
   return (
-    <div className={`fixed inset-0 z-50 flex flex-col backdrop-blur-xl ${isDark ? "bg-zinc-950 text-zinc-100 font-sans" : "bg-zinc-50 text-zinc-900 font-sans"}`}>
+    <div className={`fixed inset-0 z-50 flex flex-col backdrop-blur-xl ${isDark ? "bg-black text-zinc-100 font-sans" : "bg-zinc-50 text-zinc-900 font-sans"}`}>
       
       {!isFullscreen && (
-        <div className={`px-5 py-2.5 flex items-center justify-between border-b ${isDark ? "border-zinc-950/40 bg-zinc-950" : "border-zinc-100 bg-white"} shrink-0`}>
+        <div className={`px-5 py-2.5 flex items-center justify-between border-b ${isDark ? "border-zinc-900/40 bg-black" : "border-zinc-100 bg-white"} shrink-0`}>
           <div className="flex items-center gap-2.5">
             <button
               onClick={() => {
@@ -2253,7 +2253,7 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId, us
                           <div className="flex items-center justify-between w-full">
                             <span className={`font-semibold ${isSel ? "text-amber-400" : isDark ? "text-zinc-300" : "text-zinc-700"}`}>{m.name}</span>
                             <span className={`text-[8px] px-1 rounded border ${
-                              isDark ? "bg-zinc-950 text-zinc-500 border-transparent" : "bg-zinc-50 text-zinc-500 border-zinc-150"
+                              isDark ? "bg-black text-zinc-500 border-transparent" : "bg-zinc-50 text-zinc-500 border-zinc-150"
                             }`}>{m.badge}</span>
                           </div>
                           <span className={`text-[9.5px] line-clamp-1 ${isDark ? "text-zinc-400" : "text-zinc-500"}`}>{m.description}</span>
@@ -2353,7 +2353,7 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId, us
         </div>
       )}
 
-      <div className={`flex-1 flex flex-col md:flex-row overflow-hidden min-h-0 relative ${isDark ? "bg-zinc-950" : "bg-zinc-50"}`}>
+      <div className={`flex-1 flex flex-col md:flex-row overflow-hidden min-h-0 relative ${isDark ? "bg-black" : "bg-zinc-50"}`}>
         
         <div 
           style={{ width: isMobileScreen ? "100%" : (isFullscreen ? "0px" : `${chatWidth}px`) }}
@@ -2361,7 +2361,7 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId, us
             isFullscreen 
               ? "hidden" 
               : `w-full h-1/2 md:h-full flex flex-col shrink-0 transition-colors duration-200 ${
-                  isDark ? "border-r border-zinc-950 bg-[#121214]" : "border-r border-zinc-100 bg-[#fafafa]"
+                  isDark ? "border-r border-zinc-900 bg-black" : "border-r border-zinc-100 bg-[#fafafa]"
                 }`
           }`}
         >
@@ -2438,7 +2438,7 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId, us
                               triggerStatus("Code successfully restored to this version snapshot!", "success");
                             }
                           }}
-                          className="flex items-center gap-1 px-2 py-1 rounded-lg bg-zinc-950 border border-zinc-850 hover:bg-zinc-900 text-[10px] font-normal text-zinc-400 hover:text-zinc-200 transition-colors"
+                          className="flex items-center gap-1 px-2 py-1 rounded-lg bg-black border border-zinc-850 hover:bg-zinc-900 text-[10px] font-normal text-zinc-400 hover:text-zinc-200 transition-colors"
                           title="Restore files to the snapshot before this edit"
                         >
                           <RotateCcw className="h-3 w-3 text-amber-500" />
@@ -2490,7 +2490,7 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId, us
 
           {/* CODE STATUS INTERACTIVE BOX (Only visible when runtimeError exists to keep the chat roomy) */}
           {runtimeError && (
-            <div className={`px-4 py-2 border-t shrink-0 ${isDark ? "border-zinc-850 bg-zinc-950/40" : "border-zinc-200 bg-zinc-50"}`}>
+            <div className={`px-4 py-2 border-t shrink-0 ${isDark ? "border-zinc-850 bg-black/40" : "border-zinc-200 bg-zinc-50"}`}>
               <div className="p-2.5 rounded-xl border border-rose-500/10 bg-rose-500/5 flex items-center justify-between gap-2 text-xs">
                 <div className="flex items-center gap-2 min-w-0">
                   <AlertCircle className="h-4 w-4 text-rose-500 shrink-0 animate-pulse" />
@@ -2511,7 +2511,7 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId, us
           )}
 
           {/* PROMPT CHAT INPUT BAR */}
-          <div className={`p-4 border-t transition-colors duration-200 ${isDark ? "border-zinc-850 bg-zinc-950/80" : "border-zinc-200 bg-white"}`}>
+          <div className={`p-4 border-t transition-colors duration-200 ${isDark ? "border-zinc-850 bg-black/80" : "border-zinc-200 bg-white"}`}>
             <div className={`relative flex flex-col rounded-2xl p-1.5 transition-all border ${
               isDark 
                 ? "bg-zinc-900 border-zinc-800 focus-within:border-amber-500/50" 
@@ -2581,13 +2581,13 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId, us
         )}
 
         {/* PANEL KANAN: WORKSPACE INTERACTIVE / CODE EDITOR PANE */}
-        <div className={`flex-1 flex flex-col min-w-0 relative ${isDark ? "bg-zinc-950 text-zinc-100" : "bg-white text-zinc-800"}`}>
+        <div className={`flex-1 flex flex-col min-w-0 relative ${isDark ? "bg-black text-zinc-100" : "bg-white text-zinc-800"}`}>
           
           {/* Tab Content 1: Preview mode active */}
           {activeRightTab === "preview" && (
             <div className="flex-1 flex flex-col min-h-0">
               {isFullscreen && (
-                <div className={`px-4 py-2 border-b flex items-center justify-between shrink-0 ${isDark ? "border-zinc-900 bg-zinc-950" : "border-zinc-200 bg-zinc-50"}`}>
+                <div className={`px-4 py-2 border-b flex items-center justify-between shrink-0 ${isDark ? "border-zinc-900 bg-black" : "border-zinc-200 bg-zinc-50"}`}>
                   <div className="flex items-center gap-2">
                     <span className="text-[11px] font-bold font-mono px-2 py-0.5 rounded bg-amber-500/10 text-amber-500 border border-amber-500/20 animate-pulse">
                       Live Preview
@@ -2636,7 +2636,7 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId, us
 
               <div className="flex-1 flex items-center justify-center p-6 bg-zinc-900/20 overflow-hidden relative">
                 {deviceMode === "mobile" ? (
-                  <div className="w-[320px] h-[680px] max-w-full max-h-[95%] rounded-[40px] bg-zinc-950 border-[12px] border-zinc-900 shadow-2xl relative flex flex-col overflow-hidden animate-fade-in ring-1 ring-zinc-800/50">
+                  <div className="w-[320px] h-[680px] max-w-full max-h-[95%] rounded-[40px] bg-black border-[12px] border-zinc-900 shadow-2xl relative flex flex-col overflow-hidden animate-fade-in ring-1 ring-zinc-800/50">
                     <div className="absolute top-0 left-1/2 transform -translate-x-1/2 w-32 h-5 bg-zinc-900 rounded-b-xl z-20 flex items-center justify-center">
                       <div className="w-10 h-1 bg-zinc-800 rounded-full" />
                     </div>
@@ -2676,7 +2676,7 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId, us
                       )}
                     </button>
                   ) : (
-                    <div className="w-[380px] h-64 rounded-xl bg-zinc-950/95 border border-zinc-800/80 shadow-2xl flex flex-col overflow-hidden backdrop-blur-md animate-fade-in">
+                    <div className="w-[380px] h-64 rounded-xl bg-black/95 border border-zinc-800/80 shadow-2xl flex flex-col overflow-hidden backdrop-blur-md animate-fade-in">
                       <div className="px-3 py-2 border-b border-zinc-850 flex items-center justify-between bg-zinc-900/40 select-none shrink-0">
                         <div className="flex items-center gap-1.5">
                           <Terminal className="h-3.5 w-3.5 text-amber-500" />
@@ -2742,8 +2742,8 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId, us
             <div className="flex-1 flex overflow-hidden min-h-0">
               
               {!isFullscreen && (
-                <div className={`w-56 border-r flex flex-col shrink-0 transition-colors duration-200 ${isDark ? "border-zinc-950/40 bg-zinc-950/60" : "border-zinc-100/50 bg-zinc-50"}`}>
-                  <div className={`p-3 border-b flex items-center justify-between transition-colors duration-200 ${isDark ? "border-zinc-950/20 bg-zinc-950/25" : "border-zinc-100 bg-zinc-100/50"}`}>
+                <div className={`w-56 border-r flex flex-col shrink-0 transition-colors duration-200 ${isDark ? "border-zinc-900 bg-black" : "border-zinc-100/50 bg-zinc-50"}`}>
+                  <div className={`p-3 border-b flex items-center justify-between transition-colors duration-200 ${isDark ? "border-zinc-900 bg-black" : "border-zinc-100 bg-zinc-100/50"}`}>
                     <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">File List</span>
                     <div className="flex items-center gap-1.5">
                       <input
@@ -2849,7 +2849,7 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId, us
 
               <div className="flex-1 flex flex-col min-w-0">
                 {isFullscreen ? (
-                  <div className={`px-4 py-2 border-b flex items-center justify-between shrink-0 transition-colors duration-200 ${isDark ? "border-zinc-950/40 bg-zinc-950" : "border-zinc-100 bg-white"}`}>
+                  <div className={`px-4 py-2 border-b flex items-center justify-between shrink-0 transition-colors duration-200 ${isDark ? "border-zinc-900 bg-black" : "border-zinc-100 bg-white"}`}>
                     <div className="flex items-center gap-2">
                       <span className="text-[11px] font-bold font-mono px-2 py-0.5 rounded bg-amber-500/10 text-amber-500 border border-amber-500/20 animate-pulse">
                         {activeFilePath}
@@ -2865,7 +2865,7 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId, us
                     </button>
                   </div>
                 ) : (
-                  <div className={`px-4 py-2 border-b flex items-center justify-between shrink-0 transition-colors duration-200 ${isDark ? "border-zinc-950/45 bg-zinc-950" : "border-zinc-100 bg-white"}`}>
+                  <div className={`px-4 py-2 border-b flex items-center justify-between shrink-0 transition-colors duration-200 ${isDark ? "border-zinc-900 bg-black" : "border-zinc-100 bg-white"}`}>
                     <div className="flex items-center gap-2">
                       <span className="text-[11px] font-bold font-mono px-2 py-0.5 rounded bg-zinc-500/10 text-amber-500 border border-amber-500/20">
                         {activeFilePath}
@@ -2918,7 +2918,7 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId, us
                   <div 
                     ref={lineNumbersScrollRef}
                     className={`w-12 select-none text-right pr-3 pt-4 text-sm font-mono border-r transition-colors duration-200 overflow-y-hidden shrink-0 ${
-                      isDark ? "border-zinc-950/20 bg-zinc-950 text-zinc-600" : "border-zinc-100 bg-zinc-50/50 text-zinc-400"
+                      isDark ? "border-zinc-900 bg-black text-zinc-600" : "border-zinc-100 bg-zinc-50/50 text-zinc-400"
                     }`}
                   >
                     {Array.from({ length: Math.max(activeFile.content.split("\n").length, 30) }).map((_, i) => (
@@ -2932,7 +2932,7 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId, us
                       onScroll={handleEditorScroll}
                       value={activeFile.content}
                       onChange={handleEditorChange}
-                      className={`flex-1 h-full p-4 text-sm font-mono focus:outline-none resize-none leading-6 transition-colors duration-200 ${isDark ? "bg-zinc-950 text-zinc-200 focus:bg-zinc-950" : "bg-white text-zinc-850 focus:bg-white"}`}
+                      className={`flex-1 h-full p-4 text-sm font-mono focus:outline-none resize-none leading-6 transition-colors duration-200 ${isDark ? "bg-black text-zinc-200 focus:bg-black" : "bg-white text-zinc-850 focus:bg-white"}`}
                       spellCheck="false"
                       placeholder="Write code here..."
                     />
@@ -2942,7 +2942,7 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId, us
                       onScroll={handleViewerScroll}
                       onClick={() => setIsEditingCode(true)}
                       className={`flex-1 h-full overflow-y-auto pt-4 pb-12 px-4 text-sm font-mono transition-colors duration-200 cursor-text select-text scrollbar-thin ${
-                        isDark ? "bg-zinc-950 text-zinc-300" : "bg-white text-zinc-800"
+                        isDark ? "bg-black text-zinc-300" : "bg-white text-zinc-800"
                       }`}
                       title="Click to edit code"
                     >
@@ -2962,8 +2962,8 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId, us
               <div className="flex-1 flex overflow-hidden min-h-0">
                 {/* File List */}
                 {!isFullscreen && (
-                  <div className={`w-44 border-r flex flex-col shrink-0 transition-colors duration-200 ${isDark ? "border-zinc-950/40 bg-zinc-950/60" : "border-zinc-100/50 bg-zinc-50"}`}>
-                    <div className={`p-2.5 border-b flex items-center justify-between transition-colors duration-200 ${isDark ? "border-zinc-950/20 bg-zinc-950/25" : "border-zinc-100 bg-zinc-100/50"}`}>
+                  <div className={`w-44 border-r flex flex-col shrink-0 transition-colors duration-200 ${isDark ? "border-zinc-900 bg-black" : "border-zinc-100/50 bg-zinc-50"}`}>
+                    <div className={`p-2.5 border-b flex items-center justify-between transition-colors duration-200 ${isDark ? "border-zinc-900 bg-black" : "border-zinc-100 bg-zinc-100/50"}`}>
                       <span className="text-[9px] font-bold uppercase tracking-wider text-zinc-500">Files</span>
                       <div className="flex items-center gap-1">
                         <input
@@ -3050,7 +3050,7 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId, us
 
                 {/* Code Editor */}
                 <div className="flex-1 flex flex-col min-w-0">
-                  <div className={`px-4 py-2 border-b flex items-center justify-between shrink-0 transition-colors duration-200 ${isDark ? "border-zinc-950/45 bg-zinc-950" : "border-zinc-100 bg-white"}`}>
+                  <div className={`px-4 py-2 border-b flex items-center justify-between shrink-0 transition-colors duration-200 ${isDark ? "border-zinc-900 bg-black" : "border-zinc-100 bg-white"}`}>
                     <span className="text-[11px] font-bold font-mono px-2 py-0.5 rounded bg-zinc-500/10 text-amber-500 border border-amber-500/20">
                       {activeFilePath}
                     </span>
@@ -3088,7 +3088,7 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId, us
                     <div 
                       ref={lineNumbersScrollRef}
                       className={`w-12 select-none text-right pr-3 pt-4 text-sm font-mono border-r transition-colors duration-200 overflow-y-hidden shrink-0 ${
-                        isDark ? "border-zinc-950/20 bg-zinc-950 text-zinc-600" : "border-zinc-100 bg-zinc-50/50 text-zinc-400"
+                        isDark ? "border-zinc-900 bg-black text-zinc-600" : "border-zinc-100 bg-zinc-50/50 text-zinc-400"
                       }`}
                     >
                       {Array.from({ length: Math.max(activeFile.content.split("\n").length, 30) }).map((_, i) => (
@@ -3102,7 +3102,7 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId, us
                         onScroll={handleEditorScroll}
                         value={activeFile.content}
                         onChange={handleEditorChange}
-                        className={`flex-1 h-full p-4 text-sm font-mono focus:outline-none resize-none leading-6 transition-colors duration-200 ${isDark ? "bg-zinc-950 text-zinc-200" : "bg-white text-zinc-850"}`}
+                        className={`flex-1 h-full p-4 text-sm font-mono focus:outline-none resize-none leading-6 transition-colors duration-200 ${isDark ? "bg-black text-zinc-200" : "bg-white text-zinc-850"}`}
                         spellCheck="false"
                       />
                     ) : (
@@ -3111,7 +3111,7 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId, us
                         onScroll={handleViewerScroll}
                         onClick={() => setIsEditingCode(true)}
                         className={`flex-1 h-full overflow-y-auto pt-4 pb-12 px-4 text-sm font-mono transition-colors duration-200 cursor-text select-text scrollbar-thin ${
-                          isDark ? "bg-zinc-950 text-zinc-300" : "bg-white text-zinc-800"
+                          isDark ? "bg-black text-zinc-300" : "bg-white text-zinc-800"
                         }`}
                       >
                         {highlightCode(activeFile.content, activeFile.path)}
