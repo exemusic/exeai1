@@ -532,6 +532,82 @@ app.post("/api/feedback/list", async (req, res) => {
   }
 });
 
+// Delete feedback (only for nairicintia@gmail.com)
+app.post("/api/feedback/delete", async (req, res) => {
+  try {
+    const { email, feedbackId } = req.body;
+    if (email !== "nairicintia@gmail.com") {
+      return res.status(403).json({ error: "Forbidden: You are not authorized to perform this action." });
+    }
+    if (!feedbackId) {
+      return res.status(400).json({ error: "Feedback ID is required." });
+    }
+
+    const supabase = getSupabaseClient();
+    if (!supabase) {
+      return res.status(400).json({ error: "Supabase client not configured." });
+    }
+
+    const bucket = "execode";
+    const feedbackPath = `feedback/${feedbackId}.json`;
+
+    // 1. Try to download the feedback JSON to see if there is an attachment to delete
+    let attachmentPathToDelete: string | null = null;
+    try {
+      const { data: fileData } = await supabase.storage
+        .from(bucket)
+        .download(feedbackPath);
+
+      if (fileData) {
+        const textContent = await fileData.text();
+        const parsed = JSON.parse(textContent);
+        if (parsed && parsed.attachmentUrl) {
+          // Extract feedback_attachments/ path
+          const match = parsed.attachmentUrl.match(/feedback_attachments\/[^?]+/);
+          if (match) {
+            attachmentPathToDelete = decodeURIComponent(match[0]);
+          } else if (parsed.attachmentUrl.includes("path=")) {
+            // Check query param
+            const parts = parsed.attachmentUrl.split("path=");
+            if (parts.length > 1) {
+              const decodedPath = decodeURIComponent(parts[1].split("&")[0]);
+              if (decodedPath.startsWith("feedback_attachments/")) {
+                attachmentPathToDelete = decodedPath;
+              }
+            }
+          }
+        }
+      }
+    } catch (err) {
+      console.warn(`Failed to inspect feedback attachment for delete (non-fatal): ${feedbackId}`, err);
+    }
+
+    // 2. Delete attachment if found
+    if (attachmentPathToDelete) {
+      try {
+        await supabase.storage.from(bucket).remove([attachmentPathToDelete]);
+        console.log(`Deleted feedback attachment: ${attachmentPathToDelete}`);
+      } catch (attErr) {
+        console.warn(`Failed to delete attachment: ${attachmentPathToDelete}`, attErr);
+      }
+    }
+
+    // 3. Delete feedback JSON file
+    const { error: removeErr } = await supabase.storage
+      .from(bucket)
+      .remove([feedbackPath]);
+
+    if (removeErr) {
+      throw removeErr;
+    }
+
+    res.json({ success: true, message: "Feedback and its attachments have been successfully deleted." });
+  } catch (error: any) {
+    console.error("Feedback delete error:", error);
+    res.status(500).json({ error: error.message || "Failed to delete feedback." });
+  }
+});
+
 app.post("/api/supabase/upload", async (req, res) => {
   try {
     const { projectName, files, bucket = "execode" } = req.body;

@@ -1510,10 +1510,57 @@ export default function App() {
     }
   };
 
+  const validateAndSetFeedbackFile = (file: File) => {
+    setFeedbackError(null);
+    setFeedbackSuccess(null);
+    
+    // Only accept image or video
+    const isImage = file.type.startsWith("image/");
+    const isVideo = file.type.startsWith("video/");
+    if (!isImage && !isVideo) {
+      setFeedbackError("Hanya file foto (gambar) atau video yang diperbolehkan.");
+      return false;
+    }
+    
+    // Max size 50MB
+    const maxSize = 50 * 1024 * 1024; // 52,428,800 bytes
+    if (file.size > maxSize) {
+      setFeedbackError("Ukuran file maksimal adalah 50MB.");
+      return false;
+    }
+    
+    setFeedbackFile(file);
+    return true;
+  };
+
   const handleSendFeedback = async () => {
-    if (!feedbackMessage.trim()) {
-      setFeedbackError("Please type a message before submitting.");
+    const trimmedMsg = feedbackMessage.trim();
+    if (!trimmedMsg) {
+      setFeedbackError("Silakan ketik pesan feedback sebelum mengirim.");
       return;
+    }
+
+    if (trimmedMsg.length < 10) {
+      setFeedbackError("Pesan feedback minimal harus 10 karakter.");
+      return;
+    }
+
+    if (trimmedMsg.length > 2500) {
+      setFeedbackError("Pesan feedback maksimal adalah 2,500 karakter.");
+      return;
+    }
+
+    if (feedbackFile) {
+      const isImage = feedbackFile.type.startsWith("image/");
+      const isVideo = feedbackFile.type.startsWith("video/");
+      if (!isImage && !isVideo) {
+        setFeedbackError("Hanya file foto (gambar) atau video yang diperbolehkan.");
+        return;
+      }
+      if (feedbackFile.size > 50 * 1024 * 1024) {
+        setFeedbackError("Ukuran file maksimal adalah 50MB.");
+        return;
+      }
     }
 
     setFeedbackSubmitting(true);
@@ -2739,8 +2786,8 @@ export default function App() {
             <MessageSquare className="h-5 w-5 text-amber-500" />
             Send Feedback & Suggestions
           </h3>
-          <p className="text-sm text-zinc-500 mt-1 font-medium">
-            Have a suggestion, found a bug, or want a custom feature? Write to Hexky directly. You can attach mockups or log files!
+          <p className="text-sm text-zinc-500 mt-1 font-medium font-sans">
+            Kirimkan masukan Anda. Pesan minimal 10 karakter, maksimal 2,500 karakter. Anda hanya dapat melampirkan file foto atau video dengan ukuran maksimal 50MB.
           </p>
         </div>
 
@@ -2793,14 +2840,14 @@ export default function App() {
               <label className="text-xs font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
                 Message <span className="text-red-500">*</span>
               </label>
-              <span className={`text-[10px] font-mono ${feedbackMessage.length > 1800 ? "text-red-500 font-bold" : "text-zinc-500"}`}>
-                {feedbackMessage.length} / 2000
+              <span className={`text-[10px] font-mono ${feedbackMessage.length > 2300 ? "text-red-500 font-bold" : "text-zinc-500"}`}>
+                {feedbackMessage.length} / 2500
               </span>
             </div>
             <textarea
               value={feedbackMessage}
               onChange={(e) => {
-                if (e.target.value.length <= 2000) {
+                if (e.target.value.length <= 2500) {
                   setFeedbackMessage(e.target.value);
                 }
               }}
@@ -2824,7 +2871,7 @@ export default function App() {
               onDrop={(e) => {
                 e.preventDefault();
                 if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-                  setFeedbackFile(e.dataTransfer.files[0]);
+                  validateAndSetFeedbackFile(e.dataTransfer.files[0]);
                 }
               }}
               onClick={() => document.getElementById("feedback-file-input")?.click()}
@@ -2839,10 +2886,11 @@ export default function App() {
               <input
                 id="feedback-file-input"
                 type="file"
+                accept="image/*,video/*"
                 className="hidden"
                 onChange={(e) => {
                   if (e.target.files && e.target.files[0]) {
-                    setFeedbackFile(e.target.files[0]);
+                    validateAndSetFeedbackFile(e.target.files[0]);
                   }
                 }}
               />
@@ -2854,7 +2902,7 @@ export default function App() {
                     {feedbackFile.name}
                   </p>
                   <p className="text-xs text-zinc-500 font-medium">
-                    {(feedbackFile.size / 1024).toFixed(1)} KB — Click or drag to change file
+                    {(feedbackFile.size / (1024 * 1024)).toFixed(2)} MB — Click or drag to change file
                   </p>
                 </>
               ) : (
@@ -2864,7 +2912,7 @@ export default function App() {
                     Drag and drop file here, or click to browse
                   </p>
                   <p className="text-xs text-zinc-500 font-medium">
-                    Supports images, documents, and log files
+                    Supports photo and video files (Max 50MB)
                   </p>
                 </>
               )}
@@ -4971,7 +5019,7 @@ export default function App() {
 
                   {/* Right configuration values content panel */}
                   <div className="flex-1 overflow-y-auto p-8 md:p-12">
-                    <div className="max-w-3xl space-y-8 animate-fadeIn">
+                    <div className="w-full space-y-8 animate-fadeIn">
                       {/* TAB: AKUN */}
                       {settingsTab === "akun" && (
                         <div className="space-y-8">
