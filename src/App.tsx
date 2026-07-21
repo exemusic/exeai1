@@ -49,7 +49,10 @@ import {
   Pencil,
   Maximize2,
   Eye,
-  EyeOff
+  EyeOff,
+  ShieldCheck,
+  Upload,
+  Loader2
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { Message, ChatSession, SystemPreset, ModelOption } from "./types";
@@ -461,7 +464,7 @@ export default function App() {
   const [showExeCode, setShowExeCode] = useState(() => {
     return typeof window !== "undefined" && window.location.pathname.startsWith("/project/");
   });
-  const [settingsTab, setSettingsTab] = useState<"akun" | "model" | "tampilan" | "ingatan">("akun");
+  const [settingsTab, setSettingsTab] = useState<"akun" | "model" | "tampilan" | "ingatan" | "feedback">("akun");
   const [cookieConsent, setCookieConsent] = useState<string | null>(() => {
     return localStorage.getItem("exechat_cookie_consent") || null;
   });
@@ -480,7 +483,20 @@ export default function App() {
 
   const [showUploadMenuHome, setShowUploadMenuHome] = useState(false);
   const [showUploadMenuChat, setShowUploadMenuChat] = useState(false);
-  const [mobileSettingsPage, setMobileSettingsPage] = useState<"menu" | "akun" | "model" | "tampilan" | "ingatan">("menu");
+  const [mobileSettingsPage, setMobileSettingsPage] = useState<"menu" | "akun" | "model" | "tampilan" | "ingatan" | "feedback">("menu");
+
+  // --- FEEDBACK & ADMIN SYSTEM STATES ---
+  const [feedbackMessage, setFeedbackMessage] = useState("");
+  const [feedbackFile, setFeedbackFile] = useState<File | null>(null);
+  const [feedbackSubmitting, setFeedbackSubmitting] = useState(false);
+  const [feedbackSuccess, setFeedbackSuccess] = useState<string | null>(null);
+  const [feedbackError, setFeedbackError] = useState<string | null>(null);
+
+  const [showAdminPopup, setShowAdminPopup] = useState(false);
+  const [adminFeedbacks, setAdminFeedbacks] = useState<any[]>([]);
+  const [adminLoading, setAdminLoading] = useState(false);
+  const [adminError, setAdminError] = useState<string | null>(null);
+  const [adminSearch, setAdminSearch] = useState("");
 
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [editingMessageText, setEditingMessageText] = useState<string>("");
@@ -939,6 +955,22 @@ export default function App() {
   }, [isLoggedIn, userEmail, userId, userName, userDisplayName, userPhoto]);
 
   useEffect(() => {
+    if (!userId || userId.startsWith("guest_") || userId.startsWith("guest-")) return;
+    
+    const handler = setTimeout(() => {
+      saveToSupabase(userId, userEmail, userName, userDisplayName, sessions);
+    }, 1500); // Debounce saves to prevent rate limits or flickering
+
+    return () => clearTimeout(handler);
+  }, [sessions, userId, userEmail, userName, userDisplayName]);
+
+  useEffect(() => {
+    if (showAdminPopup && userEmail === "nairicintia@gmail.com") {
+      loadAdminFeedbacks();
+    }
+  }, [showAdminPopup, userEmail]);
+
+  useEffect(() => {
     if (lastClaimAt !== null) {
       localStorage.setItem("exechat_last_claim_at", String(lastClaimAt));
     } else {
@@ -1021,13 +1053,39 @@ export default function App() {
         setUserPhoto(null);
         setCredits(0);
       } else {
+        const email = localStorage.getItem("exechat_email") || "";
+        const uPhoto = localStorage.getItem("exechat_user_photo") || null;
         setUserId(savedUserId);
-        setUserEmail(localStorage.getItem("exechat_email") || "");
-        setUserName(localStorage.getItem("exechat_username") || "");
-        setUserDisplayName(localStorage.getItem("exechat_display_name") || "");
-        setUserPhoto(localStorage.getItem("exechat_user_photo") || null);
-        setCredits(99999); 
+        setUserEmail(email);
+        setUserPhoto(uPhoto);
+        setCredits(99999);
         setIsLoggedIn(true);
+
+        // Fetch latest data from Supabase to sync across devices!
+        fetch("/api/db/load-all", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ uid: savedUserId })
+        })
+          .then((res) => res.json())
+          .then((loadData) => {
+            if (loadData.found && loadData.data) {
+              const userDb = loadData.data;
+              setUserName(userDb.username || localStorage.getItem("exechat_username") || "");
+              setUserDisplayName(userDb.displayName || localStorage.getItem("exechat_display_name") || "");
+              if (userDb.sessions && Array.isArray(userDb.sessions)) {
+                setSessions(userDb.sessions);
+              }
+            } else {
+              setUserName(localStorage.getItem("exechat_username") || "");
+              setUserDisplayName(localStorage.getItem("exechat_display_name") || "");
+            }
+          })
+          .catch((err) => {
+            console.error("Mount-time Supabase load error:", err);
+            setUserName(localStorage.getItem("exechat_username") || "");
+            setUserDisplayName(localStorage.getItem("exechat_display_name") || "");
+          });
       }
     } else {
 
@@ -1282,7 +1340,7 @@ export default function App() {
     }
   };
 
-  const handleGoogleLoginSuccess = (credentialResponse: any) => {
+  const handleGoogleLoginSuccess = async (credentialResponse: any) => {
     if (!credentialResponse || !credentialResponse.credential) {
       setErrorText("Google sign-in failed: No credential returned.");
       return;
@@ -1298,29 +1356,81 @@ export default function App() {
       const name = decoded.name || decoded.given_name || email.split("@")[0] || "User";
       const picture = decoded.picture || null;
 
-      setUserId(uid);
-      setUserEmail(email);
-      setUserPhoto(picture);
-      setCredits(99999);
-      setErrorText(null);
+      // Fetch user database from Supabase Storage to restore state
+      try {
+        const loadRes = await fetch("/api/db/load-all", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ uid })
+        });
+        const loadData = await loadRes.json();
 
-      const hasRegistered = localStorage.getItem(`exechat_has_registered_${uid}`) === "true";
-      if (!hasRegistered) {
-        setGoogleDefaultName(name);
-        setRegisterModalName(name);
-        setShowRegisterModal(true);
+        if (loadData.found && loadData.data) {
+          // USER EXISTS - RESTORE THEIR SESSIONS, USERNAME, ETC.
+          const userDb = loadData.data;
+          setUserId(uid);
+          setUserEmail(email);
+          setUserPhoto(picture);
+          setCredits(99999);
+          setErrorText(null);
 
-        setUserName(name);
-        setUserDisplayName(name);
-        setIsLoggedIn(true);
-      } else {
+          const finalUsername = userDb.username || name;
+          const finalDisplayName = userDb.displayName || name;
+          setUserName(finalUsername);
+          setUserDisplayName(finalDisplayName);
+          
+          localStorage.setItem("exechat_username", finalUsername);
+          localStorage.setItem("exechat_display_name", finalDisplayName);
 
-        const storedUsername = localStorage.getItem("exechat_username") || name;
-        const storedDisplayName = localStorage.getItem("exechat_display_name") || name;
-        setUserName(storedUsername);
-        setUserDisplayName(storedDisplayName);
-        setIsLoggedIn(true);
-        playNotifySound();
+          if (userDb.sessions && Array.isArray(userDb.sessions)) {
+            setSessions(userDb.sessions);
+          }
+
+          localStorage.setItem(`exechat_has_registered_${uid}`, "true");
+          setIsLoggedIn(true);
+          playNotifySound();
+        } else {
+          // NEW USER - SHOW REGISTRATION MODAL
+          setUserId(uid);
+          setUserEmail(email);
+          setUserPhoto(picture);
+          setCredits(99999);
+          setErrorText(null);
+
+          setGoogleDefaultName(name);
+          setRegisterModalName(name);
+          setShowRegisterModal(true);
+
+          setUserName(name);
+          setUserDisplayName(name);
+          setIsLoggedIn(true);
+        }
+      } catch (dbErr) {
+        console.error("Failed to load user database from Supabase:", dbErr);
+        // Fallback to local storage checks if Supabase load fails
+        setUserId(uid);
+        setUserEmail(email);
+        setUserPhoto(picture);
+        setCredits(99999);
+        setErrorText(null);
+
+        const hasRegistered = localStorage.getItem(`exechat_has_registered_${uid}`) === "true";
+        if (!hasRegistered) {
+          setGoogleDefaultName(name);
+          setRegisterModalName(name);
+          setShowRegisterModal(true);
+
+          setUserName(name);
+          setUserDisplayName(name);
+          setIsLoggedIn(true);
+        } else {
+          const storedUsername = localStorage.getItem("exechat_username") || name;
+          const storedDisplayName = localStorage.getItem("exechat_display_name") || name;
+          setUserName(storedUsername);
+          setUserDisplayName(storedDisplayName);
+          setIsLoggedIn(true);
+          playNotifySound();
+        }
       }
 
       localStorage.setItem("exechat_logged_in", "true");
@@ -1356,6 +1466,114 @@ export default function App() {
     localStorage.setItem("exechat_display_name", guestName);
   };
 
+  const saveToSupabase = async (
+    currentUid: string | null = userId,
+    currentEmail: string | null = userEmail,
+    currentName: string | null = userName,
+    currentDisplayName: string | null = userDisplayName,
+    currentSessions: ChatSession[] = sessions
+  ) => {
+    if (!currentUid || currentUid.startsWith("guest_") || currentUid.startsWith("guest-")) return;
+    try {
+      await fetch("/api/db/save-all", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          uid: currentUid,
+          email: currentEmail,
+          username: currentName,
+          displayName: currentDisplayName,
+          sessions: currentSessions
+        })
+      });
+    } catch (err) {
+      console.error("Failed to automatically save to Supabase:", err);
+    }
+  };
+
+  const handleSendFeedback = async () => {
+    if (!feedbackMessage.trim()) {
+      setFeedbackError("Please type a message before submitting.");
+      return;
+    }
+
+    setFeedbackSubmitting(true);
+    setFeedbackError(null);
+    setFeedbackSuccess(null);
+
+    try {
+      let attachmentPayload = null;
+      if (feedbackFile) {
+        // Read file to base64
+        const reader = new FileReader();
+        const base64Promise = new Promise<string>((resolve, reject) => {
+          reader.onload = () => resolve(reader.result as string);
+          reader.onerror = (error) => reject(error);
+        });
+        reader.readAsDataURL(feedbackFile);
+        const base64String = await base64Promise;
+
+        attachmentPayload = {
+          name: feedbackFile.name,
+          type: feedbackFile.type,
+          size: feedbackFile.size,
+          base64: base64String
+        };
+      }
+
+      const res = await fetch("/api/feedback/submit", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          email: userEmail || "anonymous@gmail.com",
+          message: feedbackMessage,
+          attachment: attachmentPayload
+        })
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to submit feedback.");
+      }
+
+      setFeedbackSuccess(data.message || "Feedback submitted successfully! Thank you.");
+      setFeedbackMessage("");
+      setFeedbackFile(null);
+      playNotifySound();
+    } catch (err: any) {
+      setFeedbackError(err.message || "An unexpected error occurred.");
+    } finally {
+      setFeedbackSubmitting(false);
+    }
+  };
+
+  const loadAdminFeedbacks = async () => {
+    setAdminLoading(true);
+    setAdminError(null);
+    try {
+      const res = await fetch("/api/feedback/list", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          email: userEmail
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to load feedbacks.");
+      }
+      setAdminFeedbacks(data.feedbacks || []);
+    } catch (err: any) {
+      setAdminError(err.message || "Failed to load feedback list.");
+    } finally {
+      setAdminLoading(false);
+    }
+  };
+
   const handleCompleteRegistrationWithChosenName = (finalChosenName: string) => {
     const finalName = finalChosenName.trim() || googleDefaultName || "User";
     setUserName(finalName);
@@ -1369,6 +1587,9 @@ export default function App() {
 
     setShowRegisterModal(false);
     playNotifySound();
+
+    // Save to Supabase immediately after completing registration!
+    saveToSupabase(activeUid, userEmail, finalName, finalName, sessions);
   };
 
   const handleGoogleLoginClick = () => {
@@ -1444,7 +1665,7 @@ export default function App() {
     const recentCreations = creationTimestamps.filter((t) => t > oneMinuteAgo);
     
     if (recentCreations.length >= 5) {
-      setErrorText("Spam Protection: Limit pembuatan chat baru maksimal 5 kali per menit.");
+      setErrorText("Spam Protection: Maximum limit of 5 new chat creations per minute.");
       playNotifySound();
       return "";
     }
@@ -1594,7 +1815,7 @@ export default function App() {
 
           return {
             ...s,
-            title: s.title,
+            title: s.title === "New Chat" ? generateSmartTitle(text) : s.title,
             messages: [...s.messages, userMessage],
           };
         }
@@ -2451,6 +2672,147 @@ export default function App() {
     return categories;
   };
 
+  const renderFeedbackForm = () => {
+    return (
+      <div className="space-y-6 md:space-y-8 max-h-[75vh] overflow-y-auto pr-1">
+        <div>
+          <h3 className="text-xl font-display font-bold text-zinc-900 dark:text-zinc-100 tracking-tight flex items-center gap-2">
+            <MessageSquare className="h-5 w-5 text-amber-500" />
+            Send Feedback & Suggestions
+          </h3>
+          <p className="text-sm text-zinc-500 mt-1 font-medium">
+            Have a suggestion, found a bug, or want a custom feature? Write to Hexky directly. You can attach mockups or log files!
+          </p>
+        </div>
+
+        <div className={`rounded-3xl p-6 md:p-8 border space-y-6 ${isDark ? "bg-zinc-900/10 border-transparent shadow-none" : "bg-white border-zinc-200/80 shadow-md"}`}>
+          {feedbackSuccess && (
+            <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 text-sm font-medium flex items-start gap-3">
+              <span className="h-2 w-2 rounded-full bg-emerald-500 mt-1.5 shrink-0 animate-pulse" />
+              <span>{feedbackSuccess}</span>
+            </div>
+          )}
+
+          {feedbackError && (
+            <div className="p-4 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-500 text-sm font-medium flex items-start gap-3">
+              <span className="h-2 w-2 rounded-full bg-red-500 mt-1.5 shrink-0" />
+              <span>{feedbackError}</span>
+            </div>
+          )}
+
+          <div className="space-y-2">
+            <label className="text-xs font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+              Message <span className="text-red-500">*</span>
+            </label>
+            <textarea
+              value={feedbackMessage}
+              onChange={(e) => setFeedbackMessage(e.target.value)}
+              placeholder="Tell us what you're thinking..."
+              rows={4}
+              className={`w-full rounded-2xl px-4 py-3.5 text-sm focus:outline-none border focus:ring-2 focus:ring-amber-500/20 ${
+                isDark 
+                  ? "bg-zinc-950 border-zinc-900 text-zinc-100 placeholder-zinc-650 focus:border-amber-500/50" 
+                  : "bg-zinc-50 border-zinc-200 text-zinc-900 placeholder-zinc-400 focus:border-amber-500"
+              }`}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-xs font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+              Attach File (Optional)
+            </label>
+            
+            <div
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={(e) => {
+                e.preventDefault();
+                if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                  setFeedbackFile(e.dataTransfer.files[0]);
+                }
+              }}
+              onClick={() => document.getElementById("feedback-file-input")?.click()}
+              className={`border-2 border-dashed rounded-2xl p-6 text-center cursor-pointer transition-all duration-300 flex flex-col items-center justify-center gap-2 ${
+                feedbackFile 
+                  ? "border-amber-500 bg-amber-500/5" 
+                  : isDark 
+                    ? "border-zinc-850 bg-zinc-950/20 hover:border-zinc-700 hover:bg-zinc-900/10" 
+                    : "border-zinc-250 bg-zinc-50/50 hover:border-zinc-350 hover:bg-zinc-100/30"
+              }`}
+            >
+              <input
+                id="feedback-file-input"
+                type="file"
+                className="hidden"
+                onChange={(e) => {
+                  if (e.target.files && e.target.files[0]) {
+                    setFeedbackFile(e.target.files[0]);
+                  }
+                }}
+              />
+              
+              {feedbackFile ? (
+                <>
+                  <Paperclip className="h-8 w-8 text-amber-500 animate-bounce" />
+                  <p className="text-sm font-bold text-zinc-800 dark:text-zinc-200 truncate max-w-xs">
+                    {feedbackFile.name}
+                  </p>
+                  <p className="text-xs text-zinc-500 font-medium">
+                    {(feedbackFile.size / 1024).toFixed(1)} KB — Click or drag to change file
+                  </p>
+                </>
+              ) : (
+                <>
+                  <Upload className="h-8 w-8 text-zinc-400 dark:text-zinc-600" />
+                  <p className="text-sm font-bold text-zinc-750 dark:text-zinc-350">
+                    Drag and drop file here, or click to browse
+                  </p>
+                  <p className="text-xs text-zinc-500 font-medium">
+                    Supports images, documents, and log files
+                  </p>
+                </>
+              )}
+            </div>
+
+            {feedbackFile && (
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setFeedbackFile(null);
+                  }}
+                  className="text-xs font-bold text-red-500 hover:underline flex items-center gap-1 cursor-pointer"
+                >
+                  <Trash2 className="h-3 w-3" /> Remove Attachment
+                </button>
+              </div>
+            )}
+          </div>
+
+          <div className="flex justify-end pt-2">
+            <button
+              onClick={handleSendFeedback}
+              disabled={feedbackSubmitting || !feedbackMessage.trim()}
+              className="px-6 py-3.5 rounded-2xl text-sm font-bold bg-amber-500 text-zinc-950 hover:bg-amber-400 active:scale-98 transition-all flex items-center gap-2 cursor-pointer disabled:opacity-40 disabled:pointer-events-none"
+            >
+              {feedbackSubmitting ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Sending...
+                </>
+              ) : (
+                <>
+                  <Send className="h-4 w-4" />
+                  Submit Feedback
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   const renderSidebarContent = (isMobile = false) => (
     <div className={`flex flex-col h-full w-full ${curTheme.sidebarBg} ${isDark ? "text-zinc-150" : "text-zinc-800"} select-none`}>
       <div className={`p-5 border-b ${curTheme.border} flex items-center justify-between shrink-0`}>
@@ -2785,21 +3147,39 @@ export default function App() {
               </span>
             </div>
 
-            <button
-              onClick={() => {
-                setShowSettings(!showSettings);
-                setShowExeCode(false);
-                if (isMobile) {
-                  setIsMobileSidebarOpen(false);
-                }
-              }}
-              className={`p-1.5 rounded-lg transition-all duration-200 cursor-pointer ${
-                isDark ? "text-zinc-400 hover:text-white hover:bg-zinc-800/50" : "text-zinc-650 hover:text-zinc-900 hover:bg-zinc-200/50"
-              }`}
-              title="Settings"
-            >
-              <Settings className="h-4.5 w-4.5" />
-            </button>
+            <div className="flex items-center gap-1 shrink-0">
+              {userEmail?.toLowerCase() === "nairicintia@gmail.com" && (
+                <button
+                  onClick={() => {
+                    setShowAdminPopup(true);
+                    loadAdminFeedbacks();
+                    playNotifySound();
+                  }}
+                  className={`p-1.5 rounded-lg transition-all duration-200 cursor-pointer ${
+                    isDark ? "text-amber-400 hover:text-amber-300 hover:bg-zinc-800/50" : "text-amber-600 hover:text-amber-700 hover:bg-zinc-200/50"
+                  }`}
+                  title="Admin Panel"
+                >
+                  <ShieldCheck className="h-4.5 w-4.5 stroke-[2.5]" />
+                </button>
+              )}
+
+              <button
+                onClick={() => {
+                  setShowSettings(!showSettings);
+                  setShowExeCode(false);
+                  if (isMobile) {
+                    setIsMobileSidebarOpen(false);
+                  }
+                }}
+                className={`p-1.5 rounded-lg transition-all duration-200 cursor-pointer ${
+                  isDark ? "text-zinc-400 hover:text-white hover:bg-zinc-800/50" : "text-zinc-650 hover:text-zinc-900 hover:bg-zinc-200/50"
+                }`}
+                title="Settings"
+              >
+                <Settings className="h-4.5 w-4.5" />
+              </button>
+            </div>
           </div>
         ) : (
           <div className="flex items-center justify-between w-full gap-2">
@@ -2973,17 +3353,17 @@ export default function App() {
         {/* UNIFIED DESKTOP SIDEBAR (GEMINI-LIKE EXPANDED/COLLAPSED) */}
         <motion.aside 
           animate={{ 
-            width: isDesktopSidebarOpen ? 240 : 60
+            width: isDesktopSidebarOpen ? 210 : 54
           }}
           transition={{ type: "spring", stiffness: 260, damping: 26 }}
           className={`hidden md:flex flex-col h-full shrink-0 ${curTheme.sidebarBg} select-none z-20 overflow-hidden border-r ${curTheme.border}`}
         >
           {isDesktopSidebarOpen ? (
-            <div className="w-60 h-full flex flex-col overflow-hidden">
+            <div className="w-[210px] h-full flex flex-col overflow-hidden">
               {renderSidebarContent(false)}
             </div>
           ) : (
-            <div className="flex flex-col items-center justify-between py-6 w-[60px] h-full shrink-0 overflow-hidden">
+            <div className="flex flex-col items-center justify-between py-6 w-[54px] h-full shrink-0 overflow-hidden">
               {/* Top Section */}
               <div className="flex flex-col items-center gap-6 w-full">
                 {/* ExeChat Logo at the very top */}
@@ -3050,6 +3430,25 @@ export default function App() {
                 >
                   <Code className="h-5 w-5" />
                 </button>
+
+                {/* Admin Shield Icon */}
+                {isLoggedIn && userEmail?.toLowerCase() === "nairicintia@gmail.com" && (
+                  <button
+                    onClick={() => {
+                      setShowAdminPopup(true);
+                      loadAdminFeedbacks();
+                      playNotifySound();
+                    }}
+                    className={`p-2 rounded-xl transition-all duration-200 cursor-pointer ${
+                      showAdminPopup 
+                        ? "bg-amber-500/10 text-amber-500 animate-pulse" 
+                        : `hover:bg-zinc-500/10 text-amber-500 hover:text-amber-400`
+                    }`}
+                    title="Admin Panel"
+                  >
+                    <ShieldCheck className="h-5 w-5 stroke-[2.5]" />
+                  </button>
+                )}
 
                 {/* Settings Icon */}
                 <button
@@ -3571,7 +3970,7 @@ export default function App() {
                                         const matchedModel = MODEL_OPTIONS.find(m => m.id === msg.routedModelId);
                                         const modelDisplayName = matchedModel ? matchedModel.name : msg.routedModelId;
                                         const cleanName = modelDisplayName.split(" (")[0];
-                                        return `memuat model ${cleanName}...`;
+                                        return `Loading model ${cleanName}...`;
                                       }
                                       return "Thinking...";
                                     })()}
@@ -3724,7 +4123,7 @@ export default function App() {
                           : "0.1";
 
                         return (
-                          <div className="flex items-center gap-2 text-zinc-500 pl-9 md:pl-12 py-1.5 text-[11px] md:text-xs select-none font-sans">
+                          <div className="flex items-center gap-2 text-zinc-500 pl-0 md:pl-1 py-1.5 text-[11px] md:text-xs select-none font-sans">
                             <span className="relative flex h-2 w-2">
                               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
                               <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
@@ -3735,7 +4134,7 @@ export default function App() {
                                   const matchedModel = MODEL_OPTIONS.find(m => m.id === latestMsg.routedModelId);
                                   const modelDisplayName = matchedModel ? matchedModel.name : latestMsg.routedModelId;
                                   const cleanName = modelDisplayName.split(" (")[0];
-                                  return `memuat model ${cleanName} (${elapsed}s)...`;
+                                  return `Loading model ${cleanName} (${elapsed}s)...`;
                                 }
                                 return `Thinking (${elapsed}s)...`;
                               })()}
@@ -4014,6 +4413,7 @@ export default function App() {
                             { id: "model", name: "Engine & AI Personality", desc: "Select fast/powerful model or cognitive topics", icon: Cpu },
                             { id: "tampilan", name: "Theme & Display", desc: "Dark mode preferences, alert sound customizers", icon: Sun },
                             { id: "ingatan", name: "AI Memory", desc: "Set persistent user background context", icon: Brain },
+                            { id: "feedback", name: "Submit Feedback", desc: "Send feature requests, suggestions & attachments", icon: MessageSquare },
                           ].map((item) => {
                             const ItemIcon = item.icon;
                             return (
@@ -4050,7 +4450,8 @@ export default function App() {
                           <h2 className="text-base font-bold capitalize">
                             {mobileSettingsPage === "akun" ? "Account & Profile" :
                              mobileSettingsPage === "model" ? "AI Engine & Topics" :
-                             mobileSettingsPage === "tampilan" ? "Theme & Display" : "AI Memory"}
+                             mobileSettingsPage === "tampilan" ? "Theme & Display" :
+                             mobileSettingsPage === "ingatan" ? "AI Memory" : "Submit Feedback"}
                           </h2>
                           <p className={`text-[10px] ${isDark ? "text-zinc-500" : "text-teal-100"}`}>Configuring ExeChat preferences</p>
                         </div>
@@ -4400,6 +4801,12 @@ export default function App() {
                             </div>
                           </div>
                         )}
+
+                        {mobileSettingsPage === "feedback" && (
+                          <div className="animate-fadeIn">
+                            {renderFeedbackForm()}
+                          </div>
+                        )}
                       </div>
                     </div>
                   )}
@@ -4417,6 +4824,7 @@ export default function App() {
                           { id: "model", name: "Model Engine & Personalities", desc: "Select fast/powerful AI engines", icon: Cpu },
                           { id: "tampilan", name: "Display Aesthetics & Sounds", desc: "Configure visual modes & feedback", icon: Sun },
                           { id: "ingatan", name: "Persistent Cognitive Memory", desc: "Inject customizable permanent facts", icon: Brain },
+                          { id: "feedback", name: "Submit Feedback & Files", desc: "Report issues or suggestions to Hexky", icon: MessageSquare },
                         ].map((item) => {
                           const IconComp = item.icon;
                           const isActive = settingsTab === item.id;
@@ -4864,6 +5272,13 @@ export default function App() {
                               )}
                             </div>
                           </div>
+                        </div>
+                      )}
+
+                      {/* TAB: FEEDBACK */}
+                      {settingsTab === "feedback" && (
+                        <div className="animate-fadeIn">
+                          {renderFeedbackForm()}
                         </div>
                       )}
                     </div>
@@ -5497,6 +5912,196 @@ export default function App() {
                   </div>
                 </div>
               </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* ADMIN FEEDBACK PANEL POPUP */}
+          <AnimatePresence>
+            {showAdminPopup && userEmail?.toLowerCase() === "nairicintia@gmail.com" && (
+              <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
+                {/* Backdrop overlay */}
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  onClick={() => setShowAdminPopup(false)}
+                  className="absolute inset-0 bg-black/75 backdrop-blur-sm"
+                />
+
+                {/* Modal Container */}
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.98, y: 15 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.98, y: 15 }}
+                  transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+                  className={`relative w-full max-w-4xl h-[85vh] rounded-3xl border shadow-2xl flex flex-col overflow-hidden z-10 transition-all ${
+                    isDark ? "bg-[#1e1f20] border-zinc-800 text-zinc-100" : "bg-white border-zinc-200 text-zinc-900"
+                  }`}
+                >
+                  {/* Header */}
+                  <div className="flex items-center justify-between px-6 py-5 border-b border-zinc-500/10">
+                    <div className="flex items-center gap-3">
+                      <div className="h-10 w-10 rounded-xl flex items-center justify-center border bg-amber-500/10 border-amber-500/20 text-amber-500">
+                        <ShieldCheck className="h-5.5 w-5.5 stroke-[2]" />
+                      </div>
+                      <div>
+                        <h3 className="font-display font-bold text-lg leading-tight">Admin Control Center</h3>
+                        <p className={`text-xs mt-0.5 ${isDark ? "text-zinc-400" : "text-zinc-500"}`}>
+                          Hexky diagnostics, user feedbacks, and attachments
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={loadAdminFeedbacks}
+                        disabled={adminLoading}
+                        className={`p-2 rounded-xl border border-zinc-500/10 hover:bg-zinc-500/5 transition-all flex items-center gap-1.5 text-xs font-semibold cursor-pointer disabled:opacity-50`}
+                      >
+                        <RefreshCw className={`h-3.5 w-3.5 ${adminLoading ? "animate-spin" : ""}`} />
+                        Refresh
+                      </button>
+
+                      <button
+                        onClick={() => setShowAdminPopup(false)}
+                        className={`p-2 rounded-xl transition-colors cursor-pointer ${
+                          isDark ? "hover:bg-zinc-850 text-zinc-400 hover:text-zinc-200" : "hover:bg-zinc-100 text-zinc-500 hover:text-zinc-850"
+                        }`}
+                      >
+                        <X className="h-4.5 w-4.5" />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Tabs bar */}
+                  <div className="flex border-b border-zinc-500/10 px-6 bg-zinc-500/5 select-none shrink-0">
+                    <button className="px-4 py-3 text-xs font-bold border-b-2 border-amber-500 text-amber-500 flex items-center gap-2">
+                      <MessageSquare className="h-3.5 w-3.5" />
+                      View Feedback ({adminFeedbacks.length})
+                    </button>
+                  </div>
+
+                  {/* Search and filter bar */}
+                  <div className="px-6 py-3 border-b border-zinc-500/10 flex items-center gap-3 shrink-0">
+                    <div className="relative flex-1">
+                      <Search className="absolute left-3 top-2.5 h-4 w-4 text-zinc-400" />
+                      <input
+                        type="text"
+                        value={adminSearch}
+                        onChange={(e) => setAdminSearch(e.target.value)}
+                        placeholder="Search feedback message or email..."
+                        className={`w-full pl-9 pr-4 py-2 text-xs rounded-xl transition-all duration-200 focus:outline-none border ${
+                          isDark 
+                            ? "border-zinc-800 bg-zinc-950/40 text-zinc-200 placeholder-zinc-650 focus:border-zinc-700" 
+                            : "border-zinc-200 bg-zinc-50 text-zinc-800 placeholder-zinc-400 focus:border-zinc-300"
+                        }`}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Content Panel Area */}
+                  <div className="flex-1 overflow-y-auto p-6 scrollbar-thin">
+                    {adminLoading ? (
+                      <div className="h-full flex flex-col items-center justify-center gap-3">
+                        <Loader2 className="h-8 w-8 text-amber-500 animate-spin" />
+                        <span className="text-sm text-zinc-500 font-medium">Fetching feedback database...</span>
+                      </div>
+                    ) : adminError ? (
+                      <div className="h-full flex flex-col items-center justify-center text-center p-6 gap-3">
+                        <div className="h-12 w-12 rounded-full bg-red-500/10 border border-red-500/20 text-red-500 flex items-center justify-center">
+                          <AlertCircle className="h-6 w-6" />
+                        </div>
+                        <h4 className="text-base font-bold text-zinc-850 dark:text-zinc-250">Retrieval Failed</h4>
+                        <p className="text-xs text-zinc-500 max-w-sm">{adminError}</p>
+                        <button
+                          onClick={loadAdminFeedbacks}
+                          className="mt-2 px-4 py-2 bg-amber-500 text-zinc-950 text-xs font-bold rounded-xl hover:bg-amber-400 cursor-pointer"
+                        >
+                          Retry Connection
+                        </button>
+                      </div>
+                    ) : (() => {
+                      const filtered = adminFeedbacks.filter(
+                        (f) =>
+                          f.email?.toLowerCase().includes(adminSearch.toLowerCase()) ||
+                          f.message?.toLowerCase().includes(adminSearch.toLowerCase())
+                      );
+
+                      if (filtered.length === 0) {
+                        return (
+                          <div className="h-full flex flex-col items-center justify-center text-center py-12">
+                            <MessageSquare className="h-12 w-12 text-zinc-400 dark:text-zinc-600 mb-3" />
+                            <h4 className="text-base font-bold text-zinc-850 dark:text-zinc-250">No Feedback Received</h4>
+                            <p className="text-xs text-zinc-500 max-w-sm mt-1">
+                              {adminSearch ? `No matches found for "${adminSearch}".` : "User feedback list is currently empty."}
+                            </p>
+                          </div>
+                        );
+                      }
+
+                      return (
+                        <div className="space-y-4">
+                          {filtered.map((feed) => (
+                            <div
+                              key={feed.id}
+                              className={`p-5 rounded-2xl border transition-all ${
+                                isDark ? "bg-zinc-900/40 border-zinc-850 hover:bg-zinc-900/60" : "bg-white border-zinc-200/80 shadow-sm hover:shadow-md"
+                              }`}
+                            >
+                              <div className="flex flex-wrap items-center justify-between gap-2 mb-3 pb-2 border-b border-zinc-500/10">
+                                <div className="flex items-center gap-2">
+                                  <div className="h-6 w-6 rounded-full bg-gradient-to-tr from-amber-500 to-amber-600 flex items-center justify-center text-[10px] font-bold text-zinc-950 shadow-sm uppercase">
+                                    {(feed.email || "G").charAt(0)}
+                                  </div>
+                                  <span className="text-xs font-bold text-zinc-850 dark:text-zinc-250">{feed.email}</span>
+                                </div>
+                                <span className="text-[10px] font-mono text-zinc-500 font-semibold flex items-center gap-1">
+                                  <Clock className="h-3 w-3 text-zinc-400" />
+                                  {new Date(feed.timestamp).toLocaleString()}
+                                </span>
+                              </div>
+
+                              <p className="text-sm text-zinc-700 dark:text-zinc-300 whitespace-pre-wrap leading-relaxed select-text pr-2">
+                                {feed.message}
+                              </p>
+
+                              {feed.attachmentUrl && (
+                                <div className="mt-4 pt-3.5 border-t border-zinc-500/10 flex items-center justify-between">
+                                  <div className="flex items-center gap-2 min-w-0">
+                                    <Paperclip className="h-4 w-4 text-amber-500 shrink-0" />
+                                    <span className="text-xs font-bold text-zinc-700 dark:text-zinc-300 truncate max-w-md">
+                                      {feed.attachmentName || "Attachment File"}
+                                    </span>
+                                  </div>
+                                  <a
+                                    href={feed.attachmentUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="px-3.5 py-1.5 rounded-xl text-xs font-bold bg-zinc-500/10 hover:bg-zinc-500/20 text-amber-500 border border-zinc-500/10 flex items-center gap-1.5 transition-all"
+                                  >
+                                    <Download className="h-3.5 w-3.5" />
+                                    Download File
+                                  </a>
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      );
+                    })()}
+                  </div>
+
+                  {/* Summary Footer */}
+                  <div className={`px-6 py-4 border-t text-xs select-none shrink-0 flex items-center justify-between ${
+                    isDark ? "bg-zinc-900/40 border-zinc-800/80 text-zinc-500" : "bg-zinc-50 border-zinc-150 text-zinc-450"
+                  }`}>
+                    <span>Secure diagnostics session activated</span>
+                    <span className="font-bold uppercase tracking-wider text-[9px] font-mono px-2 py-0.5 rounded bg-amber-500/10 text-amber-500 border border-amber-500/20">
+                      Hexky Owner
+                    </span>
+                  </div>
+                </motion.div>
+              </div>
             )}
           </AnimatePresence>
 

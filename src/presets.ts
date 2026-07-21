@@ -3,9 +3,9 @@ import { SystemPreset, ModelOption } from "./types";
 export const MODEL_OPTIONS: ModelOption[] = [
   {
     id: "automatic",
-    name: "Automatic (Rekomendasi)",
+    name: "Automatic (Recommended)",
     badge: "Auto AI",
-    description: "Sistem cerdas memilih model terbaik berdasarkan topik (misal Gemini AI untuk analisis gambar atau web search, exeai-e5 untuk penalaran cepat).",
+    description: "Smart system selects the best model based on topic (e.g. Gemini AI for image analysis or web search, exeai-e5 for fast reasoning).",
   },
   {
     id: "gemma-4-31b",
@@ -119,59 +119,59 @@ export interface TemperaturePreset {
 export const GEMMA_TEMP_PRESETS: TemperaturePreset[] = [
   {
     id: "coding-besar",
-    name: "Coding besar (ribuan baris, full project)",
+    name: "Large Coding (thousands of lines, full project)",
     range: "0.15–0.25",
     defaultValue: 0.20,
-    description: "Sangat konsisten untuk restrukturisasi kode skala besar dan project-wide."
+    description: "Highly consistent for large-scale code restructuring and project-wide modifications."
   },
   {
     id: "coding-sedang",
-    name: "Coding sedang (fitur baru, API, komponen)",
+    name: "Medium Coding (new features, APIs, components)",
     range: "0.25–0.35",
     defaultValue: 0.30,
-    description: "Keseimbangan ideal antara kepatuhan struktur dan fleksibilitas logika baru."
+    description: "Ideal balance between structural adherence and new logic flexibility."
   },
   {
     id: "coding-kecil",
-    name: "Coding kecil (fungsi, bug fix)",
+    name: "Small Coding (individual functions, bug fixes)",
     range: "0.3–0.4",
     defaultValue: 0.35,
-    description: "Presisi tinggi dengan sedikit ruang kreatif untuk penyelesaian masalah ringkas."
+    description: "High precision with slight creative room for concise problem solving."
   },
   {
     id: "debug-error",
     name: "Debug error",
     range: "0.2–0.3",
     defaultValue: 0.25,
-    description: "Fokus maksimal pada analisis tumpukan kesalahan (stack trace) dan kecocokan sintaks."
+    description: "Maximum focus on stack trace analysis and exact syntax matching."
   },
   {
     id: "penjelasan-coding",
-    name: "Penjelasan coding",
+    name: "Code Explanation",
     range: "0.4–0.5",
     defaultValue: 0.45,
-    description: "Penjelasan ramah, deskriptif, dan mudah dipahami dengan analogi terstruktur."
+    description: "Friendly, descriptive, and easy-to-understand explanations with structured analogies."
   },
   {
     id: "chat-umum",
-    name: "Chat umum",
+    name: "General Chat",
     range: "0.6–0.7",
     defaultValue: 0.65,
-    description: "Obrolan santai sehari-hari dengan nada yang hidup, hangat, dan interaktif."
+    description: "Casual daily conversation with a lively, warm, and interactive tone."
   },
   {
     id: "brainstorming",
-    name: "Brainstorming ide",
+    name: "Idea Brainstorming",
     range: "0.7–0.8",
     defaultValue: 0.75,
-    description: "Mendorong pemikiran out-of-the-box dan opsi konseptual yang inovatif."
+    description: "Encourages out-of-the-box thinking and innovative conceptual options."
   },
   {
     id: "kreatif",
-    name: "Cerita, puisi, roleplay",
+    name: "Creative Writing, storytelling, poetry",
     range: "0.8–1.0",
     defaultValue: 0.90,
-    description: "Tingkat kreativitas tertinggi untuk penulisan naratif, sastra, dan penokohan karakter mendalam."
+    description: "Highest level of creativity for narrative writing, literature, and deep character development."
   }
 ];
 

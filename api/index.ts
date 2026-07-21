@@ -328,6 +328,210 @@ app.post("/api/db/metrics", async (req, res) => {
   }
 });
 
+// --- ADMIN & FEEDBACK SYSTEM ENDPOINTS ---
+app.post("/api/feedback/submit", async (req, res) => {
+  try {
+    const { email, message, attachment } = req.body;
+    if (!email || !message) {
+      return res.status(400).json({ error: "Email and message are required fields." });
+    }
+
+    const supabase = getSupabaseClient();
+    if (!supabase) {
+      return res.status(400).json({ error: "Supabase client not configured." });
+    }
+
+    const bucket = "execode";
+    
+    // 1. SPAM PROTECTION CHECK (30-minute delay per Google account stored securely in Supabase)
+    const sanitizedEmail = email.replace(/[^a-zA-Z0-9]/g, "_");
+    const timerPath = `feedback_timers/${sanitizedEmail}.json`;
+
+    try {
+      const { data: timerData } = await supabase.storage
+        .from(bucket)
+        .download(timerPath);
+
+      if (timerData) {
+        const textContent = await timerData.text();
+        const parsedTimer = JSON.parse(textContent);
+        if (parsedTimer && parsedTimer.lastSubmittedAt) {
+          const elapsed = Date.now() - parsedTimer.lastSubmittedAt;
+          const waitTimeLimit = 30 * 60 * 1000; // 30 minutes in milliseconds
+          if (elapsed < waitTimeLimit) {
+            const minutesLeft = Math.ceil((waitTimeLimit - elapsed) / 1000 / 60);
+            return res.status(429).json({
+              error: `Spam Protection: You can only send 1 feedback every 30 minutes. Please wait ${minutesLeft} minute(s) before trying again.`
+            });
+          }
+        }
+      }
+    } catch (err: any) {
+      // If timer file doesn't exist, it is fine to proceed
+      if (!err.message?.includes("Object not found") && err.status !== 404) {
+        console.warn("Feedback timer load error (non-fatal):", err);
+      }
+    }
+
+    // 2. PROCESS FILE ATTACHMENT
+    let attachmentUrl = null;
+    let attachmentName = null;
+    
+    if (attachment && attachment.base64 && attachment.name) {
+      // Decode Base64
+      let base64Data = attachment.base64;
+      if (base64Data.includes(";base64,")) {
+        base64Data = base64Data.split(";base64,").pop();
+      }
+      const buffer = Buffer.from(base64Data, "base64");
+      
+      const fileId = `${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+      const safeFileName = attachment.name.replace(/[^a-zA-Z0-9.]/g, "_");
+      const attachmentPath = `feedback_attachments/${fileId}_${safeFileName}`;
+
+      const { error: uploadErr } = await supabase.storage
+        .from(bucket)
+        .upload(attachmentPath, buffer, {
+          contentType: attachment.type || "application/octet-stream",
+          upsert: true
+        });
+
+      if (uploadErr) {
+        throw uploadErr;
+      }
+
+      // Generate public/download URL
+      const { data: publicUrlData } = supabase.storage
+        .from(bucket)
+        .getPublicUrl(attachmentPath);
+
+      attachmentUrl = publicUrlData?.publicUrl || `/api/feedback/attachment?path=${encodeURIComponent(attachmentPath)}`;
+      attachmentName = attachment.name;
+    }
+
+    // 3. WRITE THE FEEDBACK TO STORAGE
+    const feedbackId = `fb_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    const feedbackPayload = {
+      id: feedbackId,
+      email,
+      message,
+      attachmentUrl,
+      attachmentName,
+      timestamp: Date.now()
+    };
+
+    const fbBuffer = Buffer.from(JSON.stringify(feedbackPayload, null, 2), "utf-8");
+    const feedbackPath = `feedback/${feedbackId}.json`;
+
+    const { error: writeErr } = await supabase.storage
+      .from(bucket)
+      .upload(feedbackPath, fbBuffer, {
+        contentType: "application/json",
+        upsert: true
+      });
+
+    if (writeErr) {
+      throw writeErr;
+    }
+
+    // 4. UPDATE SPAM TIMER
+    const timerPayload = { lastSubmittedAt: Date.now() };
+    const timerBuffer = Buffer.from(JSON.stringify(timerPayload, null, 2), "utf-8");
+    await supabase.storage
+      .from(bucket)
+      .upload(timerPath, timerBuffer, {
+        contentType: "application/json",
+        upsert: true
+      });
+
+    res.json({ success: true, message: "Thank you! Your feedback has been sent successfully." });
+  } catch (error: any) {
+    console.error("Feedback submission error:", error);
+    res.status(500).json({ error: error.message || "Failed to submit feedback. Please try again later." });
+  }
+});
+
+// Endpoint to fetch feedback attachments
+app.get("/api/feedback/attachment", async (req, res) => {
+  try {
+    const filePath = req.query.path as string;
+    if (!filePath) {
+      return res.status(400).json({ error: "Missing attachment path." });
+    }
+
+    const supabase = getSupabaseClient();
+    if (!supabase) {
+      return res.status(400).json({ error: "Supabase client not configured." });
+    }
+
+    const bucket = "execode";
+    const { data, error } = await supabase.storage.from(bucket).download(filePath);
+    
+    if (error) {
+      throw error;
+    }
+
+    const buffer = Buffer.from(await data.arrayBuffer());
+    res.send(buffer);
+  } catch (error: any) {
+    console.error("Error retrieving feedback attachment:", error);
+    res.status(500).send("Error retrieving feedback attachment.");
+  }
+});
+
+// List feedbacks for owner (nairicintia@gmail.com)
+app.post("/api/feedback/list", async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (email !== "nairicintia@gmail.com") {
+      return res.status(403).json({ error: "Forbidden: You are not authorized to access this panel." });
+    }
+
+    const supabase = getSupabaseClient();
+    if (!supabase) {
+      return res.status(400).json({ error: "Supabase client not configured." });
+    }
+
+    const bucket = "execode";
+    const { data: fileList, error: listError } = await supabase.storage
+      .from(bucket)
+      .list("feedback");
+
+    if (listError) {
+      throw listError;
+    }
+
+    const feedbacks: any[] = [];
+    if (fileList && fileList.length > 0) {
+      const sortedFiles = fileList
+        .filter(f => f.name.endsWith(".json"))
+        .sort((a, b) => b.name.localeCompare(a.name))
+        .slice(0, 100);
+
+      for (const file of sortedFiles) {
+        try {
+          const { data: fileData } = await supabase.storage
+            .from(bucket)
+            .download(`feedback/${file.name}`);
+
+          if (fileData) {
+            const textContent = await fileData.text();
+            const parsed = JSON.parse(textContent);
+            feedbacks.push(parsed);
+          }
+        } catch (readErr) {
+          console.warn(`Failed to read feedback file: ${file.name}`, readErr);
+        }
+      }
+    }
+
+    res.json({ success: true, feedbacks: feedbacks.sort((a, b) => b.timestamp - a.timestamp) });
+  } catch (error: any) {
+    console.error("Feedback list load error:", error);
+    res.status(500).json({ error: error.message || "Failed to load feedback list." });
+  }
+});
+
 app.post("/api/supabase/upload", async (req, res) => {
   try {
     const { projectName, files, bucket = "execode" } = req.body;
