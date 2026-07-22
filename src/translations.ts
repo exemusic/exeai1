@@ -103,44 +103,57 @@ export interface TranslationDict {
   selected: string;
   compatible: string;
   active: string;
-  rename: string;
-  delete: string;
-  seeAll: string;
-  options: string;
-  expandSidebar: string;
-  closeSidebar: string;
-  closeHistory: string;
-  noSearchResults: string;
-  noChatHistory: string;
-  connectingToExeChat: string;
-  verifyingSecureSession: string;
-  welcomeSignInPrompt: string;
-  chatSessionsSavedPrivately: string;
-  removeAttachment: string;
-  finalStep: string;
-  whatIsYourName: string;
-  chooseNicknameDesc: string;
-  nicknameLabel: string;
-  exampleNamePlaceholder: string;
-  saveAndContinue: string;
-  skipGoogleName: string;
-  deleteWarning: string;
-  confirmClearTitle: string;
-  confirmClearDesc: string;
-  clearChat: string;
-  noConversationsFoundFor: string;
-  matchingConversations: string;
-  clickToJump: string;
-  pressEscToClose: string;
-  cookieNotificationTitle: string;
-  cookieNotificationDesc: string;
-  storageDetailsTitle: string;
-  essentialStorageDesc: string;
-  preferencesStorageDesc: string;
-  privacyRespectNotice: string;
-  hideDetails: string;
-  learnDetails: string;
-  exeChatDisclaimer: string;
+  rename?: string;
+  delete?: string;
+  seeAll?: string;
+  options?: string;
+  expandSidebar?: string;
+  closeSidebar?: string;
+  closeHistory?: string;
+  noSearchResults?: string;
+  noChatHistory?: string;
+  connectingToExeChat?: string;
+  verifyingSecureSession?: string;
+  welcomeSignInPrompt?: string;
+  chatSessionsSavedPrivately?: string;
+  removeAttachment?: string;
+  finalStep?: string;
+  whatIsYourName?: string;
+  chooseNicknameDesc?: string;
+  nicknameLabel?: string;
+  exampleNamePlaceholder?: string;
+  saveAndContinue?: string;
+  skipGoogleName?: string;
+  deleteWarning?: string;
+  confirmClearTitle?: string;
+  confirmClearDesc?: string;
+  clearChat?: string;
+  searchConversationsPlaceholder?: string;
+  noConversationsFound?: string;
+  noConversationsFoundFor?: string;
+  matchingConversations?: string;
+  clickToJump?: string;
+  clickToJumpConversation?: string;
+  pressEscToClose?: string;
+  cookieNotificationTitle?: string;
+  cookieNotificationDesc?: string;
+  cookieTitle?: string;
+  cookieNoticeText?: string;
+  storageDetailsTitle?: string;
+  ourStorageDetails?: string;
+  essentialRequired?: string;
+  essentialDesc?: string;
+  essentialStorageDesc?: string;
+  preferencesOptional?: string;
+  preferencesDesc?: string;
+  preferencesStorageDesc?: string;
+  privacyRespectNotice?: string;
+  privacyRespect?: string;
+  hideDetails?: string;
+  learnDetails?: string;
+  reject?: string;
+  accept?: string;
+  exeChatDisclaimer?: string;
   
   // ExeCode Workspace
   workspaceTitle: string;
@@ -273,18 +286,31 @@ export const translations: Record<string, TranslationDict> = {
     confirmClearTitle: "Clear Conversation",
     confirmClearDesc: "Are you sure you want to delete all messages in this conversation? This action cannot be undone.",
     clearChat: "Clear Chat",
+    searchConversationsPlaceholder: "Search for conversations...",
+    noConversationsFound: 'No conversations found for "{query}"',
     noConversationsFoundFor: 'No conversations found for "{query}"',
     matchingConversations: "Matching Conversations",
     clickToJump: "Click on a conversation to jump to it",
+    clickToJumpConversation: "Click on a conversation to jump to it",
     pressEscToClose: "Press ESC to close",
     cookieNotificationTitle: "Cookie & Storage Notification",
     cookieNotificationDesc: "ExeChat uses cookies and local storage (localStorage) to remember your chat sessions, theme settings, and Google login verification to function optimally and securely.",
+    cookieTitle: "Cookie & Storage Notification",
+    cookieNoticeText: "ExeChat uses cookies and local storage (localStorage) to remember your chat sessions, theme settings, and Google login verification to function optimally and securely.",
     storageDetailsTitle: "Our Storage Details:",
+    ourStorageDetails: "Our Storage Details:",
+    essentialRequired: "Essential (Required)",
+    essentialDesc: "Stores your chat session IDs, Google login status, and the API keys needed to interact with the AI.",
     essentialStorageDesc: "Essential (Required): Stores your chat session IDs, Google login status, and the API keys needed to interact with the AI.",
+    preferencesOptional: "Preferences (Optional)",
+    preferencesDesc: "Stores your theme choices (Dark/Light), assistant characters/presets, and nickname memory preferences.",
     preferencesStorageDesc: "Preferences (Optional): Stores your theme choices (Dark/Light), assistant characters/presets, and nickname memory preferences.",
     privacyRespectNotice: "We fully respect your privacy. All your chat data is stored locally on your own device.",
+    privacyRespect: "We fully respect your privacy. All your chat data is stored locally on your own device.",
     hideDetails: "Hide Details",
     learnDetails: "Learn Details",
+    reject: "Reject",
+    accept: "Accept",
     exeChatDisclaimer: "ExeChat can make mistakes. Verify important info.",
     
     workspaceTitle: "ExeCode Web AI Workstation",
@@ -416,18 +442,31 @@ export const translations: Record<string, TranslationDict> = {
     confirmClearTitle: "Hapus Percakapan",
     confirmClearDesc: "Apakah Anda yakin ingin menghapus semua pesan dalam percakapan ini? Tindakan ini tidak dapat dibatalkan.",
     clearChat: "Hapus Chat",
+    searchConversationsPlaceholder: "Cari percakapan...",
+    noConversationsFound: 'Tidak ada percakapan ditemukan untuk "{query}"',
     noConversationsFoundFor: 'Tidak ada percakapan ditemukan untuk "{query}"',
     matchingConversations: "Percakapan Cocok",
     clickToJump: "Klik pada percakapan untuk langsung membukanya",
+    clickToJumpConversation: "Klik pada percakapan untuk langsung membukanya",
     pressEscToClose: "Tekan ESC untuk menutup",
     cookieNotificationTitle: "Pemberitahuan Cookie & Penyimpanan",
     cookieNotificationDesc: "ExeChat menggunakan cookie dan penyimpanan lokal (localStorage) untuk mengingat sesi chat, pengaturan tema, dan verifikasi login Google agar berfungsi secara optimal dan aman.",
+    cookieTitle: "Pemberitahuan Cookie & Penyimpanan",
+    cookieNoticeText: "ExeChat menggunakan cookie dan penyimpanan lokal (localStorage) untuk mengingat sesi chat, pengaturan tema, dan verifikasi login Google agar berfungsi secara optimal dan aman.",
     storageDetailsTitle: "Rincian Penyimpanan Kami:",
+    ourStorageDetails: "Rincian Penyimpanan Kami:",
+    essentialRequired: "Penting (Wajib)",
+    essentialDesc: "Menyimpan ID sesi chat, status login Google, dan kunci API untuk berinteraksi dengan AI.",
     essentialStorageDesc: "Penting (Wajib): Menyimpan ID sesi chat, status login Google, dan kunci API untuk berinteraksi dengan AI.",
+    preferencesOptional: "Preferensi (Opsional)",
+    preferencesDesc: "Menyimpan pilihan tema (Gelap/Terang), preset asisten, dan preferensi memori nama panggilan.",
     preferencesStorageDesc: "Preferensi (Opsional): Menyimpan pilihan tema (Gelap/Terang), preset asisten, dan preferensi memori nama panggilan.",
     privacyRespectNotice: "Kami sepenuhnya menghormati privasi Anda. Semua data percakapan Anda disimpan secara lokal di perangkat Anda sendiri.",
+    privacyRespect: "Kami sepenuhnya menghormati privasi Anda. Semua data percakapan Anda disimpan secara lokal di perangkat Anda sendiri.",
     hideDetails: "Sembunyikan Rincian",
     learnDetails: "Pelajari Rincian",
+    reject: "Tolak",
+    accept: "Terima",
     exeChatDisclaimer: "ExeChat dapat membuat kesalahan. Verifikasi info penting.",
     
     workspaceTitle: "Workstation Web AI ExeCode",

@@ -1386,7 +1386,7 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId, us
       en: "ENGLISH"
     };
     const langName = langNames[activeUserLang] || "ENGLISH";
-    const languageInstruction = `ACTIVE USER LANGUAGE IS ${langName}. You MUST write your complete explanation, commentary, and response in natural, fluent, and helpful ${langName}.`;
+    const languageInstruction = `AUTO-DETECT USER PROMPT LANGUAGE: You MUST write your complete response in the EXACT SAME LANGUAGE as the user's latest prompt. If the user writes in English, reply in natural English. If the user writes in Indonesian, reply in natural Indonesian. (Default interface setting: ${langName}).`;
 
     const currentPromptTurn = {
       role: "user",
@@ -1406,17 +1406,17 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId, us
         `=========================================\n` +
         `SYSTEM & RESPONSE FORMAT INSTRUCTIONS:\n` +
         `=========================================\n` +
-        `1. MANDATORY: ALWAYS start your response with a clear, friendly, and comprehensive explanation of your changes in the SAME language as the User Instruction and Active Language Directive. Act as an elite senior developer on ExeCode Workstation - warm, helpful, professional, and clear.\n` +
-        `2. NEVER output ONLY a JSON code block without plain-text explanation. Write 1 to 3 friendly paragraphs explaining what changes you made and why.\n` +
-        `3. Follow user instructions precisely. DO NOT add unrequested extra features, buttons, or unasked visual components.\n` +
-        `4. AFTER your natural explanation, provide a \`\`\`json code block containing an array of ONLY the files you modified or created.\n` +
-        `5. Provide complete, production-ready code in the "content" field. NEVER use placeholders or ellipsis like "// rest of code".\n` +
-        `6. JSON output structure example:\n` +
+        `1. MANDATORY LANGUAGE MATCHING: Respond strictly in the SAME language as the User Instruction (e.g. English if prompt is in English, Indonesian if prompt is in Indonesian).\n` +
+        `2. CRITICAL FOR CODE MODIFICATIONS: When the user asks to modify, update, fix, create, or change code (or states that code hasn't changed), you MUST generate the updated workspace code inside a single \`\`\`json block at the end of your message.\n` +
+        `3. NEVER output ONLY a JSON code block without plain-text explanation. Write 1 to 3 friendly paragraphs explaining what changes you made and why.\n` +
+        `4. Follow user instructions precisely. DO NOT add unrequested extra features, buttons, or unasked visual components.\n` +
+        `5. JSON output structure example:\n` +
         `\`\`\`json\n` +
         `[\n` +
         `  { "path": "index.html", "content": "...complete updated html..." }\n` +
         `]\n` +
-        `\`\`\``
+        `\`\`\`\n` +
+        `6. Provide complete, production-ready code in the "content" field. NEVER use placeholders or ellipsis like "// rest of code".`
     };
 
     const payloadMessages = [...previousContext, currentPromptTurn];
@@ -1591,7 +1591,9 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId, us
         let finalResponseText = displayableText ? displayableText.trim() : "";
         if (!finalResponseText) {
           const fileNames = editedFiles.map(f => f.path).join(", ");
-          finalResponseText = `Saya telah memperbarui file **${fileNames}** di workspace ExeCode Anda sesuai dengan instruksi yang Anda berikan. Seluruh perubahan telah diterapkan secara langsung pada live preview.`;
+          finalResponseText = activeUserLang === "id"
+            ? `Saya telah memperbarui file **${fileNames}** di workspace ExeCode Anda. Perubahan telah diterapkan langsung pada live preview.`
+            : `I have updated **${fileNames}** in your ExeCode workspace. The changes have been applied directly to the live preview.`;
         }
 
         setChatHistory(prev => prev.map(msg => 
@@ -1617,7 +1619,9 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId, us
 
         let nonCodeText = displayableText ? displayableText.trim() : fullText.replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
         if (!nonCodeText) {
-          nonCodeText = "Saya telah memproses instruksi Anda secara lengkap. Silakan periksa atau uji coba perubahan di workspace ExeCode Anda.";
+          nonCodeText = activeUserLang === "id"
+            ? "Saya telah memproses instruksi Anda secara lengkap."
+            : "I have processed your request.";
         }
 
         let thinkHeader = "";
