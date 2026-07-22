@@ -502,7 +502,15 @@ export default function App() {
   // --- FEEDBACK & ADMIN SYSTEM STATES ---
   // --- LANGUAGE STATES ---
   const [userLanguage, setUserLanguage] = useState<string>(() => {
-    return localStorage.getItem("exechat_user_language") || "";
+    const saved = localStorage.getItem("exechat_user_language");
+    if (saved) return saved;
+    if (typeof navigator !== "undefined") {
+      const browserLang = (navigator.language || (navigator.languages && navigator.languages[0]) || "").toLowerCase();
+      if (browserLang.startsWith("id") || browserLang.startsWith("in")) {
+        return "id";
+      }
+    }
+    return "en";
   });
   const [showLanguagePopup, setShowLanguagePopup] = useState(false);
 
@@ -670,10 +678,14 @@ export default function App() {
 
   const getBrowserLanguageInstruction = () => {
     try {
-      const browserLanguages = navigator.languages || [navigator.language || "en"];
-      const primaryLang = (browserLanguages[0] || "en").toLowerCase();
+      const activeCode = userLanguage || (() => {
+        const primaryLang = (navigator.languages?.[0] || navigator.language || "en").toLowerCase();
+        return (primaryLang.startsWith("id") || primaryLang.startsWith("in")) ? "id" : "en";
+      })();
+
       const languageNames: Record<string, string> = {
-        id: "Indonesian",
+        id: "Indonesian (Bahasa Indonesia)",
+        en: "English",
         ar: "Arabic",
         es: "Spanish",
         fr: "French",
@@ -690,23 +702,18 @@ export default function App() {
         nl: "Dutch",
       };
       
-      const langCode = primaryLang.split("-")[0];
-      const targetLangName = languageNames[langCode] || langCode.toUpperCase();
+      const targetLangName = languageNames[activeCode] || activeCode.toUpperCase();
       
-      let localeInstruction = `\n\n[CRITICAL USER REGION & AUTO-LANGUAGE DETECTION]\n`;
-      localeInstruction += `User Browser Primary Language: ${primaryLang} (${targetLangName})\n`;
-      localeInstruction += `Preferred Languages: ${browserLanguages.join(", ")}\n\n`;
+      let localeInstruction = `\n\n[USER REGION & ACTIVE LANGUAGE DIRECTIVE]\n`;
+      localeInstruction += `Active Region Language: ${activeCode.toUpperCase()} (${targetLangName})\n\n`;
       
-      localeInstruction += `CRITICAL TRANSLATION DIRECTIVE:\n`;
-      localeInstruction += `The user's web browser (Chrome, Edge, Safari, etc.) indicates they are from a region where the primary language is ${targetLangName}.\n`;
-      if (langCode === "id") {
-        localeInstruction += `Always prioritize translating text between English <-> Indonesian (Inggris <-> Indonesia) by default when translation is requested, and respond to general queries in Indonesian.\n`;
-      } else if (langCode === "ar") {
-        localeInstruction += `Always prioritize translating text between English <-> Arabic (إنجليزي <-> عربي) by default when translation is requested, and respond to general queries in Arabic.\n`;
+      localeInstruction += `CRITICAL LANGUAGE DIRECTIVE:\n`;
+      if (activeCode === "id") {
+        localeInstruction += `The user's active region language is Bahasa Indonesia. You MUST respond to all general queries, explanations, and code commentary in natural, fluent Bahasa Indonesia.\n`;
       } else {
-        localeInstruction += `Always prioritize translating text between English <-> ${targetLangName} by default when translation is requested, and respond to general queries in ${targetLangName}.\n`;
+        localeInstruction += `The user's active region language is English. You MUST respond to all general queries, explanations, and code commentary in fluent English.\n`;
       }
-      localeInstruction += `Keep your translations natural, idiomatic, and highly contextual. Explain any grammatical differences or cultural nuances beautifully.`;
+      localeInstruction += `Keep explanations clear, friendly, and contextual.`;
       
       return localeInstruction;
     } catch (e) {
