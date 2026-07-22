@@ -77,7 +77,37 @@ interface ExeCodeWorkspaceProps {
   userId?: string | null;
 }
 
+const EXECODE_MD_CONTENT = `# ExeCode Web AI Workstation
+
+## Overview & Purpose
+ExeCode is an interactive, multi-file web code editor and live preview workstation built with React, Tailwind CSS, and Supabase backend services.
+It enables developers to build, edit, test, and run complete web applications (\`index.html\`, \`app.js\`, \`style.css\`, etc.) in real-time within a secure sandboxed iframe environment.
+
+## Application Architecture & Key Features
+- **Multi-File Virtual Workspace**: Create, edit, and organize workspace files (\`index.html\`, \`app.js\`, \`style.css\`, \`execode.md\`, etc.) with real-time state tracking.
+- **AI-Powered Code Assistant**: Real-time streaming AI model that reads project files, understands multi-turn user prompt history, modifies workspace code atomically, and explains changes clearly.
+- **Atomic Supabase Cloud Persistence**: Instant synchronization and storage of user project bundles (\`project.json\`) in Supabase Storage (\`execode\` bucket).
+- **Live Preview Sandbox**: Interactive iframe execution environment supporting dynamic JavaScript execution, device switching (Desktop / Mobile), and full screen viewing.
+- **Multilingual Support**: Fully localized interface available in Indonesian, English, Spanish, Japanese, French, German, Chinese, and Arabic.
+- **Admin Security**: Secure feedback submission system with file attachments and owner-restricted administration endpoints.
+
+## Recent Updates & Change History
+1. **Natural UI Refinement**: Modernized pure dark theme (\`#000000\`), sleek borders, crisp typography, and removal of all generic AI slop and premium badges.
+2. **Context-Aware AI Memory**: AI model now retains full multi-turn conversation history and reads \`execode.md\` for project background.
+3. **Atomic State Synchronization**: Sub-second project saving and loading via Supabase \`project.json\` state bundles.
+4. **Admin Endpoint Security**: Feedback list and delete APIs strictly restricted to authorized owner accounts.
+
+## Guidelines for AI Assistant
+- Always generate complete, production-ready code for edited files.
+- Provide clear, friendly explanations in the user's spoken language before writing the JSON file array.
+- Follow user prompt requests precisely without adding unrequested extra features or buttons.
+`;
+
 const DEFAULT_FILES: VirtualFile[] = [
+  {
+    path: "execode.md",
+    content: EXECODE_MD_CONTENT
+  },
   {
     path: "index.html",
     content: `<!DOCTYPE html>
@@ -110,7 +140,11 @@ if (button) {
 export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId, userEmail, userId }: ExeCodeWorkspaceProps) {
   const [files, setFiles] = useState<VirtualFile[]>(() => {
     const saved = localStorage.getItem("execode_files");
-    return saved ? JSON.parse(saved) : DEFAULT_FILES;
+    let loaded: VirtualFile[] = saved ? JSON.parse(saved) : DEFAULT_FILES;
+    if (!loaded.some(f => f.path.toLowerCase() === "execode.md")) {
+      loaded = [{ path: "execode.md", content: EXECODE_MD_CONTENT }, ...loaded];
+    }
+    return loaded;
   });
   
   const [activeFilePath, setActiveFilePath] = useState<string>("index.html");
@@ -699,9 +733,13 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId, us
     })
     .then(data => {
       if (data.files && data.files.length > 0) {
-        setFiles(data.files);
+        let loadedFiles = data.files;
+        if (!loadedFiles.some((f: VirtualFile) => f.path.toLowerCase() === "execode.md")) {
+          loadedFiles = [{ path: "execode.md", content: EXECODE_MD_CONTENT }, ...loadedFiles];
+        }
+        setFiles(loadedFiles);
         setActiveFilePath("index.html");
-        refreshPreview(data.files);
+        refreshPreview(loadedFiles);
         triggerStatus(`Successfully loaded '${targetProjectName}' from cloud!`, "success");
       } else {
         refreshPreview(initialFiles);
@@ -1306,36 +1344,66 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId, us
     setChatHistory(prev => [...prev, userMsg, tempAssistantMsg]);
     setIsAIEditing(true);
 
+    // Build previous conversation turns context (up to last 8 messages)
+    const previousContext = chatHistory.slice(-8).map(msg => {
+      if (msg.role === "user") {
+        return {
+          role: "user",
+          content: msg.content
+        };
+      } else {
+        let cleanText = msg.content || "";
+        cleanText = cleanText.replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
+        cleanText = cleanText.replace(/```(?:json|js|javascript|html)?[\s\S]*?```/gi, "").trim();
+        if (!cleanText && msg.editedPaths && msg.editedPaths.length > 0) {
+          cleanText = `[Updated workspace files: ${msg.editedPaths.join(", ")}]`;
+        }
+        return {
+          role: "assistant",
+          content: cleanText || "I updated your workspace files according to your instructions."
+        };
+      }
+    }).filter(m => m.content && m.content.trim().length > 0);
+
+    const execodeMdFile = files.find(f => f.path.toLowerCase() === "execode.md");
+    const execodeMdContent = execodeMdFile ? execodeMdFile.content : EXECODE_MD_CONTENT;
+
+    const currentPromptTurn = {
+      role: "user",
+      content: `USER INSTRUCTION: "${promptToSend}"\n\n` +
+        `=========================================\n` +
+        `EXECODE WORKSPACE MANIFEST & DOCUMENTATION (execode.md):\n` +
+        `=========================================\n` +
+        `${execodeMdContent}\n\n` +
+        `=========================================\n` +
+        `CURRENT WORKSPACE FILES & CODE:\n` +
+        `=========================================\n` +
+        JSON.stringify(files, null, 2) + "\n\n" +
+        `=========================================\n` +
+        `SYSTEM & RESPONSE FORMAT INSTRUCTIONS:\n` +
+        `=========================================\n` +
+        `1. MANDATORY: ALWAYS start your response with a clear, friendly, and comprehensive explanation of your changes in the SAME language as the User Instruction (e.g. if the user asked in Indonesian, explain in Indonesian; if English, explain in English). Act as an elite senior developer on ExeCode Workstation - warm, helpful, professional, and clear.\n` +
+        `2. NEVER output ONLY a JSON code block without plain-text explanation. Write 1 to 3 friendly paragraphs explaining what changes you made and why.\n` +
+        `3. Follow user instructions precisely. DO NOT add unrequested extra features, buttons, or unasked visual components.\n` +
+        `4. AFTER your natural explanation, provide a \`\`\`json code block containing an array of ONLY the files you modified or created.\n` +
+        `5. Provide complete, production-ready code in the "content" field. NEVER use placeholders or ellipsis like "// rest of code".\n` +
+        `6. JSON output structure example:\n` +
+        `\`\`\`json\n` +
+        `[\n` +
+        `  { "path": "index.html", "content": "...complete updated html..." }\n` +
+        `]\n` +
+        `\`\`\``
+    };
+
+    const payloadMessages = [...previousContext, currentPromptTurn];
+
     try {
       const response = await fetch("/api/chat/stream", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           model: selectedModel,
-          messages: [
-            {
-              role: "user",
-              content: `User Instructions: "${promptToSend}"\n\n` +
-                `Here is the entire list of files in my workspace with their current code:\n\n` +
-                JSON.stringify(files, null, 2) + "\n\n" +
-                `IMPORTANT (AI BEHAVIOR & STRUCTURE INSTRUCTIONS):\n` +
-                `1. Provide a clear, friendly, and natural explanation of your changes in the SAME language as the User Instructions (e.g., if the user asks in Indonesian, reply/explain in Indonesian; if English, use English). Act as an elite senior developer on Google AI Studio - warm, professional, clear, and highly helpful, avoiding stiff or artificial formatting.\n` +
-                `2. Your primary focus is: SELECTING/ADJUSTING/TIDYING files, FIXING BUGS, EDITING files, and VERIFYING to ensure there is no wrong code.\n` +
-                `3. VERY IMPORTANT: You must follow user commands precisely. DO NOT add other features, components, buttons, or logic that were not requested or asked by the user!\n` +
-                `4. Provide your explanation outside the JSON code block naturally. You do not need to use rigid templates like "### Explanation of Changes". Feel free to explain the logic and benefits comprehensively in your own style.\n` +
-                `5. Provide a \`\`\`json code block containing the array of ONLY updated files. DO NOT include files that were not edited at all.\n` +
-                `6. Write the NEW file content completely in the "content" field. NEVER shorten file content with ellipsis, comments like "// remaining code", or "/* ... */" because that will break the user's program.\n` +
-                `7. To be safe from JSON parsing limits, try to escape double quotes (\`\"\`) in your code, or use single quotes (\`'\`) or backticks (\`\` \` \`\`) inside the code string.\n` +
-                `8. Do not corrupt or delete important files. Edit index.html or app.js as needed, or create new files if required.\n\n` +
-                `Example format of the response to follow:\n` +
-                `[Your beautiful, natural, and comprehensive explanation of changes in the user's language]\n\n` +
-                `\`\`\`json\n` +
-                `[\n` +
-                `  { "path": "index.html", "content": "...complete new code..." }\n` +
-                `]\n` +
-                `\`\`\``
-            }
-          ]
+          messages: payloadMessages
         })
       });
 
@@ -1496,11 +1564,17 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId, us
           thinkHeader = thinkMatch[0] + "\n\n";
         }
 
+        let finalResponseText = displayableText ? displayableText.trim() : "";
+        if (!finalResponseText) {
+          const fileNames = editedFiles.map(f => f.path).join(", ");
+          finalResponseText = `Saya telah memperbarui file **${fileNames}** di workspace ExeCode Anda sesuai dengan instruksi yang Anda berikan. Seluruh perubahan telah diterapkan secara langsung pada live preview.`;
+        }
+
         setChatHistory(prev => prev.map(msg => 
           msg.id === assistantMsgId 
             ? { 
                 ...msg, 
-                content: thinkHeader + (displayableText ? displayableText.trim() : "I have updated your code files as requested."), 
+                content: thinkHeader + finalResponseText, 
                 filesSnapshot: oldFiles,
                 thinkingDuration: finalDur,
                 modelId: selectedModel,
@@ -1517,11 +1591,22 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId, us
           finalDur = finalThinkingDurationsRef.current[assistantMsgId];
         }
 
+        let nonCodeText = displayableText ? displayableText.trim() : fullText.replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
+        if (!nonCodeText) {
+          nonCodeText = "Saya telah memproses instruksi Anda secara lengkap. Silakan periksa atau uji coba perubahan di workspace ExeCode Anda.";
+        }
+
+        let thinkHeader = "";
+        const thinkMatch = fullText.match(/<think>([\s\S]*?)<\/think>/i);
+        if (thinkMatch) {
+          thinkHeader = thinkMatch[0] + "\n\n";
+        }
+
         setChatHistory(prev => prev.map(msg => 
           msg.id === assistantMsgId 
             ? { 
                 ...msg, 
-                content: fullText.trim() || "I have processed your request.",
+                content: thinkHeader + nonCodeText,
                 thinkingDuration: finalDur,
                 modelId: selectedModel
               } 
