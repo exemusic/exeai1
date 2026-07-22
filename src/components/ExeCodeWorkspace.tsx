@@ -39,7 +39,8 @@ import {
   Lock,
   Menu,
   Info,
-  FileUp
+  FileUp,
+  Square
 } from "lucide-react";
 import JSZip from "jszip";
 import { MODEL_OPTIONS } from "../presets";
@@ -247,6 +248,21 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId, us
   const typewriterIntervalIdRef = useRef<any>(null);
   const typewriterDurationRef = useRef<number>(0.1);
   const isAIEditingActiveRef = useRef<boolean>(false);
+  const abortControllerRef = useRef<AbortController | null>(null);
+
+  const handleStopGeneration = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    isAIEditingActiveRef.current = false;
+    if (typewriterIntervalIdRef.current) {
+      clearTimeout(typewriterIntervalIdRef.current);
+      typewriterIntervalIdRef.current = null;
+    }
+    setIsAIEditing(false);
+    triggerStatus("AI generation stopped.", "info");
+  };
 
   // Initialize backup when entering edit mode or changing file
   useEffect(() => {
@@ -1048,7 +1064,11 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId, us
   };
 
   const cleanDisplayContent = (text: string) => {
-    let cleaned = text.replace(/```(?:json|javascript|js|html|css|typescript|ts)?[\s\S]*?(?:```|$)/gi, "");
+    if (!text) return "";
+    let cleaned = text.replace(/<think>[\s\S]*?<\/think>/gi, "");
+    cleaned = cleaned.replace(/<think>[\s\S]*$/gi, "");
+    cleaned = cleaned.replace(/<\/?think>/gi, "");
+    cleaned = cleaned.replace(/```(?:json|javascript|js|html|css|typescript|ts)?[\s\S]*?(?:```|$)/gi, "");
     return cleaned.trim();
   };
 
@@ -1341,6 +1361,13 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId, us
       typewriterIntervalIdRef.current = null;
     }
 
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
     const userMsg: ChatMessage = {
       id: "usr-" + Date.now(),
       role: "user",
@@ -1427,13 +1454,14 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId, us
         `2. CRITICAL FOR CODE MODIFICATIONS: When the user asks to modify, update, fix, create, or change code (or states that code hasn't changed), you MUST generate the updated workspace code inside a single \`\`\`json block at the end of your message.\n` +
         `3. DETAILED & COMPREHENSIVE RESPONSES ONLY: NEVER write brief or generic 1-sentence responses like 'I have processed your request' or 'Done'. ALWAYS write 2 to 4 detailed, friendly, and professional paragraphs explaining what changes were made, why, how the interface was updated, and how to test them.\n` +
         `4. Follow user instructions precisely. DO NOT add unrequested extra features, buttons, or unasked visual components.\n` +
-        `5. JSON output structure example:\n` +
+        `5. SOLUTION-FIRST DIRECTIVE: NEVER state 'tidak bisa' (cannot do) or claim 'sudah dilakukan' (already done) unless you actually provide the complete code changes. You MUST ALWAYS provide a direct, functional, working code solution and include the complete updated files in the \`\`\`json block.\n` +
+        `6. JSON output structure example:\n` +
         `\`\`\`json\n` +
         `[\n` +
         `  { "path": "index.html", "content": "...complete updated html..." }\n` +
         `]\n` +
         `\`\`\`\n` +
-        `6. Provide complete, production-ready code in the "content" field. NEVER use placeholders or ellipsis like "// rest of code".`
+        `7. Provide complete, production-ready code in the "content" field. NEVER use placeholders or ellipsis like "// rest of code".`
     };
 
     const payloadMessages = [...previousContext, currentPromptTurn];
@@ -1442,6 +1470,7 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId, us
       const response = await fetch("/api/chat/stream", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        signal: controller.signal,
         body: JSON.stringify({
           model: selectedModel,
           messages: payloadMessages
@@ -1662,13 +1691,26 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId, us
         triggerStatus("AI response received.", "success");
       }
     } catch (err: any) {
-      console.error("AI Code Edit Error: ", err);
-      setChatHistory(prev => prev.map(msg => 
-        msg.id === assistantMsgId 
-          ? { ...msg, content: `Failed to modify code: ${err.message}. Please try again.` } 
-          : msg
-      ));
-      triggerStatus(`Failed to process AI edit: ${err.message}`, "error");
+      if (err.name === "AbortError") {
+        console.log("AI response generation stopped by user.");
+        setChatHistory(prev => prev.map(msg => 
+          msg.id === assistantMsgId 
+            ? { 
+                ...msg, 
+                content: msg.content ? msg.content + "\n\n*[Respons AI dihentikan oleh pengguna]*" : "*[Respons AI dihentikan oleh pengguna]*" 
+              } 
+            : msg
+        ));
+        triggerStatus("Respons AI berhasil dihentikan.", "info");
+      } else {
+        console.error("AI Code Edit Error: ", err);
+        setChatHistory(prev => prev.map(msg => 
+          msg.id === assistantMsgId 
+            ? { ...msg, content: `Failed to modify code: ${err.message}. Please try again.` } 
+            : msg
+        ));
+        triggerStatus(`Failed to process AI edit: ${err.message}`, "error");
+      }
     } finally {
       isAIEditingActiveRef.current = false;
       if (typewriterIntervalIdRef.current) {
@@ -1906,8 +1948,7 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId, us
 
     if (match) {
       const thinking = match[1].trim();
-      // Remove all <think>...</think> blocks from actual content to be absolutely sure they never leak
-      const actual = content.replace(thinkRegex, "").trim();
+      const actual = cleanDisplayContent(content);
       return { thinking: sanitizeAndShortenThought(thinking), actual, isThinking: false };
     }
 
@@ -1916,21 +1957,19 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId, us
     const openMatch = openThinkRegex.exec(content);
     if (openMatch) {
       const thinking = openMatch[1].trim();
-      const actual = content.replace(openThinkRegex, "").trim();
+      const actual = cleanDisplayContent(content);
       return { thinking: sanitizeAndShortenThought(thinking), actual, isThinking: true };
     }
 
     // Check if the content ends with a partial <think tag to prevent temporary flickering of partial tag
     const partialThinkRegex = /<t(h(i(n(k)?)?)?)?$/i;
     if (partialThinkRegex.test(content)) {
-      return { thinking: "", actual: content.replace(partialThinkRegex, "").trim(), isThinking: true };
+      const actual = cleanDisplayContent(content);
+      return { thinking: "", actual, isThinking: true };
     }
 
-    // Just in case there is any stray/orphaned </think> or <think> in the text, clean them up
-    let cleaned = content;
-    cleaned = cleaned.replace(/<\/?think>/gi, "");
-
-    return { thinking: null, actual: cleaned.trim(), isThinking: false };
+    const actual = cleanDisplayContent(content);
+    return { thinking: null, actual, isThinking: false };
   };
 
   const extractUpdatedFilesFromContent = (text: string): string[] => {
@@ -1999,17 +2038,49 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId, us
         {msg && msg.role === "assistant" && (() => {
           const actionSteps: any[] = [];
 
-          // 1. Thought Step (if we have thinking text and are NOT actively thinking anymore)
-          if (thinking !== null && !isThinking) {
+          // 1. Thought Steps (break into multiple process steps if thinking text exists)
+          if (thinking !== null && thinking.trim().length > 0) {
+            const rawSteps = thinking
+              .split(/\n+/)
+              .map(s => s.replace(/^(?:\d+\.|\*|-|•)\s*/, "").trim())
+              .filter(Boolean);
+
+            if (rawSteps.length > 0) {
+              rawSteps.forEach((stepText, idx) => {
+                const sKey = `${msgId}-thought-${idx}`;
+                actionSteps.push({
+                  type: "thought",
+                  stepKey: sKey,
+                  text: `Thought process ${idx + 1}`,
+                  subtext: stepText,
+                  content: stepText,
+                  isThinking: false
+                });
+              });
+            } else {
+              const sKey = `${msgId}-thought-0`;
+              actionSteps.push({
+                type: "thought",
+                stepKey: sKey,
+                text: `Thought for ${typeof msgDuration === "number" ? msgDuration.toFixed(1) : msgDuration} seconds`,
+                subtext: thinking,
+                content: thinking,
+                isThinking: false
+              });
+            }
+          } else if (isThinking) {
+            const sKey = `${msgId}-thought-0`;
             actionSteps.push({
               type: "thought",
-              text: `Thought for ${typeof msgDuration === "number" ? msgDuration.toFixed(1) : msgDuration} seconds`,
-              content: thinking,
-              isThinking: false
+              stepKey: sKey,
+              text: `Thinking process active`,
+              subtext: "Analyzing project files and prompt...",
+              content: "Analyzing project files and prompt...",
+              isThinking: true
             });
           }
 
-          // 2. Read & Edit Steps
+          // 2. Read & Edit Steps (ONLY FOR ACTUALLY UPDATED FILES)
           if (updatedFiles.length > 0) {
             updatedFiles.forEach((file) => {
               actionSteps.push({
@@ -2033,20 +2104,10 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId, us
               status: "succeeded"
             });
           } else {
-            // Checked workspace code files
-            const mainFiles = files.filter(f => f.path !== "execode.md").map(f => f.path);
-            (mainFiles.length > 0 ? mainFiles : ["index.html", "app.js"]).forEach(file => {
-              actionSteps.push({
-                type: "read",
-                text: "Read file",
-                subtext: "Read file:",
-                file: file
-              });
-            });
             actionSteps.push({
               type: "verify",
-              text: "Verify workspace",
-              subtext: "Workspace check:",
+              text: "Evaluated prompt context",
+              subtext: "Response generated without file edits",
               status: "succeeded"
             });
           }
@@ -2087,103 +2148,106 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId, us
                     className="overflow-hidden w-full border-t border-zinc-800/20"
                   >
                     <div className="w-full p-4 flex flex-col gap-4">
-                      {actionSteps.map((step, idx) => (
-                        <div key={idx} className="flex gap-3 items-start">
-                          <div className="pt-0.5 shrink-0">
-                            {step.type === "thought" && (
-                              <svg className={`h-4 w-4 shrink-0 ${isDark ? "text-amber-400" : "text-amber-500"}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                <path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A5 5 0 0 0 8 8c0 1.3.5 2.6 1.5 3.5.8.8 1.3 1.5 1.5 2.5" />
-                                <path d="M9 18h6" />
-                                <path d="M10 22h4" />
-                              </svg>
-                            )}
-                            {step.type === "read" && (
-                              <svg className={`h-4 w-4 shrink-0 ${isDark ? "text-blue-400" : "text-blue-500"}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                                <polyline points="14 2 14 8 20 8" />
-                                <line x1="16" y1="13" x2="8" y2="13" />
-                                <line x1="16" y1="17" x2="8" y2="17" />
-                              </svg>
-                            )}
-                            {step.type === "edit" && (
-                              <svg className={`h-4 w-4 shrink-0 ${isDark ? "text-teal-400" : "text-teal-500"}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                <path d="M12 20h9" />
-                                <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
-                              </svg>
-                            )}
-                            {step.type === "verify" && (
-                              <svg className={`h-4 w-4 shrink-0 ${isDark ? "text-emerald-400" : "text-emerald-500"}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                <polyline points="20 6 9 17 4 12" />
-                              </svg>
-                            )}
-                          </div>
-                          
-                          <div className="flex flex-col flex-1 min-w-0">
-                            <div className="flex items-center justify-between w-full gap-2">
-                              <span className={`text-[12px] font-medium ${isDark ? "text-[#e3e3e3]" : "text-zinc-800"}`}>
-                                {step.text}
-                              </span>
-                              {step.content && (
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setExpandedThoughts(prev => ({ ...prev, [msgId]: !prev[msgId] }));
-                                  }}
-                                  className={`text-[10px] font-semibold px-2 py-0.5 rounded-md border transition-all cursor-pointer ${
-                                    isDark 
-                                      ? "bg-zinc-900 border-zinc-800 hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200" 
-                                      : "bg-zinc-100 border-zinc-200 hover:bg-zinc-200 text-zinc-600 hover:text-zinc-800"
-                                  }`}
-                                >
-                                  {expandedThoughts[msgId] ? "Hide Detail" : "Show Detail"}
-                                </button>
+                      {actionSteps.map((step, idx) => {
+                        const sKey = step.stepKey || `${msgId}-${idx}`;
+                        return (
+                          <div key={idx} className="flex gap-3 items-start">
+                            <div className="pt-0.5 shrink-0">
+                              {step.type === "thought" && (
+                                <svg className={`h-4 w-4 shrink-0 ${isDark ? "text-amber-400" : "text-amber-500"}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                  <path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A5 5 0 0 0 8 8c0 1.3.5 2.6 1.5 3.5.8.8 1.3 1.5 1.5 2.5" />
+                                  <path d="M9 18h6" />
+                                  <path d="M10 22h4" />
+                                </svg>
+                              )}
+                              {step.type === "read" && (
+                                <svg className={`h-4 w-4 shrink-0 ${isDark ? "text-blue-400" : "text-blue-500"}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                                  <polyline points="14 2 14 8 20 8" />
+                                  <line x1="16" y1="13" x2="8" y2="13" />
+                                  <line x1="16" y1="17" x2="8" y2="17" />
+                                </svg>
+                              )}
+                              {step.type === "edit" && (
+                                <svg className={`h-4 w-4 shrink-0 ${isDark ? "text-teal-400" : "text-teal-500"}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                  <path d="M12 20h9" />
+                                  <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
+                                </svg>
+                              )}
+                              {step.type === "verify" && (
+                                <svg className={`h-4 w-4 shrink-0 ${isDark ? "text-emerald-400" : "text-emerald-500"}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                  <polyline points="20 6 9 17 4 12" />
+                                </svg>
                               )}
                             </div>
                             
-                            {step.subtext && (
-                              <div className={`text-[11px] mt-1 flex items-center flex-wrap gap-1.5 ${isDark ? "text-[#9e9e9e]" : "text-zinc-500"}`}>
-                                <span>{step.subtext}</span>
-                                {step.file && (
-                                  <span className={`font-mono text-[10.5px] px-1.5 py-0.5 rounded ${
-                                    isDark 
-                                      ? "bg-zinc-900 text-[#e3e3e3] border border-zinc-800/80" 
-                                      : "bg-zinc-200/50 text-zinc-800 border border-zinc-300"
-                                  }`}>
-                                    {step.file}
-                                  </span>
+                            <div className="flex flex-col flex-1 min-w-0">
+                              <div className="flex items-center justify-between w-full gap-2">
+                                <span className={`text-[12px] font-medium ${isDark ? "text-[#e3e3e3]" : "text-zinc-800"}`}>
+                                  {step.text}
+                                </span>
+                                {step.content && (
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setExpandedThoughts(prev => ({ ...prev, [sKey]: !prev[sKey] }));
+                                    }}
+                                    className={`text-[10px] font-semibold px-2 py-0.5 rounded-md border transition-all cursor-pointer ${
+                                      isDark 
+                                        ? "bg-zinc-900 border-zinc-800 hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200" 
+                                        : "bg-zinc-100 border-zinc-200 hover:bg-zinc-200 text-zinc-600 hover:text-zinc-800"
+                                    }`}
+                                  >
+                                    {expandedThoughts[sKey] ? "Hide Detail" : "Show Detail"}
+                                  </button>
                                 )}
-                                {step.status && (
-                                  <span className={`font-mono text-[10.5px] px-1.5 py-0.5 rounded text-emerald-500 ${
-                                    isDark 
-                                      ? "bg-[#131314] border border-zinc-800/80" 
-                                      : "bg-emerald-50 text-emerald-700 border border-emerald-100"
-                                  }`}>
-                                    {step.status}
-                                  </span>
-                                )}
                               </div>
-                            )}
+                              
+                              {step.subtext && (
+                                <div className={`text-[11px] mt-1 flex items-center flex-wrap gap-1.5 ${isDark ? "text-[#9e9e9e]" : "text-zinc-500"}`}>
+                                  <span>{step.subtext}</span>
+                                  {step.file && (
+                                    <span className={`font-mono text-[10.5px] px-1.5 py-0.5 rounded ${
+                                      isDark 
+                                        ? "bg-zinc-900 text-[#e3e3e3] border border-zinc-800/80" 
+                                        : "bg-zinc-200/50 text-zinc-800 border border-zinc-300"
+                                    }`}>
+                                      {step.file}
+                                    </span>
+                                  )}
+                                  {step.status && (
+                                    <span className={`font-mono text-[10.5px] px-1.5 py-0.5 rounded text-emerald-500 ${
+                                      isDark 
+                                        ? "bg-[#131314] border border-zinc-800/80" 
+                                        : "bg-emerald-50 text-emerald-700 border border-emerald-100"
+                                    }`}>
+                                      {step.status}
+                                    </span>
+                                  )}
+                                </div>
+                              )}
 
-                            {step.content && expandedThoughts[msgId] && (
-                              <div className={`mt-2 w-full border p-3 rounded-lg font-mono text-[10.5px] leading-relaxed whitespace-pre-wrap max-h-[160px] overflow-y-auto scrollbar-thin border-l-2 pl-3 ${
-                                isDark 
-                                  ? "bg-black/40 border-zinc-900/60 border-l-amber-500/40 text-zinc-400" 
-                                  : "bg-zinc-50 border-zinc-250 border-l-amber-500/60 text-zinc-600"
-                              }`}>
-                                {step.content}
-                              </div>
-                            )}
+                              {step.content && expandedThoughts[sKey] && (
+                                <div className={`mt-2 w-full border p-3 rounded-lg font-mono text-[10.5px] leading-relaxed whitespace-pre-wrap max-h-[160px] overflow-y-auto scrollbar-thin border-l-2 pl-3 ${
+                                  isDark 
+                                    ? "bg-black/40 border-zinc-900/60 border-l-amber-500/40 text-zinc-400" 
+                                    : "bg-zinc-50 border-zinc-250 border-l-amber-500/60 text-zinc-600"
+                                }`}>
+                                  {step.content}
+                                </div>
+                              )}
 
-                            {step.isThinking && (
-                              <div className="flex items-center gap-1.5 py-1.5 select-none">
-                                <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-[bounce_1s_infinite_100ms]" />
-                                <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-[bounce_1s_infinite_200ms]" />
-                                <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-[bounce_1s_infinite_300ms]" />
-                              </div>
-                            )}
+                              {step.isThinking && (
+                                <div className="flex items-center gap-1.5 py-1.5 select-none">
+                                  <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-[bounce_1s_infinite_100ms]" />
+                                  <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-[bounce_1s_infinite_200ms]" />
+                                  <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-[bounce_1s_infinite_300ms]" />
+                                </div>
+                              )}
+                            </div>
                           </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   </motion.div>
                 )}
@@ -2524,34 +2588,31 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId, us
               const latestMsg = chatHistory[chatHistory.length - 1];
               const { isThinking } = latestMsg ? parseMessageThinking(latestMsg.content || "") : { isThinking: false };
               const isStillThinking = latestMsg ? (latestMsg.content === "" || isThinking) : false;
+              const elapsed = typeof latestMsg?.thinkingDuration === "number"
+                ? latestMsg.thinkingDuration.toFixed(1)
+                : "0.1";
 
-              if (isStillThinking) {
-                const elapsed = typeof latestMsg?.thinkingDuration === "number"
-                  ? latestMsg.thinkingDuration.toFixed(1)
-                  : "0.1";
-                return (
-                  <div className="flex items-center gap-2 py-3 px-1.5 select-none font-sans">
-                    <span className="relative flex h-2 w-2">
+              return (
+                <div className="flex items-center justify-between gap-2 py-2 px-3 my-1 rounded-xl border border-amber-500/20 bg-amber-500/5 select-none font-sans">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="relative flex h-2 w-2 shrink-0">
                       <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
                       <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
                     </span>
-                    <span className="text-xs text-amber-600 dark:text-amber-450 font-medium animate-pulse">
-                      Thinking ({elapsed}s)...
+                    <span className="text-xs text-amber-600 dark:text-amber-400 font-medium truncate">
+                      {isStillThinking ? `Thinking (${elapsed}s)...` : "Applying code modifications..."}
                     </span>
                   </div>
-                );
-              }
 
-              return (
-                <div className="flex items-center gap-2 py-3 px-1.5 select-none animate-pulse">
-                  <div className="flex gap-1 items-center">
-                    <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-[bounce_1s_infinite_100ms]" />
-                    <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-[bounce_1s_infinite_200ms]" />
-                    <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-[bounce_1s_infinite_300ms]" />
-                  </div>
-                  <span className="text-xs text-zinc-500 font-medium font-sans">
-                    Applying code modifications...
-                  </span>
+                  <button
+                    type="button"
+                    onClick={handleStopGeneration}
+                    className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 border border-rose-500/30 text-[11px] font-semibold transition-all cursor-pointer shrink-0 active:scale-95"
+                    title="Stop / Cancel AI Generation"
+                  >
+                    <Square className="h-3 w-3 fill-current" />
+                    <span>Stop</span>
+                  </button>
                 </div>
               );
             })()}
@@ -2617,23 +2678,29 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId, us
                   </button>
                 </div>
 
-                <button
-                  onClick={() => handleSendPromptToAI()}
-                  disabled={isAIEditing || !aiPrompt.trim()}
-                  className={`p-2 rounded-xl transition-all ${
-                    isAIEditing 
-                      ? isDark ? "bg-zinc-800 text-zinc-500 cursor-not-allowed" : "bg-zinc-100 text-zinc-400 cursor-not-allowed"
-                      : !aiPrompt.trim()
+                {isAIEditing ? (
+                  <button
+                    type="button"
+                    onClick={handleStopGeneration}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 border border-rose-500/30 text-xs font-semibold transition-all cursor-pointer shadow-sm active:scale-95"
+                    title="Stop / Cancel AI Generation"
+                  >
+                    <Square className="h-3.5 w-3.5 fill-current" />
+                    <span>Stop</span>
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => handleSendPromptToAI()}
+                    disabled={!aiPrompt.trim()}
+                    className={`p-2 rounded-xl transition-all ${
+                      !aiPrompt.trim()
                         ? isDark ? "bg-zinc-800 text-zinc-500" : "bg-zinc-100 text-zinc-400"
                         : "bg-amber-500 hover:bg-amber-450 text-white shadow-md active:scale-95 cursor-pointer"
-                  }`}
-                >
-                  {isAIEditing ? (
-                    <RefreshCw className="h-4 w-4 animate-spin" />
-                  ) : (
+                    }`}
+                  >
                     <Send className="h-4 w-4" />
-                  )}
-                </button>
+                  </button>
+                )}
               </div>
             </div>
           </div>
