@@ -2876,15 +2876,15 @@ export default function App() {
 
     const categories: { label: string; items: ChatSession[] }[] = [];
     if (today.length > 0) {
-      categories.push({ label: "Today", items: today });
+      categories.push({ label: getTranslation("today", userLanguage), items: today });
     }
     
     if (showYesterdayHistory) {
       if (yesterday.length > 0) {
-        categories.push({ label: "Yesterday", items: yesterday });
+        categories.push({ label: getTranslation("yesterday", userLanguage), items: yesterday });
       }
       if (earlier.length > 0) {
-        categories.push({ label: "Earlier", items: earlier });
+        categories.push({ label: getTranslation("previous7Days", userLanguage), items: earlier });
       }
     }
 
@@ -2893,28 +2893,21 @@ export default function App() {
 
   const renderFeedbackForm = () => {
     const categories = [
-      { id: "Suggestion", label: "Suggestion", icon: Lightbulb, color: "text-amber-500 bg-amber-500/10 border-amber-500/20" },
-      { id: "Bug Report", label: "Bug Report", icon: Bug, color: "text-red-500 bg-red-500/10 border-red-500/20" },
-      { id: "Question", label: "Question", icon: HelpCircle, color: "text-blue-500 bg-blue-500/10 border-blue-500/20" },
-      { id: "Other", label: "Other", icon: MessageSquare, color: "text-zinc-500 bg-zinc-500/10 border-zinc-500/20" }
+      { id: "Suggestion", label: getTranslation("catSuggestion", userLanguage), icon: Lightbulb, color: "text-amber-500 bg-amber-500/10 border-amber-500/20" },
+      { id: "Bug Report", label: getTranslation("catBug", userLanguage), icon: Bug, color: "text-red-500 bg-red-500/10 border-red-500/20" },
+      { id: "Question", label: getTranslation("catFeature", userLanguage), icon: HelpCircle, color: "text-blue-500 bg-blue-500/10 border-blue-500/20" },
+      { id: "Other", label: getTranslation("catOther", userLanguage), icon: MessageSquare, color: "text-zinc-500 bg-zinc-500/10 border-zinc-500/20" }
     ];
-
-    const placeholders: Record<string, string> = {
-      "Suggestion": "What is your idea or custom feature request? Write here...",
-      "Bug Report": "What went wrong? Describe the bug, steps to reproduce, or attach a screenshot/log...",
-      "Question": "What would you like to ask or clarify about ExeChat?...",
-      "Other": "Tell us what you're thinking..."
-    };
 
     return (
       <div className="space-y-6 md:space-y-8 max-h-[75vh] overflow-y-auto pr-1">
         <div>
           <h3 className="text-xl font-display font-bold text-zinc-900 dark:text-zinc-100 tracking-tight flex items-center gap-2">
             <MessageSquare className="h-5 w-5 text-amber-500" />
-            Send Feedback & Suggestions
+            {getTranslation("feedbackHeader", userLanguage)}
           </h3>
           <p className="text-sm text-zinc-500 mt-1 font-medium font-sans">
-            Please submit your feedback. Your message must be between 10 and 2,500 characters. You may attach a photo or video file up to 50MB in size.
+            {getTranslation("feedbackSubheader", userLanguage)}
           </p>
         </div>
 
@@ -2978,7 +2971,7 @@ export default function App() {
                   setFeedbackMessage(e.target.value);
                 }
               }}
-              placeholder={placeholders[feedbackCategory]}
+              placeholder={getTranslation("feedbackPlaceholder", userLanguage)}
               rows={4}
               className={`w-full rounded-2xl px-4 py-3.5 text-sm focus:outline-none border focus:ring-2 focus:ring-amber-500/20 ${
                 isDark 
@@ -2990,7 +2983,7 @@ export default function App() {
 
           <div className="space-y-2">
             <label className="text-xs font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-              Attach File (Optional)
+              {getTranslation("attachFile", userLanguage)}
             </label>
             
             <div
@@ -3079,7 +3072,7 @@ export default function App() {
               ) : (
                 <>
                   <Send className="h-3.5 w-3.5" />
-                  Submit Feedback
+                  {getTranslation("sendFeedback", userLanguage)}
                 </>
               )}
             </button>
@@ -3142,7 +3135,7 @@ export default function App() {
           }`}
         >
           <Plus className="h-4 w-4 stroke-[2.5]" />
-          <span>New Chat</span>
+          <span>{getTranslation("newChat", userLanguage)}</span>
         </button>
 
         <button
@@ -3161,7 +3154,7 @@ export default function App() {
           }`}
         >
           <Code className="h-4 w-4 text-amber-500" />
-          <span>ExeCode Workspace</span>
+          <span>{getTranslation("workstation", userLanguage)}</span>
         </button>
       </div>
 
@@ -3172,7 +3165,7 @@ export default function App() {
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search conversations..."
+            placeholder={getTranslation("searchChats", userLanguage)}
             className={`w-full pl-10 pr-4 py-2.5 rounded-xl text-sm transition-all duration-200 focus:outline-none border ${
               isDark 
                 ? "border-zinc-800/80 bg-black/40 text-zinc-300 placeholder-zinc-600 focus:border-zinc-700 focus:bg-black/70" 
@@ -5099,11 +5092,11 @@ export default function App() {
                       {/* Navigation categories */}
                       <nav className="space-y-2">
                         {[
-                          { id: "akun", name: "Account Profile & Status", desc: "View Google logins & usernames", icon: User },
-                          { id: "model", name: "Model Engine & Personalities", desc: "Select fast/powerful AI engines", icon: Cpu },
-                          { id: "tampilan", name: "Display Aesthetics & Sounds", desc: "Configure visual modes & feedback", icon: Sun },
-                          { id: "ingatan", name: "Persistent Cognitive Memory", desc: "Inject customizable permanent facts", icon: Brain },
-                          { id: "feedback", name: "Submit Feedback & Files", desc: "Report issues or suggestions to Hexky", icon: MessageSquare },
+                          { id: "akun", name: getTranslation("tabAccountName", userLanguage), desc: getTranslation("tabAccountDesc", userLanguage), icon: User },
+                          { id: "model", name: getTranslation("tabModelName", userLanguage), desc: getTranslation("tabModelDesc", userLanguage), icon: Cpu },
+                          { id: "tampilan", name: getTranslation("tabTampilanName", userLanguage), desc: getTranslation("tabTampilanDesc", userLanguage), icon: Sun },
+                          { id: "ingatan", name: getTranslation("tabIngatanName", userLanguage), desc: getTranslation("tabIngatanDesc", userLanguage), icon: Brain },
+                          { id: "feedback", name: getTranslation("tabFeedbackName", userLanguage), desc: getTranslation("tabFeedbackDesc", userLanguage), icon: MessageSquare },
                         ].map((item) => {
                           const IconComp = item.icon;
                           const isActive = settingsTab === item.id;
@@ -5144,7 +5137,7 @@ export default function App() {
                       className="w-full flex items-center justify-center gap-2 p-3.5 rounded-2xl font-bold text-sm border transition-all duration-300 hover:scale-[1.02] cursor-pointer bg-zinc-900 hover:bg-zinc-850 text-white border-transparent dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 dark:border-transparent"
                     >
                       <X className="h-4 w-4 stroke-[2.5]" />
-                      <span>Close</span>
+                      <span>{getTranslation("close", userLanguage)}</span>
                     </button>
                   </div>
 
@@ -5155,8 +5148,8 @@ export default function App() {
                       {settingsTab === "akun" && (
                         <div className="space-y-8">
                           <div>
-                            <h3 className="text-xl font-display font-bold text-zinc-900 dark:text-zinc-100 tracking-tight">Account Profile & Status</h3>
-                            <p className="text-sm text-zinc-500 mt-1 font-medium">Verify login authenticity status and customize greeting nicknames.</p>
+                            <h3 className="text-xl font-display font-bold text-zinc-900 dark:text-zinc-100 tracking-tight">{getTranslation("accountHeader", userLanguage)}</h3>
+                            <p className="text-sm text-zinc-500 mt-1 font-medium">{getTranslation("accountSubheader", userLanguage)}</p>
                           </div>
 
                           <div className={`rounded-3xl p-6 md:p-8 border ${isDark ? "bg-zinc-900/10 border-transparent shadow-none" : "bg-white border-zinc-200/80 shadow-md"}`}>
@@ -5172,24 +5165,24 @@ export default function App() {
                                 <div>
                                   <div className="flex items-center gap-2">
                                     <span className="h-2.5 w-2.5 rounded-full bg-emerald-500 animate-pulse" />
-                                    <span className="text-base font-bold text-zinc-800 dark:text-zinc-200">Active Secure Connection</span>
+                                    <span className="text-base font-bold text-zinc-800 dark:text-zinc-200">{getTranslation("activeConnection", userLanguage)}</span>
                                   </div>
-                                  <p className="text-sm text-zinc-500 mt-1 font-mono">{userEmail || "Offline Local Storage Mode"}</p>
+                                  <p className="text-sm text-zinc-500 mt-1 font-mono">{userEmail || getTranslation("offlineMode", userLanguage)}</p>
                                 </div>
                               </div>
                               <button
                                 onClick={handleLogout}
                                 className="px-6 py-3 text-sm font-bold rounded-2xl border border-red-950/20 text-red-500 bg-red-500/5 hover:bg-red-500/10 transition-colors"
                               >
-                                Sign Out Account
+                                {getTranslation("signOut", userLanguage)}
                               </button>
                             </div>
                           </div>
 
                           <div className={`rounded-3xl p-6 md:p-8 border space-y-6 ${isDark ? "bg-zinc-900/10 border-transparent shadow-none" : "bg-white border-zinc-200/80 shadow-md"}`}>
                             <div>
-                              <h4 className="text-base font-bold text-zinc-800 dark:text-zinc-200">Personalize AI Nickname Greetings</h4>
-                              <p className="text-xs text-zinc-500 mt-1 font-medium">Set a unique name the assistant will use during private chat dialogs.</p>
+                              <h4 className="text-base font-bold text-zinc-800 dark:text-zinc-200">{getTranslation("nicknameHeader", userLanguage)}</h4>
+                              <p className="text-xs text-zinc-500 mt-1 font-medium">{getTranslation("nicknameSubheader", userLanguage)}</p>
                             </div>
 
                             <div className="space-y-4">
@@ -5197,7 +5190,7 @@ export default function App() {
                                 <input
                                   value={userName}
                                   onChange={(e) => setUserName(e.target.value)}
-                                  placeholder="Enter custom name..."
+                                  placeholder={getTranslation("enterCustomName", userLanguage)}
                                   className={`flex-1 rounded-2xl px-4 py-3.5 text-sm focus:outline-none border ${
                                     isDark ? "bg-black border-zinc-900 text-zinc-100" : "bg-zinc-50 border-zinc-200"
                                   }`}
@@ -5206,7 +5199,7 @@ export default function App() {
                                   onClick={handleSaveUsername}
                                   className="px-6 py-3.5 rounded-2xl text-sm font-bold bg-amber-500 text-zinc-950 transition-transform hover:scale-[1.01]"
                                 >
-                                  Save Nickname
+                                  {getTranslation("saveNickname", userLanguage)}
                                 </button>
                               </div>
                               {redeemFeedback && (
@@ -5221,9 +5214,9 @@ export default function App() {
                             <div>
                               <h4 className="text-base font-bold text-zinc-800 dark:text-zinc-200 flex items-center gap-2">
                                 <Globe className="h-5 w-5 text-amber-500" />
-                                Preferred Cognitive Language
+                                {getTranslation("prefLangHeader", userLanguage)}
                               </h4>
-                              <p className="text-xs text-zinc-500 mt-1 font-medium">Select your preferred language. The system and AI responses will prioritize this choice.</p>
+                              <p className="text-xs text-zinc-500 mt-1 font-medium">{getTranslation("prefLangSubheader", userLanguage)}</p>
                             </div>
 
                             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
@@ -5259,12 +5252,12 @@ export default function App() {
                       {settingsTab === "model" && (
                         <div className="space-y-8">
                           <div>
-                            <h3 className="text-xl font-display font-bold text-zinc-900 dark:text-zinc-100 tracking-tight">AI Engine & Cognitive Topics</h3>
-                            <p className="text-sm text-zinc-500 mt-1 font-medium">Switch high-level AI reasoning engines and focus topics for tailored behaviors.</p>
+                            <h3 className="text-xl font-display font-bold text-zinc-900 dark:text-zinc-100 tracking-tight">{getTranslation("modelHeader", userLanguage)}</h3>
+                            <p className="text-sm text-zinc-500 mt-1 font-medium">{getTranslation("modelSubheader", userLanguage)}</p>
                           </div>
 
                           <div className="space-y-4">
-                            <h4 className="text-sm font-bold text-zinc-550 uppercase font-mono tracking-wider">Available LLM Engines</h4>
+                            <h4 className="text-sm font-bold text-zinc-550 uppercase font-mono tracking-wider">{getTranslation("availEngines", userLanguage)}</h4>
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                               {MODEL_OPTIONS.map((m) => {
                                 const isSelected = currentSession ? currentSession.model === m.id : selectedModelId === m.id;
@@ -5293,9 +5286,9 @@ export default function App() {
                                       <div className="flex items-center justify-between mb-3">
                                         <span className="text-sm font-bold">{m.name}</span>
                                         {isSelected ? (
-                                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/25 uppercase font-mono">Selected</span>
+                                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/25 uppercase font-mono">{getTranslation("selected", userLanguage)}</span>
                                         ) : (
-                                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-zinc-500/5 text-zinc-500 border border-zinc-500/10 uppercase font-mono">Compatible</span>
+                                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-zinc-500/5 text-zinc-500 border border-zinc-500/10 uppercase font-mono">{getTranslation("compatible", userLanguage)}</span>
                                         )}
                                       </div>
                                       <p className="text-xs leading-relaxed text-zinc-500">{m.description}</p>
@@ -5446,17 +5439,17 @@ export default function App() {
                       {settingsTab === "tampilan" && (
                         <div className="space-y-8">
                           <div>
-                            <h3 className="text-xl font-display font-bold text-zinc-900 dark:text-zinc-100 tracking-tight">Display Aesthetics & Themes</h3>
-                            <p className="text-sm text-zinc-500 mt-1 font-medium">Customize the layout presentation, system colors, and sound effects.</p>
+                            <h3 className="text-xl font-display font-bold text-zinc-900 dark:text-zinc-100 tracking-tight">{getTranslation("displayHeader", userLanguage)}</h3>
+                            <p className="text-sm text-zinc-500 mt-1 font-medium">{getTranslation("displaySubheader", userLanguage)}</p>
                           </div>
 
                            <div className={`rounded-3xl p-6 md:p-8 border space-y-6 ${isDark ? "bg-zinc-900/10 border-transparent shadow-none" : "bg-white border-zinc-200/80 shadow-md"}`}>
-                             <h4 className="text-sm font-bold text-zinc-550 uppercase font-mono tracking-wider">Select Style theme</h4>
+                             <h4 className="text-sm font-bold text-zinc-550 uppercase font-mono tracking-wider">{getTranslation("selectStyleTheme", userLanguage)}</h4>
                              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                                {[
-                                 { id: "system", name: "System Sync", desc: "Follow OS configurations", icon: Laptop },
-                                 { id: "dark", name: "Slate Dark", desc: "Eye-saving deep slate", icon: Moon },
-                                 { id: "light", name: "Pure Light", desc: "High contrast paper white", icon: Sun },
+                                 { id: "system", name: getTranslation("systemSync", userLanguage), desc: "Follow OS configurations", icon: Laptop },
+                                 { id: "dark", name: getTranslation("slateDark", userLanguage), desc: "Eye-saving deep slate", icon: Moon },
+                                 { id: "light", name: getTranslation("pureLight", userLanguage), desc: "High contrast paper white", icon: Sun },
                                ].map((t) => {
                                  const isSelected = themeMode === t.id;
                                  const IconComp = t.icon;
@@ -5491,10 +5484,10 @@ export default function App() {
                           </div>
 
                           <div className={`rounded-3xl p-6 md:p-8 border space-y-4 ${isDark ? "bg-zinc-900/10 border-transparent shadow-none" : "bg-white border-zinc-200/80 shadow-md"}`}>
-                            <h4 className="text-base font-bold text-zinc-800 dark:text-zinc-200">Chat History Settings</h4>
+                            <h4 className="text-base font-bold text-zinc-800 dark:text-zinc-200">{getTranslation("chatHistorySettings", userLanguage)}</h4>
                             <div className="flex items-center justify-between">
                               <div>
-                                <p className="text-xs md:text-sm text-zinc-500 font-medium">Toggle yesterday, earlier and older chat logs in your navigation sidebar list.</p>
+                                <p className="text-xs md:text-sm text-zinc-500 font-medium">{getTranslation("toggleYesterdayDesc", userLanguage)}</p>
                               </div>
                               <button
                                 onClick={() => {
@@ -5517,8 +5510,8 @@ export default function App() {
                           </div>
 
                           <div className={`rounded-3xl p-6 md:p-8 border space-y-4 ${isDark ? "bg-zinc-900/10 border-transparent shadow-none" : "bg-white border-zinc-200/80 shadow-md"}`}>
-                            <h4 className="text-base font-bold text-zinc-800 dark:text-zinc-200">Acoustic Audio Feedback</h4>
-                            <p className="text-xs md:text-sm text-zinc-500 leading-relaxed font-medium">ExeChat will play a peaceful, gentle notify sound when generation is complete. This helps with multitasking or screen-off interactive prompts.</p>
+                            <h4 className="text-base font-bold text-zinc-800 dark:text-zinc-200">{getTranslation("acousticAudioHeader", userLanguage)}</h4>
+                            <p className="text-xs md:text-sm text-zinc-500 leading-relaxed font-medium">{getTranslation("acousticAudioDesc", userLanguage)}</p>
                           </div>
                         </div>
                       )}
@@ -5527,14 +5520,14 @@ export default function App() {
                       {settingsTab === "ingatan" && (
                         <div className="space-y-8">
                           <div>
-                            <h3 className="text-xl font-display font-bold text-zinc-900 dark:text-zinc-100 tracking-tight">AI Memory Preferences</h3>
-                            <p className="text-sm text-zinc-500 mt-1 font-medium">Give ExeChat persistent background facts (like occupation, coding preference, language) to remember permanently.</p>
+                            <h3 className="text-xl font-display font-bold text-zinc-900 dark:text-zinc-100 tracking-tight">{getTranslation("memoryHeader", userLanguage)}</h3>
+                            <p className="text-sm text-zinc-500 mt-1 font-medium">{getTranslation("memorySubheader", userLanguage)}</p>
                           </div>
 
                           <div className={`rounded-3xl p-6 md:p-8 border space-y-6 ${isDark ? "bg-zinc-900/10 border-transparent shadow-none" : "bg-white border-zinc-200/80 shadow-md"}`}>
                             <div className="flex items-center gap-3">
                               <Brain className="h-6 w-6 text-amber-500 animate-pulse" />
-                              <h4 className="text-base font-bold text-zinc-800 dark:text-zinc-200">Inject custom memory preference (Max 5)</h4>
+                              <h4 className="text-base font-bold text-zinc-800 dark:text-zinc-200">{getTranslation("injectMemory", userLanguage)}</h4>
                             </div>
 
                             <div className="flex gap-3">
@@ -5542,7 +5535,7 @@ export default function App() {
                                 type="text"
                                 value={memoryInput}
                                 onChange={(e) => setMemoryInput(e.target.value)}
-                                placeholder={memories.length >= 5 ? "Maximum limit of 5 preferences reached" : "Example: I prefer codes written in React TSX style..."}
+                                placeholder={memories.length >= 5 ? "Maximum limit reached" : "Example: React TSX style..."}
                                 disabled={memories.length >= 5}
                                 className={`flex-1 rounded-2xl px-4 py-3.5 text-sm focus:outline-none border ${
                                   isDark ? "bg-black border-zinc-900 text-zinc-100" : "bg-zinc-50 border-zinc-200"
@@ -5559,13 +5552,13 @@ export default function App() {
                                 disabled={!memoryInput.trim() || memories.length >= 5}
                                 className="px-6 py-3.5 rounded-2xl text-sm font-bold bg-amber-500 text-zinc-950 disabled:opacity-40"
                               >
-                                Save Memory
+                                {getTranslation("saveMemory", userLanguage)}
                               </button>
                             </div>
 
                             <div className="space-y-3 pt-4 border-t border-zinc-500/10">
                               {memories.length === 0 ? (
-                                <div className="text-center py-8 text-sm text-zinc-500 italic border border-dashed rounded-2xl border-zinc-500/20">No persistent memories configured yet. Customize yours above!</div>
+                                <div className="text-center py-8 text-sm text-zinc-500 italic border border-dashed rounded-2xl border-dashed rounded-2xl border-zinc-500/20">{getTranslation("noMemories", userLanguage)}</div>
                               ) : (
                                 memories.map((mem, idx) => (
                                   <div key={idx} className="flex items-center justify-between gap-4 p-4.5 rounded-2xl bg-zinc-500/5 border border-zinc-500/10 text-sm">
