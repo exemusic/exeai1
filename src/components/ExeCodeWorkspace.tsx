@@ -1665,10 +1665,9 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId, us
 
         let nonCodeText = displayableText ? displayableText.trim() : fullText.replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
         if (!nonCodeText) {
-          const filePaths = files.map(f => f.path).filter(p => p !== "execode.md").join(", ");
           nonCodeText = activeUserLang === "id"
-            ? `Saya telah memeriksa berkas workspace Anda (${filePaths || "index.html, app.js"}). Silakan tentukan perubahan spesifik atau kode yang ingin ditambahkan.`
-            : `I have examined your workspace files (${filePaths || "index.html, app.js"}). Please specify the exact code changes or additions you would like to make.`;
+            ? "Maaf, AI tidak dapat menerapkan perubahan kode secara otomatis untuk permintaan ini. Silakan berikan instruksi perubahan kode yang lebih spesifik atau coba kirim ulang."
+            : "Sorry, the AI could not automatically apply code changes for this request. Please provide more specific instructions or try again.";
         }
 
         let thinkHeader = "";
@@ -1848,7 +1847,7 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId, us
   const sanitizeAndShortenThought = (thinking: string): string => {
     if (!thinking) return "";
 
-    // Keywords to completely filter out (privacy, internal directives, system guidelines, massive dumps)
+    // Keywords to completely filter out (privacy, internal directives, system guidelines, secrets, APIs)
     const forbiddenKeywords = [
       "chika",
       "ravita",
@@ -1873,12 +1872,18 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId, us
       "workspace file",
       "index.html",
       "src/",
-      "\\\"path\\\":",
-      "\\\"content\\\":",
+      "\"path\":",
+      "\"content\":",
       "{\"path\"",
       "{\"content\"",
-      "\"path\":",
-      "\"content\":"
+      "api_key",
+      "apikey",
+      "secret",
+      "token",
+      "bearer",
+      "password",
+      "auth_key",
+      "credentials"
     ];
 
     const lines = thinking.split("\n");
