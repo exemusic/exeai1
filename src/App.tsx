@@ -64,6 +64,7 @@ import { jwtDecode } from "jwt-decode";
 import { MODEL_OPTIONS, SYSTEM_PRESETS, SUGGESTED_PROMPTS, GEMMA_TEMP_PRESETS } from "./presets";
 import { ExeCodeWorkspace } from "./components/ExeCodeWorkspace";
 import { PublicProjectView } from "./components/PublicProjectView";
+import { getTranslation } from "./translations";
 
 const LANGUAGES = [
   { code: "en", name: "English", nativeName: "English", flag: "🇺🇸" },
@@ -501,25 +502,90 @@ export default function App() {
   const [showLanguagePopup, setShowLanguagePopup] = useState(false);
 
   useEffect(() => {
-    const greetingsId = [
-      "ada ide baru untuk dijelajahi?",
-      "apa yang ingin kita bahas hari ini?",
-      "apa yang ingin Anda ketahui?",
-      "ada yang bisa saya bantu?",
-      "mari buat sesuatu yang luar biasa!",
-      "tanyakan apa saja pada saya.",
-      "ada topik menarik hari ini?"
-    ];
-    const greetingsEn = [
-      "any new ideas?",
-      "what should we discuss today?",
-      "what would you like to know?",
-      "is there anything I can help with?",
-      "let's create something great!",
-      "ask me anything.",
-      "any exciting topics today?"
-    ];
-    const greetingsList = userLanguage === "id" ? greetingsId : greetingsEn;
+    const greetingsDict: Record<string, string[]> = {
+      id: [
+        "ada ide baru untuk dijelajahi?",
+        "apa yang ingin kita bahas hari ini?",
+        "apa yang ingin Anda ketahui?",
+        "ada yang bisa saya bantu?",
+        "mari buat sesuatu yang luar biasa!",
+        "tanyakan apa saja pada saya.",
+        "ada topik menarik hari ini?"
+      ],
+      en: [
+        "any new ideas?",
+        "what should we discuss today?",
+        "what would you like to know?",
+        "is there anything I can help with?",
+        "let's create something great!",
+        "ask me anything.",
+        "any exciting topics today?"
+      ],
+      ar: [
+        "هل لديك أفكار جديدة؟",
+        "ماذا تريد أن نناقش اليوم؟",
+        "ما الذي تود معرفته؟",
+        "كيف يمكنني مساعدتك؟",
+        "لنبتكر شيئاً رائعاً اليوم!",
+        "اسألني أي شيء.",
+        "هل هناك موضوع مثير اليوم؟"
+      ],
+      ja: [
+        "何か新しいアイデアはありますか？",
+        "今日は何を話し合いましょうか？",
+        "何について知りたいですか？",
+        "何かお手伝いできることはありますか？",
+        "素晴らしいものを一緒に作りましょう！",
+        "なんでも質問してください。",
+        "面白いトピックはありますか？"
+      ],
+      ko: [
+        "새로운 아이디어가 있으신가요?",
+        "오늘 어떤 주제를 논의할까요?",
+        "무엇을 알고 싶으신가요?",
+        "제가 도와드릴 일이 있나요?",
+        "멋진 프로젝트를 시작해 볼까요!",
+        "무엇이든 물어보세요.",
+        "오늘 흥미로운 주제가 있나요?"
+      ],
+      es: [
+        "¿tienes alguna idea nueva?",
+        "¿qué nos gustaría discutir hoy?",
+        "¿qué te gustaría saber?",
+        "¿en qué puedo ayudarte?",
+        "¡creemos algo increíble!",
+        "pregúntame lo que sea.",
+        "¿algún tema emocionante hoy?"
+      ],
+      zh: [
+        "今天有什么新想法吗？",
+        "我们今天想讨论什么？",
+        "您想了解些什么呢？",
+        "有什么我可以帮忙的吗？",
+        "让我们一起创造精彩的作品！",
+        "随时向我提问。",
+        "今天有什么有趣的话题吗？"
+      ],
+      fr: [
+        "avez-vous de nouvelles idées ?",
+        "de quoi aimerions-nous discuter aujourd'hui ?",
+        "que souhaitez-vous savoir ?",
+        "comment puis-je vous aider ?",
+        "créons quelque chose de fantastique !",
+        "posez-moi toutes vos questions.",
+        "des sujets passionnants aujourd'hui ?"
+      ],
+      de: [
+        "hast du neue Ideen?",
+        "worüber möchten wir heute sprechen?",
+        "was möchtest du wissen?",
+        "wie kann ich dir helfen?",
+        "lass uns etwas Großartiges schaffen!",
+        "frag mich irgendetwas.",
+        "gibt es heute spannende Themen?"
+      ]
+    };
+    const greetingsList = greetingsDict[userLanguage] || greetingsDict.en;
     const randomIdx = Math.floor(Math.random() * greetingsList.length);
     setWelcomeGreeting(greetingsList[randomIdx]);
   }, [userLanguage]);

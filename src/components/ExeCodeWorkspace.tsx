@@ -1374,9 +1374,19 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId, us
     const execodeMdContent = execodeMdFile ? execodeMdFile.content : EXECODE_MD_CONTENT;
 
     const activeUserLang = (typeof window !== "undefined" ? localStorage.getItem("exechat_user_language") : null) || "en";
-    const languageInstruction = activeUserLang === "id"
-      ? "ACTIVE USER LANGUAGE IS INDONESIAN (Bahasa Indonesia). You MUST write your complete explanation in natural, fluent, and helpful Bahasa Indonesia."
-      : "ACTIVE USER LANGUAGE IS ENGLISH. Write your explanation in clear English.";
+    const langNames: Record<string, string> = {
+      id: "INDONESIAN (Bahasa Indonesia)",
+      ar: "ARABIC (العربية)",
+      ja: "JAPANESE (日本語)",
+      ko: "KOREAN (한국어)",
+      es: "SPANISH (Español)",
+      zh: "MANDARIN CHINESE (中文)",
+      fr: "FRENCH (Français)",
+      de: "GERMAN (Deutsch)",
+      en: "ENGLISH"
+    };
+    const langName = langNames[activeUserLang] || "ENGLISH";
+    const languageInstruction = `ACTIVE USER LANGUAGE IS ${langName}. You MUST write your complete explanation, commentary, and response in natural, fluent, and helpful ${langName}.`;
 
     const currentPromptTurn = {
       role: "user",
