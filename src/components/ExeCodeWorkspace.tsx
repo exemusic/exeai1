@@ -230,6 +230,13 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId, us
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const activeFile = files.find(f => f.path === activeFilePath) || files[0];
   const [isEditingCode, setIsEditingCode] = useState<boolean>(false);
+  const [localCodeContent, setLocalCodeContent] = useState<string>(activeFile?.content || "");
+  const debouncedSyncRef = useRef<any>(null);
+
+  // Sync local editor content when active file changes or AI updates active file
+  useEffect(() => {
+    setLocalCodeContent(activeFile?.content || "");
+  }, [activeFilePath, activeFile?.content]);
 
   // Advanced Editor UX States & Refs
   const [editBackupContent, setEditBackupContent] = useState<string>("");
@@ -267,17 +274,21 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId, us
   // Initialize backup when entering edit mode or changing file
   useEffect(() => {
     if (isEditingCode) {
-      setEditBackupContent(activeFile.content);
+      setEditBackupContent(activeFile?.content || localCodeContent);
     }
   }, [isEditingCode, activeFilePath]);
 
   const handleUndoEdit = () => {
+    if (debouncedSyncRef.current) clearTimeout(debouncedSyncRef.current);
+    setLocalCodeContent(editBackupContent);
     setFiles(prev => prev.map(f => f.path === activeFilePath ? { ...f, content: editBackupContent } : f));
     triggerStatus("Changes reverted to previous version successfully!", "info");
   };
 
   const handleSaveEdit = () => {
-    setEditBackupContent(activeFile.content);
+    if (debouncedSyncRef.current) clearTimeout(debouncedSyncRef.current);
+    setFiles(prev => prev.map(f => f.path === activeFilePath ? { ...f, content: localCodeContent } : f));
+    setEditBackupContent(localCodeContent);
     refreshPreview();
     triggerStatus("Changes saved successfully!", "success");
   };
@@ -801,7 +812,14 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId, us
 
   const handleEditorChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const updatedContent = e.target.value;
-    setFiles(prev => prev.map(f => f.path === activeFilePath ? { ...f, content: updatedContent } : f));
+    setLocalCodeContent(updatedContent);
+
+    if (debouncedSyncRef.current) {
+      clearTimeout(debouncedSyncRef.current);
+    }
+    debouncedSyncRef.current = setTimeout(() => {
+      setFiles(prev => prev.map(f => f.path === activeFilePath ? { ...f, content: updatedContent } : f));
+    }, 250);
   };
 
   const refreshPreview = (customFiles: VirtualFile[] = files) => {
@@ -2436,37 +2454,35 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId, us
           </div>
 
           <div className="flex items-center gap-2">
-            {/* Device selector and reload button in header */}
-            {activeRightTab === "preview" && (
-              <div className={`flex items-center gap-0.5 p-1 rounded-xl border ${isDark ? "bg-zinc-900/60 border-transparent" : "bg-zinc-100 border-zinc-150"}`}>
-                <button
-                  onClick={() => setDeviceMode("desktop")}
-                  className={`p-1.5 rounded-md transition-all cursor-pointer ${deviceMode === "desktop" ? "bg-amber-500/10 text-amber-500" : isDark ? "text-zinc-400 hover:text-zinc-200" : "text-zinc-500 hover:text-zinc-800"}`}
-                  title="Desktop Preview"
-                >
-                  <Monitor className="h-3.5 w-3.5" />
-                </button>
-                <button
-                  onClick={() => setDeviceMode("mobile")}
-                  className={`p-1.5 rounded-md transition-all cursor-pointer ${deviceMode === "mobile" ? "bg-amber-500/10 text-amber-500" : isDark ? "text-zinc-400 hover:text-zinc-200" : "text-zinc-500 hover:text-zinc-800"}`}
-                  title="Mobile Preview"
-                >
-                  <Smartphone className="h-3.5 w-3.5" />
-                </button>
-                <div className={`h-4 w-px mx-1 ${isDark ? "bg-zinc-800/40" : "bg-zinc-200"}`} />
-                <button
-                  onClick={() => {
-                    refreshPreview();
-                    setPreviewKey(prev => prev + 1);
-                    triggerStatus("Preview updated!", "success");
-                  }}
-                  className="p-1.5 text-zinc-400 hover:text-zinc-200 transition-colors cursor-pointer"
-                  title="Reload Preview"
-                >
-                  <RefreshCw className="h-3.5 w-3.5" />
-                </button>
-              </div>
-            )}
+            {/* Device selector and reload button in header - always rendered for stable UI layout */}
+            <div className={`flex items-center gap-0.5 p-1 rounded-xl border ${isDark ? "bg-zinc-900/60 border-transparent" : "bg-zinc-100 border-zinc-150"}`}>
+              <button
+                onClick={() => setDeviceMode("desktop")}
+                className={`p-1.5 rounded-md transition-all cursor-pointer ${deviceMode === "desktop" ? "bg-amber-500/10 text-amber-500" : isDark ? "text-zinc-400 hover:text-zinc-200" : "text-zinc-500 hover:text-zinc-800"}`}
+                title="Desktop Preview"
+              >
+                <Monitor className="h-3.5 w-3.5" />
+              </button>
+              <button
+                onClick={() => setDeviceMode("mobile")}
+                className={`p-1.5 rounded-md transition-all cursor-pointer ${deviceMode === "mobile" ? "bg-amber-500/10 text-amber-500" : isDark ? "text-zinc-400 hover:text-zinc-200" : "text-zinc-500 hover:text-zinc-800"}`}
+                title="Mobile Preview"
+              >
+                <Smartphone className="h-3.5 w-3.5" />
+              </button>
+              <div className={`h-4 w-px mx-1 ${isDark ? "bg-zinc-800/40" : "bg-zinc-200"}`} />
+              <button
+                onClick={() => {
+                  refreshPreview();
+                  setPreviewKey(prev => prev + 1);
+                  triggerStatus("Preview updated!", "success");
+                }}
+                className="p-1.5 text-zinc-400 hover:text-zinc-200 transition-colors cursor-pointer"
+                title="Reload Preview"
+              >
+                <RefreshCw className="h-3.5 w-3.5" />
+              </button>
+            </div>
 
             <button
               onClick={handleUploadToSupabase}
@@ -2723,273 +2739,275 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId, us
         )}
 
         {/* PANEL KANAN: WORKSPACE INTERACTIVE / CODE EDITOR PANE */}
-        <div className={`flex-1 flex flex-col min-w-0 relative ${isDark ? "bg-black text-zinc-100" : "bg-white text-zinc-800"}`}>
+        <div className={`flex-1 flex flex-row min-w-0 overflow-hidden relative ${isDark ? "bg-black text-zinc-100" : "bg-white text-zinc-800"}`}>
           
-          {/* Tab Content 1: Preview mode active */}
-          {activeRightTab === "preview" && (
-            <div className="flex-1 flex flex-col min-h-0">
-              {isFullscreen && (
-                <div className={`px-4 py-2 border-b flex items-center justify-between shrink-0 ${isDark ? "border-zinc-900 bg-black" : "border-zinc-200 bg-zinc-50"}`}>
-                  <div className="flex items-center gap-2">
-                    <span className="text-[11px] font-bold font-mono px-2 py-0.5 rounded bg-amber-500/10 text-amber-500 border border-amber-500/20 animate-pulse">
-                      Live Preview
-                    </span>
-                    <span className={`text-[10px] font-sans ${isDark ? "text-zinc-400" : "text-zinc-500"}`}>Full Screen Mode • Testing application</span>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <div className={`flex items-center gap-1 p-1 rounded-lg border ${isDark ? "bg-zinc-900 border-zinc-850" : "bg-zinc-100 border-zinc-200"}`}>
-                      <button
-                        onClick={() => setDeviceMode("desktop")}
-                        className={`p-1.5 rounded-md transition-all ${deviceMode === "desktop" ? "bg-amber-500/10 text-amber-500" : "text-zinc-400 hover:text-zinc-200"}`}
-                        title="Desktop Preview"
-                      >
-                        <Monitor className="h-3.5 w-3.5" />
-                      </button>
-                      <button
-                        onClick={() => setDeviceMode("mobile")}
-                        className={`p-1.5 rounded-md transition-all ${deviceMode === "mobile" ? "bg-amber-500/10 text-amber-500" : "text-zinc-400 hover:text-zinc-200"}`}
-                        title="Smartphone Preview"
-                      >
-                        <Smartphone className="h-3.5 w-3.5" />
-                      </button>
-                      <div className="h-4 w-px bg-zinc-800 mx-1" />
-                      <button
-                        onClick={() => {
-                          refreshPreview();
-                          setPreviewKey(prev => prev + 1);
-                          triggerStatus("Preview updated!", "success");
-                        }}
-                        className="p-1.5 text-zinc-400 hover:text-zinc-200 transition-colors"
-                        title="Reload Preview"
-                      >
-                        <RefreshCw className="h-3.5 w-3.5" />
-                      </button>
-                    </div>
+          {/* File List sidebar rendered persistently on left of workspace panel to prevent layout shift */}
+          {!isFullscreen && (
+            <div className={`w-56 border-r flex flex-col shrink-0 transition-colors duration-200 ${isDark ? "border-zinc-900 bg-black" : "border-zinc-100/50 bg-zinc-50"}`}>
+              <div className={`p-3 border-b flex items-center justify-between transition-colors duration-200 ${isDark ? "border-zinc-900 bg-black" : "border-zinc-100 bg-zinc-100/50"}`}>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">File List</span>
+                <div className="flex items-center gap-1.5">
+                  <input
+                    ref={fileUploadRef}
+                    type="file"
+                    onChange={handleDeviceFileUpload}
+                    className="hidden"
+                    accept=".html,.js,.css,.json,.txt,.md,image/*"
+                  />
+                  <button
+                    onClick={() => fileUploadRef.current?.click()}
+                    className="p-1 rounded hover:bg-amber-500/10 text-amber-500 transition-colors"
+                    title="Upload File from Device"
+                  >
+                    <FileUp className="h-3.5 w-3.5" />
+                  </button>
+                  <button
+                    onClick={() => setShowNewFileInput(!showNewFileInput)}
+                    className="p-1 rounded hover:bg-amber-500/10 text-amber-500 transition-colors"
+                    title="Create New File"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              </div>
+
+              {showNewFileInput && (
+                <div className={`p-3 border-b flex flex-col gap-2 transition-colors duration-200 ${isDark ? "border-zinc-850 bg-amber-500/5" : "border-zinc-200 bg-amber-500/5"}`}>
+                  <input
+                    type="text"
+                    value={newFileName}
+                    onChange={(e) => setNewFileName(e.target.value)}
+                    placeholder="style.css, app.js..."
+                    className={`w-full px-2 py-1.5 text-xs rounded border focus:outline-none focus:border-amber-500 font-mono transition-colors ${
+                      isDark ? "border-zinc-800 bg-zinc-900 text-zinc-200" : "border-zinc-300 bg-white text-zinc-800"
+                    }`}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") handleAddFile();
+                    }}
+                  />
+                  <div className="flex justify-end gap-1.5">
                     <button
-                      onClick={() => setIsFullscreen(false)}
-                      className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-rose-500 hover:bg-rose-600 text-white flex items-center gap-1.5 transition-all shadow-md active:scale-95 cursor-pointer"
+                      onClick={() => setShowNewFileInput(false)}
+                      className={`px-2 py-0.5 text-[10px] font-normal rounded ${isDark ? "text-zinc-400 hover:bg-zinc-800" : "text-zinc-500 hover:bg-zinc-200"}`}
                     >
-                      <Minimize2 className="h-3.5 w-3.5" />
-                      <span>Return</span>
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleAddFile}
+                      className="px-2.5 py-0.5 text-[10px] font-semibold bg-amber-500 text-white rounded"
+                    >
+                      Add
                     </button>
                   </div>
                 </div>
               )}
 
-              <div className="flex-1 flex items-center justify-center p-6 bg-zinc-900/20 overflow-hidden relative">
-                {deviceMode === "mobile" ? (
-                  <div className="w-[320px] h-[680px] max-w-full max-h-[95%] rounded-[40px] bg-black border-[12px] border-zinc-900 shadow-2xl relative flex flex-col overflow-hidden animate-fade-in ring-1 ring-zinc-800/50">
-                    <div className="absolute top-0 left-1/2 transform -translate-x-1/2 w-32 h-5 bg-zinc-900 rounded-b-xl z-20 flex items-center justify-center">
-                      <div className="w-10 h-1 bg-zinc-800 rounded-full" />
-                    </div>
-                    <iframe
-                      key={previewKey}
-                      src={getCombinedPreviewBlob()}
-                      className="w-full h-full border-none rounded-[28px] bg-slate-950"
-                      sandbox="allow-scripts allow-same-origin allow-popups"
-                      title="Mobile App Preview"
-                    />
-                    <div className="absolute bottom-1.5 left-1/2 transform -translate-x-1/2 w-20 h-1 bg-zinc-800 rounded-full" />
-                  </div>
-                ) : (
-                  <div className="w-full h-full rounded-xl bg-slate-950 border border-zinc-850 shadow-2xl overflow-hidden flex flex-col">
-                    <iframe
-                      key={previewKey}
-                      src={getCombinedPreviewBlob()}
-                      className="w-full h-full border-none bg-slate-950"
-                      sandbox="allow-scripts allow-same-origin allow-popups"
-                      title="Desktop App Preview"
-                    />
-                  </div>
-                )}
-
-                <div className="absolute bottom-4 right-4 z-30 font-mono">
-                  {!isConsoleOpen ? (
-                    <button
-                      onClick={() => setIsConsoleOpen(true)}
-                      className="px-3.5 py-1.5 rounded-xl bg-zinc-900/90 border border-zinc-800/80 hover:bg-zinc-800 text-[11px] font-medium text-zinc-300 flex items-center gap-2 shadow-2xl backdrop-blur-md transition-all hover:scale-105 active:scale-95 cursor-pointer"
+              <div className="flex-1 overflow-y-auto p-2 space-y-0.5">
+                {files.map(file => {
+                  const isActive = file.path === activeFilePath;
+                  const isHtml = file.path.endsWith(".html");
+                  const isJs = file.path.endsWith(".js");
+                  const isJson = file.path.endsWith(".json");
+                  
+                  return (
+                    <div
+                      key={file.path}
+                      className={`group w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-normal font-mono cursor-pointer transition-all border ${
+                        isActive 
+                          ? "bg-amber-500/10 text-amber-400 border-amber-500/15" 
+                          : isDark 
+                            ? "border-transparent text-zinc-400 hover:bg-zinc-900/60 hover:text-zinc-200" 
+                            : "border-transparent text-zinc-600 hover:bg-zinc-150 hover:text-zinc-900"
+                      }`}
+                      onClick={() => setActiveFilePath(file.path)}
                     >
-                      <Terminal className="h-3.5 w-3.5 text-amber-500" />
-                      <span>Console</span>
-                      {consoleLogs.length > 0 && (
-                        <span className="px-1.5 py-0.5 text-[9px] font-bold rounded-full bg-amber-500 text-zinc-950">
-                          {consoleLogs.length}
-                        </span>
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        {isHtml ? <Code className="h-3.5 w-3.5 text-orange-400 shrink-0" /> :
+                         isJs ? <FileCode className="h-3.5 w-3.5 text-yellow-400 shrink-0" /> :
+                         isJson ? <FileJson className="h-3.5 w-3.5 text-emerald-400 shrink-0" /> :
+                         <File className="h-3.5 w-3.5 text-zinc-400 shrink-0" />}
+                        <span className="truncate">{file.path}</span>
+                      </div>
+                      {file.path !== "index.html" && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteFile(file.path);
+                          }}
+                          className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-rose-500/10 text-rose-400 transition-all shrink-0"
+                          title="Delete File"
+                        >
+                          <Trash className="h-3.5 w-3.5" />
+                        </button>
                       )}
-                    </button>
-                  ) : (
-                    <div className="w-[380px] h-64 rounded-xl bg-black/95 border border-zinc-800/80 shadow-2xl flex flex-col overflow-hidden backdrop-blur-md animate-fade-in">
-                      <div className="px-3 py-2 border-b border-zinc-850 flex items-center justify-between bg-zinc-900/40 select-none shrink-0">
-                        <div className="flex items-center gap-1.5">
-                          <Terminal className="h-3.5 w-3.5 text-amber-500" />
-                          <span className="text-[10px] font-bold tracking-tight text-zinc-200">Console Output</span>
-                          {consoleLogs.length > 0 && (
-                            <span className="px-1.5 py-0.2 text-[9px] font-bold rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20">
-                              {consoleLogs.length} logs
-                            </span>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <button
-                            onClick={() => setConsoleLogs([])}
-                            className="p-1 rounded hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 transition-colors"
-                            title="Clear logs"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </button>
-                          <button
-                            onClick={() => setIsConsoleOpen(false)}
-                            className="p-1 rounded hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 transition-colors"
-                            title="Close console"
-                          >
-                            <ChevronDown className="h-4 w-4" />
-                          </button>
-                        </div>
-                      </div>
-                      <div className="flex-1 overflow-y-auto p-3 space-y-1.5">
-                        {consoleLogs.length === 0 ? (
-                          <div className="h-full flex items-center justify-center text-[10px] text-zinc-600 italic">
-                            No logs captured. Call console.log() in your project.
-                          </div>
-                        ) : (
-                          consoleLogs.map((log, idx) => {
-                            let logColor = "text-zinc-300";
-                            let bgClass = "";
-                            if (log.type === "error") {
-                                logColor = "text-rose-400";
-                                bgClass = "bg-rose-500/5";
-                            } else if (log.type === "warn") {
-                                logColor = "text-amber-400";
-                                bgClass = "bg-amber-500/5";
-                            } else if (log.type === "info") {
-                                logColor = "text-blue-400";
-                            }
-                            return (
-                              <div key={idx} className={`p-1.5 rounded text-[11px] leading-relaxed font-mono flex items-start gap-2 ${bgClass}`}>
-                                <span className="text-zinc-600 shrink-0 select-none text-[9px] pt-0.5">{log.timestamp}</span>
-                                <span className={`flex-1 break-all ${logColor}`}>{log.text}</span>
-                              </div>
-                            );
-                          })
-                        )}
-                      </div>
                     </div>
-                  )}
-                </div>
+                  );
+                })}
               </div>
             </div>
           )}
 
-          {activeRightTab === "code" && (
-            <div className="flex-1 flex overflow-hidden min-h-0">
-              
-              {!isFullscreen && (
-                <div className={`w-56 border-r flex flex-col shrink-0 transition-colors duration-200 ${isDark ? "border-zinc-900 bg-black" : "border-zinc-100/50 bg-zinc-50"}`}>
-                  <div className={`p-3 border-b flex items-center justify-between transition-colors duration-200 ${isDark ? "border-zinc-900 bg-black" : "border-zinc-100 bg-zinc-100/50"}`}>
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">File List</span>
-                    <div className="flex items-center gap-1.5">
-                      <input
-                        ref={fileUploadRef}
-                        type="file"
-                        onChange={handleDeviceFileUpload}
-                        className="hidden"
-                        accept=".html,.js,.css,.json,.txt,.md,image/*"
-                      />
+          {/* Right Pane Body: Toggle between Preview and Code */}
+          <div className="flex-1 flex flex-col min-w-0 min-h-0 overflow-hidden relative">
+            {/* Tab Content 1: Preview mode active */}
+            {activeRightTab === "preview" && (
+              <div className="flex-1 flex flex-col min-h-0">
+                {isFullscreen && (
+                  <div className={`px-4 py-2 border-b flex items-center justify-between shrink-0 ${isDark ? "border-zinc-900 bg-black" : "border-zinc-200 bg-zinc-50"}`}>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[11px] font-bold font-mono px-2 py-0.5 rounded bg-amber-500/10 text-amber-500 border border-amber-500/20 animate-pulse">
+                        Live Preview
+                      </span>
+                      <span className={`text-[10px] font-sans ${isDark ? "text-zinc-400" : "text-zinc-500"}`}>Full Screen Mode • Testing application</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className={`flex items-center gap-1 p-1 rounded-lg border ${isDark ? "bg-zinc-900 border-zinc-850" : "bg-zinc-100 border-zinc-200"}`}>
+                        <button
+                          onClick={() => setDeviceMode("desktop")}
+                          className={`p-1.5 rounded-md transition-all ${deviceMode === "desktop" ? "bg-amber-500/10 text-amber-500" : "text-zinc-400 hover:text-zinc-200"}`}
+                          title="Desktop Preview"
+                        >
+                          <Monitor className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          onClick={() => setDeviceMode("mobile")}
+                          className={`p-1.5 rounded-md transition-all ${deviceMode === "mobile" ? "bg-amber-500/10 text-amber-500" : "text-zinc-400 hover:text-zinc-200"}`}
+                          title="Smartphone Preview"
+                        >
+                          <Smartphone className="h-3.5 w-3.5" />
+                        </button>
+                        <div className="h-4 w-px bg-zinc-800 mx-1" />
+                        <button
+                          onClick={() => {
+                            refreshPreview();
+                            setPreviewKey(prev => prev + 1);
+                            triggerStatus("Preview updated!", "success");
+                          }}
+                          className="p-1.5 text-zinc-400 hover:text-zinc-200 transition-colors"
+                          title="Reload Preview"
+                        >
+                          <RefreshCw className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
                       <button
-                        onClick={() => fileUploadRef.current?.click()}
-                        className="p-1 rounded hover:bg-amber-500/10 text-amber-500 transition-colors"
-                        title="Upload File from Device"
+                        onClick={() => setIsFullscreen(false)}
+                        className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-rose-500 hover:bg-rose-600 text-white flex items-center gap-1.5 transition-all shadow-md active:scale-95 cursor-pointer"
                       >
-                        <FileUp className="h-3.5 w-3.5" />
-                      </button>
-                      <button
-                        onClick={() => setShowNewFileInput(!showNewFileInput)}
-                        className="p-1 rounded hover:bg-amber-500/10 text-amber-500 transition-colors"
-                        title="Create New File"
-                      >
-                        <Plus className="h-3.5 w-3.5" />
+                        <Minimize2 className="h-3.5 w-3.5" />
+                        <span>Return</span>
                       </button>
                     </div>
                   </div>
+                )}
 
-                  {showNewFileInput && (
-                    <div className={`p-3 border-b flex flex-col gap-2 transition-colors duration-200 ${isDark ? "border-zinc-850 bg-amber-500/5" : "border-zinc-200 bg-amber-500/5"}`}>
-                      <input
-                        type="text"
-                        value={newFileName}
-                        onChange={(e) => setNewFileName(e.target.value)}
-                        placeholder="style.css, app.js..."
-                        className={`w-full px-2 py-1.5 text-xs rounded border focus:outline-none focus:border-amber-500 font-mono transition-colors ${
-                          isDark ? "border-zinc-800 bg-zinc-900 text-zinc-200" : "border-zinc-300 bg-white text-zinc-800"
-                        }`}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") handleAddFile();
-                        }}
-                      />
-                      <div className="flex justify-end gap-1.5">
-                        <button
-                          onClick={() => setShowNewFileInput(false)}
-                          className={`px-2 py-0.5 text-[10px] font-normal rounded ${isDark ? "text-zinc-400 hover:bg-zinc-800" : "text-zinc-500 hover:bg-zinc-200"}`}
-                        >
-                          Cancel
-                        </button>
-                        <button
-                          onClick={handleAddFile}
-                          className="px-2.5 py-0.5 text-[10px] font-semibold bg-amber-500 text-white rounded"
-                        >
-                          Add
-                        </button>
+                <div className="flex-1 flex items-center justify-center p-6 bg-zinc-900/20 overflow-hidden relative">
+                  {deviceMode === "mobile" ? (
+                    <div className="w-[320px] h-[680px] max-w-full max-h-[95%] rounded-[40px] bg-black border-[12px] border-zinc-900 shadow-2xl relative flex flex-col overflow-hidden animate-fade-in ring-1 ring-zinc-800/50">
+                      <div className="absolute top-0 left-1/2 transform -translate-x-1/2 w-32 h-5 bg-zinc-900 rounded-b-xl z-20 flex items-center justify-center">
+                        <div className="w-10 h-1 bg-zinc-800 rounded-full" />
                       </div>
+                      <iframe
+                        key={previewKey}
+                        src={getCombinedPreviewBlob()}
+                        className="w-full h-full border-none rounded-[28px] bg-slate-950"
+                        sandbox="allow-scripts allow-same-origin allow-popups"
+                        title="Mobile App Preview"
+                      />
+                      <div className="absolute bottom-1.5 left-1/2 transform -translate-x-1/2 w-20 h-1 bg-zinc-800 rounded-full" />
+                    </div>
+                  ) : (
+                    <div className="w-full h-full rounded-xl bg-slate-950 border border-zinc-850 shadow-2xl overflow-hidden flex flex-col">
+                      <iframe
+                        key={previewKey}
+                        src={getCombinedPreviewBlob()}
+                        className="w-full h-full border-none bg-slate-950"
+                        sandbox="allow-scripts allow-same-origin allow-popups"
+                        title="Desktop App Preview"
+                      />
                     </div>
                   )}
 
-                  <div className="flex-1 overflow-y-auto p-2 space-y-0.5">
-                    {files.map(file => {
-                      const isActive = file.path === activeFilePath;
-                      const isHtml = file.path.endsWith(".html");
-                      const isJs = file.path.endsWith(".js");
-                      const isJson = file.path.endsWith(".json");
-                      
-                      return (
-                        <div
-                          key={file.path}
-                          className={`group w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-normal font-mono cursor-pointer transition-all border ${
-                            isActive 
-                              ? "bg-amber-500/10 text-amber-400 border-amber-500/15" 
-                              : isDark 
-                                ? "border-transparent text-zinc-400 hover:bg-zinc-900/60 hover:text-zinc-200" 
-                                : "border-transparent text-zinc-600 hover:bg-zinc-150 hover:text-zinc-900"
-                          }`}
-                          onClick={() => setActiveFilePath(file.path)}
-                        >
-                          <div className="flex items-center gap-1.5 min-w-0">
-                            {isHtml ? <Code className="h-3.5 w-3.5 text-orange-400 shrink-0" /> :
-                             isJs ? <FileCode className="h-3.5 w-3.5 text-yellow-400 shrink-0" /> :
-                             isJson ? <FileJson className="h-3.5 w-3.5 text-emerald-400 shrink-0" /> :
-                             <File className="h-3.5 w-3.5 text-zinc-400 shrink-0" />}
-                            <span className="truncate">{file.path}</span>
+                  <div className="absolute bottom-4 right-4 z-30 font-mono">
+                    {!isConsoleOpen ? (
+                      <button
+                        onClick={() => setIsConsoleOpen(true)}
+                        className="px-3.5 py-1.5 rounded-xl bg-zinc-900/90 border border-zinc-800/80 hover:bg-zinc-800 text-[11px] font-medium text-zinc-300 flex items-center gap-2 shadow-2xl backdrop-blur-md transition-all hover:scale-105 active:scale-95 cursor-pointer"
+                      >
+                        <Terminal className="h-3.5 w-3.5 text-amber-500" />
+                        <span>Console</span>
+                        {consoleLogs.length > 0 && (
+                          <span className="px-1.5 py-0.5 text-[9px] font-bold rounded-full bg-amber-500 text-zinc-950">
+                            {consoleLogs.length}
+                          </span>
+                        )}
+                      </button>
+                    ) : (
+                      <div className="w-[380px] h-64 rounded-xl bg-black/95 border border-zinc-800/80 shadow-2xl flex flex-col overflow-hidden backdrop-blur-md animate-fade-in">
+                        <div className="px-3 py-2 border-b border-zinc-850 flex items-center justify-between bg-zinc-900/40 select-none shrink-0">
+                          <div className="flex items-center gap-1.5">
+                            <Terminal className="h-3.5 w-3.5 text-amber-500" />
+                            <span className="text-[10px] font-bold tracking-tight text-zinc-200">Console Output</span>
+                            {consoleLogs.length > 0 && (
+                              <span className="px-1.5 py-0.2 text-[9px] font-bold rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                                {consoleLogs.length} logs
+                              </span>
+                            )}
                           </div>
-                          {file.path !== "index.html" && (
+                          <div className="flex items-center gap-1">
                             <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleDeleteFile(file.path);
-                              }}
-                              className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-rose-500/10 text-rose-400 transition-all shrink-0"
-                              title="Delete File"
+                              onClick={() => setConsoleLogs([])}
+                              className="p-1 rounded hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 transition-colors"
+                              title="Clear logs"
                             >
-                              <Trash className="h-3.5 w-3.5" />
+                              <Trash2 className="h-3.5 w-3.5" />
                             </button>
+                            <button
+                              onClick={() => setIsConsoleOpen(false)}
+                              className="p-1 rounded hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 transition-colors"
+                              title="Close console"
+                            >
+                              <ChevronDown className="h-4 w-4" />
+                            </button>
+                          </div>
+                        </div>
+                        <div className="flex-1 overflow-y-auto p-3 space-y-1.5">
+                          {consoleLogs.length === 0 ? (
+                            <div className="h-full flex items-center justify-center text-[10px] text-zinc-600 italic">
+                              No logs captured. Call console.log() in your project.
+                            </div>
+                          ) : (
+                            consoleLogs.map((log, idx) => {
+                              let logColor = "text-zinc-300";
+                              let bgClass = "";
+                              if (log.type === "error") {
+                                  logColor = "text-rose-400";
+                                  bgClass = "bg-rose-500/5";
+                              } else if (log.type === "warn") {
+                                  logColor = "text-amber-400";
+                                  bgClass = "bg-amber-500/5";
+                              } else if (log.type === "info") {
+                                  logColor = "text-blue-400";
+                              }
+                              return (
+                                <div key={idx} className={`p-1.5 rounded text-[11px] leading-relaxed font-mono flex items-start gap-2 ${bgClass}`}>
+                                  <span className="text-zinc-600 shrink-0 select-none text-[9px] pt-0.5">{log.timestamp}</span>
+                                  <span className={`flex-1 break-all ${logColor}`}>{log.text}</span>
+                                </div>
+                              );
+                            })
                           )}
                         </div>
-                      );
-                    })}
+                      </div>
+                    )}
                   </div>
-
                 </div>
-              )}
+              </div>
+            )}
 
-              <div className="flex-1 flex flex-col min-w-0">
+            {/* Tab Content 2: Code editor mode active */}
+            {activeRightTab === "code" && (
+              <div className="flex-1 flex flex-col min-w-0 overflow-hidden min-h-0">
+                <div className="flex-1 flex flex-col min-w-0">
                 {isFullscreen ? (
                   <div className={`px-4 py-2 border-b flex items-center justify-between shrink-0 transition-colors duration-200 ${isDark ? "border-zinc-900 bg-black" : "border-zinc-100 bg-white"}`}>
                     <div className="flex items-center gap-2">
@@ -3063,7 +3081,7 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId, us
                       isDark ? "border-zinc-900 bg-black text-zinc-600" : "border-zinc-100 bg-zinc-50/50 text-zinc-400"
                     }`}
                   >
-                    {Array.from({ length: Math.max(activeFile.content.split("\n").length, 30) }).map((_, i) => (
+                    {Array.from({ length: Math.max((localCodeContent.match(/\n/g) || []).length + 1, 30) }).map((_, i) => (
                       <div key={i} className="h-6 leading-6 select-none">{i + 1}</div>
                     ))}
                   </div>
@@ -3072,10 +3090,12 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId, us
                     <textarea
                       ref={editorScrollRef}
                       onScroll={handleEditorScroll}
-                      value={activeFile.content}
+                      value={localCodeContent}
                       onChange={handleEditorChange}
+                      autoCapitalize="none"
+                      autoCorrect="off"
+                      spellCheck={false}
                       className={`flex-1 h-full p-4 text-sm font-mono focus:outline-none resize-none leading-6 transition-colors duration-200 ${isDark ? "bg-black text-zinc-200 focus:bg-black" : "bg-white text-zinc-850 focus:bg-white"}`}
-                      spellCheck="false"
                       placeholder="Write code here..."
                     />
                   ) : (
@@ -3088,7 +3108,7 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId, us
                       }`}
                       title="Click to edit code"
                     >
-                      {highlightCode(activeFile.content, activeFile.path)}
+                      {highlightCode(localCodeContent, activeFile.path)}
                     </div>
                   )}
                 </div>
@@ -3096,6 +3116,7 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId, us
 
             </div>
           )}
+          </div>
 
           {activeRightTab === "split" && (
             <div className="flex-1 flex overflow-hidden min-h-0">

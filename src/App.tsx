@@ -3563,10 +3563,10 @@ export default function App() {
 
           <div className="mb-8 select-none">
             <h2 className="text-xl font-semibold tracking-tight text-white">
-              {getTranslation("hello", userLanguage)}
+              {getTranslation("hello", "en")}
             </h2>
             <p className="mt-2 text-sm text-zinc-400">
-              {getTranslation("welcomeSignInPrompt", userLanguage)}
+              {getTranslation("welcomeSignInPrompt", "en")}
             </p>
           </div>
 
@@ -3596,7 +3596,7 @@ export default function App() {
           </div>
 
           <p className="mt-8 text-[11px] text-zinc-500 font-medium select-none">
-            {getTranslation("chatSessionsSavedPrivately", userLanguage)}
+            {getTranslation("chatSessionsSavedPrivately", "en")}
           </p>
         </motion.div>
       </div>
