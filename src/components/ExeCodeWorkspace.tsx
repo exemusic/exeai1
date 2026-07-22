@@ -1048,30 +1048,33 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId, us
   };
 
   const cleanDisplayContent = (text: string) => {
-    let cleaned = text.replace(/```(?:json|javascript|js|html|typescript|ts)?[\s\S]*?(?:```|$)/gi, "");
+    let cleaned = text.replace(/```(?:json|javascript|js|html|css|typescript|ts)?[\s\S]*?(?:```|$)/gi, "");
     return cleaned.trim();
   };
 
   const extractFilesFromMarkdownBlocks = (text: string, currentFiles: VirtualFile[]): VirtualFile[] | null => {
-    const codeBlockRegex = /```([a-zA-Z0-9_-]*)\n([\s\S]*?)\n```/g;
+    if (!text) return null;
+
+    const codeBlockRegex = /```([a-zA-Z0-9_-]*)\s*\n?([\s\S]*?)(?:```|$)/g;
     const blocks: { lang: string; content: string; index: number }[] = [];
     let match;
     while ((match = codeBlockRegex.exec(text)) !== null) {
-      blocks.push({
-        lang: match[1],
-        content: match[2],
-        index: match.index
-      });
+      if (match[2] && match[2].trim().length > 0) {
+        blocks.push({
+          lang: (match[1] || "").trim().toLowerCase(),
+          content: match[2].trim(),
+          index: match.index
+        });
+      }
     }
 
-    if (blocks.length === 0) return null;
-
     const extracted: VirtualFile[] = [];
+
     let lastSearchIndex = 0;
     for (let i = 0; i < blocks.length; i++) {
       const block = blocks[i];
       
-      if (block.lang.toLowerCase() === "json" && (block.content.trim().startsWith("[") || block.content.includes('"path"'))) {
+      if (block.lang === "json" && (block.content.startsWith("[") || block.content.includes('"path"'))) {
         continue;
       }
 
@@ -1097,14 +1100,16 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId, us
           });
         }
       } else {
-        const lang = block.lang.toLowerCase();
+        const lang = block.lang;
         let fallbackPath = "";
-        if (lang === "html") {
+        if (lang === "html" || block.content.includes("<!DOCTYPE html") || block.content.includes("<html")) {
           fallbackPath = "index.html";
-        } else if (lang === "css") {
+        } else if (lang === "css" || block.content.includes("body {") || block.content.includes(".class")) {
           fallbackPath = "style.css";
-        } else if (lang === "js" || lang === "javascript") {
+        } else if (lang === "js" || lang === "javascript" || block.content.includes("document.getElement") || block.content.includes("addEventListener")) {
           fallbackPath = "app.js";
+        } else if (!lang && (block.content.startsWith("<!DOCTYPE") || block.content.startsWith("<html"))) {
+          fallbackPath = "index.html";
         }
 
         if (fallbackPath) {
@@ -1118,6 +1123,16 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId, us
             });
           }
         }
+      }
+    }
+
+    if (extracted.length === 0) {
+      const htmlMatch = text.match(/<!DOCTYPE html[\s\S]*?<\/html>/i) || text.match(/<html[\s\S]*?<\/html>/i);
+      if (htmlMatch) {
+        extracted.push({
+          path: "index.html",
+          content: htmlMatch[0]
+        });
       }
     }
 
