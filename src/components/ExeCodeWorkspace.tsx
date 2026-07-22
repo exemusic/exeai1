@@ -882,6 +882,15 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId, us
       }
     }
 
+    const defaultCanvasBgTag = `\n  <style id="default-canvas-bg">html, body { background-color: #ffffff; color: #000000; }</style>`;
+    if (finalHtml.includes("<head>")) {
+      finalHtml = finalHtml.replace("<head>", `<head>${defaultCanvasBgTag}`);
+    } else if (finalHtml.includes("</head>")) {
+      finalHtml = finalHtml.replace("</head>", `${defaultCanvasBgTag}\n</head>`);
+    } else {
+      finalHtml = defaultCanvasBgTag + finalHtml;
+    }
+
     const errorHandlingScript = `
       <script>
         window.addEventListener('error', function(e) {
@@ -1469,7 +1478,7 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId, us
         `SYSTEM & RESPONSE FORMAT INSTRUCTIONS:\n` +
         `=========================================\n` +
         `1. MANDATORY LANGUAGE MATCHING: Respond strictly in the SAME language as the User Instruction (e.g. English if prompt is in English, Indonesian if prompt is in Indonesian).\n` +
-        `2. CRITICAL FOR CODE MODIFICATIONS: When the user asks to modify, update, fix, create, or change code (or states that code hasn't changed), you MUST generate the updated workspace code inside a single \`\`\`json block at the end of your message.\n` +
+        `2. CRITICAL FOR CODE MODIFICATIONS & ERROR FIXES: When the user asks to modify, update, fix, create, or change code, OR provides an error log/syntax error/console error (e.g. "Uncaught SyntaxError...", "Identifier already declared...", etc.), you MUST fix the bug in the code and generate the complete updated workspace files inside a single \`\`\`json block at the end of your message.\n` +
         `3. DETAILED & COMPREHENSIVE RESPONSES ONLY: NEVER write brief or generic 1-sentence responses like 'I have processed your request' or 'Done'. ALWAYS write 2 to 4 detailed, friendly, and professional paragraphs explaining what changes were made, why, how the interface was updated, and how to test them.\n` +
         `4. Follow user instructions precisely. DO NOT add unrequested extra features, buttons, or unasked visual components.\n` +
         `5. SOLUTION-FIRST DIRECTIVE: NEVER state 'tidak bisa' (cannot do) or claim 'sudah dilakukan' (already done) unless you actually provide the complete code changes. You MUST ALWAYS provide a direct, functional, working code solution and include the complete updated files in the \`\`\`json block.\n` +
@@ -1684,8 +1693,8 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId, us
         let nonCodeText = displayableText ? displayableText.trim() : fullText.replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
         if (!nonCodeText) {
           nonCodeText = activeUserLang === "id"
-            ? "Maaf, AI tidak dapat menerapkan perubahan kode secara otomatis untuk permintaan ini. Silakan berikan instruksi perubahan kode yang lebih spesifik atau coba kirim ulang."
-            : "Sorry, the AI could not automatically apply code changes for this request. Please provide more specific instructions or try again.";
+            ? "AI telah menerima petunjuk Anda. Apabila perubahan kode belum otomatis diterapkan pada file, Anda dapat meminta AI untuk secara langsung memperbarui kode file terkait."
+            : "The AI has received your prompt. If code modifications were not automatically applied, you can request the AI to update the target file directly.";
         }
 
         let thinkHeader = "";
@@ -2741,8 +2750,8 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId, us
         {/* PANEL KANAN: WORKSPACE INTERACTIVE / CODE EDITOR PANE */}
         <div className={`flex-1 flex flex-row min-w-0 overflow-hidden relative ${isDark ? "bg-black text-zinc-100" : "bg-white text-zinc-800"}`}>
           
-          {/* File List sidebar rendered persistently on left of workspace panel to prevent layout shift */}
-          {!isFullscreen && (
+          {/* File List sidebar rendered only when viewing code mode */}
+          {!isFullscreen && activeRightTab === "code" && (
             <div className={`w-56 border-r flex flex-col shrink-0 transition-colors duration-200 ${isDark ? "border-zinc-900 bg-black" : "border-zinc-100/50 bg-zinc-50"}`}>
               <div className={`p-3 border-b flex items-center justify-between transition-colors duration-200 ${isDark ? "border-zinc-900 bg-black" : "border-zinc-100 bg-zinc-100/50"}`}>
                 <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">File List</span>
@@ -2909,18 +2918,18 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId, us
                       <iframe
                         key={previewKey}
                         src={getCombinedPreviewBlob()}
-                        className="w-full h-full border-none rounded-[28px] bg-slate-950"
+                        className="w-full h-full border-none rounded-[28px] bg-white"
                         sandbox="allow-scripts allow-same-origin allow-popups"
                         title="Mobile App Preview"
                       />
                       <div className="absolute bottom-1.5 left-1/2 transform -translate-x-1/2 w-20 h-1 bg-zinc-800 rounded-full" />
                     </div>
                   ) : (
-                    <div className="w-full h-full rounded-xl bg-slate-950 border border-zinc-850 shadow-2xl overflow-hidden flex flex-col">
+                    <div className="w-full h-full rounded-xl bg-white border border-zinc-300 shadow-2xl overflow-hidden flex flex-col">
                       <iframe
                         key={previewKey}
                         src={getCombinedPreviewBlob()}
-                        className="w-full h-full border-none bg-slate-950"
+                        className="w-full h-full border-none bg-white"
                         sandbox="allow-scripts allow-same-origin allow-popups"
                         title="Desktop App Preview"
                       />
