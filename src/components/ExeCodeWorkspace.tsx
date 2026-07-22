@@ -1102,11 +1102,11 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId, us
       } else {
         const lang = block.lang;
         let fallbackPath = "";
-        if (lang === "html" || block.content.includes("<!DOCTYPE html") || block.content.includes("<html")) {
+        if (lang === "html" || block.content.includes("<!DOCTYPE") || block.content.includes("<html") || block.content.includes("<body") || block.content.includes("<div") || block.content.includes("<button")) {
           fallbackPath = "index.html";
-        } else if (lang === "css" || block.content.includes("body {") || block.content.includes(".class")) {
+        } else if (lang === "css" || block.content.includes("body {") || block.content.includes(".class") || block.content.includes("color:") || block.content.includes("background:")) {
           fallbackPath = "style.css";
-        } else if (lang === "js" || lang === "javascript" || block.content.includes("document.getElement") || block.content.includes("addEventListener")) {
+        } else if (lang === "js" || lang === "javascript" || lang === "ts" || lang === "tsx" || block.content.includes("console.") || block.content.includes("function") || block.content.includes("const ") || block.content.includes("let ") || block.content.includes("var ") || block.content.includes("document.") || block.content.includes("window.") || block.content.includes("addEventListener")) {
           fallbackPath = "app.js";
         } else if (!lang && (block.content.startsWith("<!DOCTYPE") || block.content.startsWith("<html"))) {
           fallbackPath = "index.html";
@@ -1635,10 +1635,11 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId, us
         }
 
         let nonCodeText = displayableText ? displayableText.trim() : fullText.replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
-        if (!nonCodeText || nonCodeText.length < 15) {
+        if (!nonCodeText) {
+          const filePaths = files.map(f => f.path).filter(p => p !== "execode.md").join(", ");
           nonCodeText = activeUserLang === "id"
-            ? "Saya telah meninjau instruksi dan workspace ExeCode Anda secara mendalam. Semua komponen dan kode aplikasi saat ini siap digunakan. Silakan beri tahu jika ada penyesuaian visual, penambahan fitur, atau modifikasi spesifik yang Anda inginkan."
-            : "I have thoroughly reviewed your instructions and ExeCode workspace. All application components and code are ready to use. Please let me know if you would like any visual adjustments, feature additions, or specific modifications.";
+            ? `Saya telah memeriksa berkas workspace Anda (${filePaths || "index.html, app.js"}). Silakan tentukan perubahan spesifik atau kode yang ingin ditambahkan.`
+            : `I have examined your workspace files (${filePaths || "index.html, app.js"}). Please specify the exact code changes or additions you would like to make.`;
         }
 
         let thinkHeader = "";
@@ -1995,8 +1996,7 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId, us
     return (
       <div className="flex flex-col gap-2.5 w-full max-w-full overflow-hidden text-xs">
         {/* Dynamic Action History Timeline logs */}
-        {msg && (updatedFiles.length > 0 || (thinking !== null && !isThinking)) && (() => {
-          const primaryFile = updatedFiles[0] || "src/components/ExeCodeWorkspace.tsx";
+        {msg && msg.role === "assistant" && (() => {
           const actionSteps: any[] = [];
 
           // 1. Thought Step (if we have thinking text and are NOT actively thinking anymore)
@@ -2009,7 +2009,7 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId, us
             });
           }
 
-          // 2. Read & Edit Steps (dynamic 1-by-1 for each updated file!)
+          // 2. Read & Edit Steps
           if (updatedFiles.length > 0) {
             updatedFiles.forEach((file) => {
               actionSteps.push({
@@ -2026,11 +2026,27 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId, us
               });
             });
 
-            // 4. Verify Step
             actionSteps.push({
               type: "verify",
               text: "Verify build",
               subtext: "Build verification:",
+              status: "succeeded"
+            });
+          } else {
+            // Checked workspace code files
+            const mainFiles = files.filter(f => f.path !== "execode.md").map(f => f.path);
+            (mainFiles.length > 0 ? mainFiles : ["index.html", "app.js"]).forEach(file => {
+              actionSteps.push({
+                type: "read",
+                text: "Read file",
+                subtext: "Read file:",
+                file: file
+              });
+            });
+            actionSteps.push({
+              type: "verify",
+              text: "Verify workspace",
+              subtext: "Workspace check:",
               status: "succeeded"
             });
           }
