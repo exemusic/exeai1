@@ -3321,7 +3321,7 @@ export default function App() {
                                           ? "hover:bg-zinc-700 text-zinc-400 hover:text-zinc-200" 
                                           : "hover:bg-zinc-200 text-zinc-500 hover:text-zinc-800"
                                       }`}
-                                      title="Options"
+                                      title={getTranslation("options", userLanguage)}
                                     >
                                       <MoreHorizontal className="h-4 w-4" />
                                     </button>
@@ -3346,7 +3346,7 @@ export default function App() {
                                           }`}
                                         >
                                           <Edit2 className="h-3.5 w-3.5" />
-                                          Rename
+                                          {getTranslation("rename", userLanguage)}
                                         </button>
                                         <button
                                           onClick={(e) => {
@@ -3359,7 +3359,7 @@ export default function App() {
                                           }`}
                                         >
                                           <Trash2 className="h-3.5 w-3.5" />
-                                          Delete
+                                          {getTranslation("delete", userLanguage)}
                                         </button>
                                       </div>
                                     )}
@@ -3384,7 +3384,7 @@ export default function App() {
                         }}
                         className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 hover:text-[#1a73e8] dark:hover:text-[#59a6ff] hover:underline transition-all cursor-pointer"
                       >
-                        See all
+                        {getTranslation("seeAll", userLanguage)}
                       </button>
                     </div>
                   )}
@@ -3444,7 +3444,7 @@ export default function App() {
                 className={`p-1.5 rounded-lg transition-all duration-200 cursor-pointer ${
                   isDark ? "text-zinc-400 hover:text-white hover:bg-zinc-800/50" : "text-zinc-650 hover:text-zinc-900 hover:bg-zinc-200/50"
                 }`}
-                title="Settings"
+                title={getTranslation("settings", userLanguage)}
               >
                 <Settings className="h-4.5 w-4.5" />
               </button>
@@ -3469,7 +3469,7 @@ export default function App() {
               className={`p-1.5 rounded-lg transition-all duration-200 cursor-pointer shrink-0 ${
                 isDark ? "text-zinc-400 hover:text-white hover:bg-zinc-800/50" : "text-zinc-650 hover:text-zinc-900 hover:bg-zinc-200/50"
               }`}
-              title="Settings"
+              title={getTranslation("settings", userLanguage)}
             >
               <Settings className="h-4.5 w-4.5" />
             </button>
@@ -3511,8 +3511,8 @@ export default function App() {
               </svg>
             </div>
           </div>
-          <h2 className="text-lg font-medium tracking-wide animate-pulse">Connecting to ExeChat...</h2>
-          <p className="mt-2 text-xs text-zinc-500 font-mono">Verifying secure session...</p>
+          <h2 className="text-lg font-medium tracking-wide animate-pulse">{getTranslation("connectingToExeChat", userLanguage)}</h2>
+          <p className="mt-2 text-xs text-zinc-500 font-mono">{getTranslation("verifyingSecureSession", userLanguage)}</p>
         </div>
       </div>
     );
@@ -3563,10 +3563,10 @@ export default function App() {
 
           <div className="mb-8 select-none">
             <h2 className="text-xl font-semibold tracking-tight text-white">
-              Welcome
+              {getTranslation("hello", userLanguage)}
             </h2>
             <p className="mt-2 text-sm text-zinc-400">
-              Please sign in using your Google account to start your chat session.
+              {getTranslation("welcomeSignInPrompt", userLanguage)}
             </p>
           </div>
 
@@ -3596,7 +3596,7 @@ export default function App() {
           </div>
 
           <p className="mt-8 text-[11px] text-zinc-500 font-medium select-none">
-            Chat sessions are saved privately in your browser.
+            {getTranslation("chatSessionsSavedPrivately", userLanguage)}
           </p>
         </motion.div>
       </div>
@@ -5636,7 +5636,7 @@ export default function App() {
                   <div className="flex items-center justify-between mb-4 pb-1">
                     <div className="flex items-center gap-2">
                       <Sparkles className="h-5 w-5 text-amber-500 animate-pulse" />
-                      <h3 className="font-sans font-semibold text-lg">Select Topic</h3>
+                      <h3 className="font-sans font-semibold text-lg">{getTranslation("selectTopic", userLanguage)}</h3>
                     </div>
                     <button
                       onClick={() => setShowPresetModal(false)}
@@ -5649,7 +5649,7 @@ export default function App() {
                   </div>
 
                   <p className={`text-xs mb-5 leading-normal ${isDark ? "text-zinc-400" : "text-zinc-500"}`}>
-                    Select a trending or specialized topic to focus your AI assistant's expertise.
+                    {getTranslation("chooseTopicDesc", userLanguage)}
                   </p>
 
                   {/* Scrollable list of Presets */}
@@ -5700,7 +5700,7 @@ export default function App() {
                               </div>
                               {isSelected && (
                                 <span className="text-[10px] font-mono font-medium text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20 shrink-0">
-                                  Active
+                                  {getTranslation("active", userLanguage)}
                                 </span>
                               )}
                             </div>
@@ -5722,7 +5722,7 @@ export default function App() {
                           : "border-zinc-200 hover:bg-zinc-100 text-zinc-600"
                       }`}
                     >
-                      Cancel
+                      {getTranslation("cancel", userLanguage)}
                     </button>
                   </div>
                 </motion.div>
@@ -5756,7 +5756,7 @@ export default function App() {
                   <div className="flex items-center justify-between mb-4 pb-1">
                     <div className="flex items-center gap-2">
                       <Cpu className="h-5 w-5 text-purple-500 animate-pulse" />
-                      <h3 className="font-sans font-semibold text-lg">Select AI Model</h3>
+                      <h3 className="font-sans font-semibold text-lg">{getTranslation("selectModel", userLanguage)}</h3>
                     </div>
                     <button
                       onClick={() => setShowModelModal(false)}
@@ -5769,7 +5769,7 @@ export default function App() {
                   </div>
 
                   <p className={`text-xs mb-5 leading-normal ${isDark ? "text-zinc-400" : "text-zinc-500"}`}>
-                    Choose the artificial intelligence model (Hexky) that best fits your analysis and chat response needs.
+                    {getTranslation("chooseModelDesc", userLanguage)}
                   </p>
 
                   {/* Scrollable list of Models */}
@@ -5824,7 +5824,7 @@ export default function App() {
                               </div>
                               {isSelected && (
                                 <span className="text-[10px] font-mono font-medium text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20 shrink-0">
-                                  Active
+                                  {getTranslation("active", userLanguage)}
                                 </span>
                               )}
                             </div>
@@ -5846,7 +5846,7 @@ export default function App() {
                           : "border-zinc-200 hover:bg-zinc-100 text-zinc-600"
                       }`}
                     >
-                      Cancel
+                      {getTranslation("cancel", userLanguage)}
                     </button>
                   </div>
                 </motion.div>
@@ -5884,23 +5884,23 @@ export default function App() {
                       <User className="h-5 w-5" />
                     </div>
                     <div>
-                      <p className={`text-[10px] font-medium ${isDark ? "text-zinc-500" : "text-zinc-400"}`}>Final Step</p>
-                      <h3 className={`font-sans font-semibold text-base ${isDark ? "text-zinc-100" : "text-zinc-900"}`}>What is Your Name?</h3>
+                      <p className={`text-[10px] font-medium ${isDark ? "text-zinc-500" : "text-zinc-400"}`}>{getTranslation("finalStep", userLanguage)}</p>
+                      <h3 className={`font-sans font-semibold text-base ${isDark ? "text-zinc-100" : "text-zinc-900"}`}>{getTranslation("whatIsYourName", userLanguage)}</h3>
                     </div>
                   </div>
 
                   <p className={`text-xs leading-relaxed mb-5 font-sans ${isDark ? "text-zinc-400" : "text-zinc-500"}`}>
-                    Choose a nickname to display in your chat sessions. Skip to use the name from your Google account.
+                    {getTranslation("chooseNicknameDesc", userLanguage)}
                   </p>
 
                   {/* Input field */}
                   <div className="space-y-1.5 mb-5">
-                    <label className={`block text-[10px] font-medium uppercase tracking-wider ${isDark ? "text-zinc-500" : "text-zinc-400"}`}>Nickname</label>
+                    <label className={`block text-[10px] font-medium uppercase tracking-wider ${isDark ? "text-zinc-500" : "text-zinc-400"}`}>{getTranslation("nicknameLabel", userLanguage)}</label>
                     <input
                       type="text"
                       value={registerModalName}
                       onChange={(e) => setRegisterModalName(e.target.value)}
-                      placeholder="Example: John Doe"
+                      placeholder={getTranslation("exampleNamePlaceholder", userLanguage)}
                       maxLength={30}
                       className={`w-full rounded-xl border px-4 py-2.5 text-sm outline-none transition-colors font-sans ${
                         isDark 
@@ -5918,7 +5918,7 @@ export default function App() {
                         isDark ? "bg-white hover:bg-zinc-100 text-zinc-950" : "bg-zinc-900 hover:bg-zinc-800 text-white shadow-sm"
                       }`}
                     >
-                      Save & Continue
+                      {getTranslation("saveAndContinue", userLanguage)}
                     </button>
 
                     <button
@@ -5929,7 +5929,7 @@ export default function App() {
                           : "border-zinc-200 hover:border-zinc-300 bg-transparent hover:bg-zinc-50 text-zinc-600 hover:text-zinc-800"
                       }`}
                     >
-                      Skip (Use Google Name)
+                      {getTranslation("skipGoogleName", userLanguage)}
                     </button>
                   </div>
                 </motion.div>
@@ -6025,13 +6025,13 @@ export default function App() {
                       <Trash2 className="h-5 w-5" />
                     </div>
                     <div>
-                      <p className={`text-[10px] font-medium ${isDark ? "text-zinc-500" : "text-zinc-400"}`}>Delete Warning</p>
-                      <h3 className={`font-sans font-semibold text-base ${isDark ? "text-zinc-100" : "text-zinc-900"}`}>Clear Conversation</h3>
+                      <p className={`text-[10px] font-medium ${isDark ? "text-zinc-500" : "text-zinc-400"}`}>{getTranslation("deleteWarning", userLanguage)}</p>
+                      <h3 className={`font-sans font-semibold text-base ${isDark ? "text-zinc-100" : "text-zinc-900"}`}>{getTranslation("confirmClearTitle", userLanguage)}</h3>
                     </div>
                   </div>
 
                   <p className={`text-xs leading-relaxed mb-5 font-sans ${isDark ? "text-zinc-400" : "text-zinc-500"}`}>
-                    Are you sure you want to delete all messages in this conversation? This action cannot be undone.
+                    {getTranslation("confirmClearDesc", userLanguage)}
                   </p>
 
                   {/* Actions buttons */}
@@ -6044,7 +6044,7 @@ export default function App() {
                       }}
                       className="w-full py-2.5 px-4 rounded-xl font-semibold text-xs transition-colors duration-150 cursor-pointer text-center bg-red-600 hover:bg-red-500 text-white shadow-sm"
                     >
-                      Clear Chat
+                      {getTranslation("clearChat", userLanguage)}
                     </button>
 
                     <button
@@ -6055,7 +6055,7 @@ export default function App() {
                           : "border-zinc-200 hover:border-zinc-300 bg-transparent hover:bg-zinc-50 text-zinc-600 hover:text-zinc-800"
                       }`}
                     >
-                      Cancel
+                      {getTranslation("cancel", userLanguage)}
                     </button>
                   </div>
                 </motion.div>
@@ -6096,7 +6096,7 @@ export default function App() {
                       type="text"
                       value={popupSearchQuery}
                       onChange={(e) => setPopupSearchQuery(e.target.value)}
-                      placeholder="Search for conversations..."
+                      placeholder={getTranslation("searchConversationsPlaceholder", userLanguage)}
                       className={`w-full pl-11 pr-10 py-3 rounded-xl text-base transition-all duration-200 focus:outline-none border ${
                         isDark 
                           ? "border-zinc-800 bg-black/45 text-zinc-100 placeholder-zinc-600 focus:border-zinc-700 focus:bg-black/70" 
@@ -6128,7 +6128,7 @@ export default function App() {
                       if (popupFiltered.length === 0) {
                         return (
                           <div className={`text-center py-12 text-sm ${isDark ? "text-zinc-500" : "text-zinc-400"}`}>
-                            No conversations found for "{popupSearchQuery}"
+                            {getTranslation("noConversationsFound", userLanguage).replace("{query}", popupSearchQuery)}
                           </div>
                         );
                       }
@@ -6136,7 +6136,7 @@ export default function App() {
                       return (
                         <>
                           <div className={`px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider select-none ${isDark ? "text-zinc-500" : "text-zinc-400"}`}>
-                            {popupSearchQuery ? "Matching Conversations" : "Recent Conversations"}
+                            {popupSearchQuery ? getTranslation("matchingConversations", userLanguage) : getTranslation("recentConversations", userLanguage)}
                           </div>
                           {popupFiltered.map((s) => {
                             const isActive = s.id === currentSessionId;
@@ -6179,8 +6179,8 @@ export default function App() {
                   <div className={`px-4 py-3 border-t text-[11px] flex justify-between select-none ${
                     isDark ? "bg-zinc-900/40 border-zinc-800/80 text-zinc-500" : "bg-zinc-50/50 border-zinc-150 text-zinc-400"
                   }`}>
-                    <span>Click on a conversation to jump to it</span>
-                    <span>Press ESC to close</span>
+                    <span>{getTranslation("clickToJumpConversation", userLanguage)}</span>
+                    <span>{getTranslation("pressEscToClose", userLanguage)}</span>
                   </div>
                 </motion.div>
               </div>
@@ -6212,10 +6212,10 @@ export default function App() {
                   </div>
                   <div className="space-y-1.5 min-w-0">
                     <h4 className={`text-sm font-bold tracking-tight ${isDark ? "text-zinc-100" : "text-zinc-900"}`}>
-                      Cookie & Storage Notification
+                      {getTranslation("cookieTitle", userLanguage)}
                     </h4>
                     <p className={`text-xs leading-relaxed ${isDark ? "text-zinc-400" : "text-zinc-500"}`}>
-                      ExeChat uses cookies and local storage (localStorage) to remember your chat sessions, theme settings, and Google login verification to function optimally and securely.
+                      {getTranslation("cookieNoticeText", userLanguage)}
                     </p>
                   </div>
                 </div>
@@ -6228,16 +6228,16 @@ export default function App() {
                       isDark ? "bg-zinc-900/60 border-zinc-800 text-zinc-400" : "bg-zinc-50 border-zinc-200 text-zinc-650"
                     }`}
                   >
-                    <div className="font-semibold text-xs mb-1">Our Storage Details:</div>
+                    <div className="font-semibold text-xs mb-1">{getTranslation("ourStorageDetails", userLanguage)}</div>
                     <div className="flex items-start gap-1.5">
                       <span className="text-amber-500">•</span>
-                      <span><strong>Essential (Required)</strong>: Stores your chat session IDs, Google login status, and the API keys needed to interact with the AI.</span>
+                      <span><strong>{getTranslation("essentialRequired", userLanguage)}</strong>: {getTranslation("essentialDesc", userLanguage)}</span>
                     </div>
                     <div className="flex items-start gap-1.5">
                       <span className="text-amber-500">•</span>
-                      <span><strong>Preferences (Optional)</strong>: Stores your theme choices (Dark/Light), assistant characters/presets, and nickname memory preferences.</span>
+                      <span><strong>{getTranslation("preferencesOptional", userLanguage)}</strong>: {getTranslation("preferencesDesc", userLanguage)}</span>
                     </div>
-                    <div>We fully respect your privacy. All your chat data is stored locally on your own device.</div>
+                    <div>{getTranslation("privacyRespect", userLanguage)}</div>
                   </motion.div>
                 )}
 
@@ -6246,7 +6246,7 @@ export default function App() {
                     onClick={() => setShowCookieDetails(!showCookieDetails)}
                     className={`text-xs font-semibold hover:underline ${isDark ? "text-zinc-400 hover:text-zinc-250" : "text-zinc-600 hover:text-zinc-900"}`}
                   >
-                    {showCookieDetails ? "Hide Details" : "Learn Details"}
+                    {showCookieDetails ? getTranslation("hideDetails", userLanguage) : getTranslation("learnDetails", userLanguage)}
                   </button>
 
                   <div className="flex items-center gap-2">
@@ -6262,7 +6262,7 @@ export default function App() {
                           : "border-zinc-200 hover:bg-zinc-100 text-zinc-600 hover:text-zinc-800"
                       }`}
                     >
-                      Reject
+                      {getTranslation("reject", userLanguage)}
                     </button>
                     <button
                       onClick={() => {
@@ -6276,7 +6276,7 @@ export default function App() {
                           : "bg-zinc-900 hover:bg-zinc-800 text-white border-transparent shadow-sm hover:scale-[1.02]"
                       }`}
                     >
-                      Accept
+                      {getTranslation("accept", userLanguage)}
                     </button>
                   </div>
                 </div>

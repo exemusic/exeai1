@@ -103,6 +103,44 @@ export interface TranslationDict {
   selected: string;
   compatible: string;
   active: string;
+  rename: string;
+  delete: string;
+  seeAll: string;
+  options: string;
+  expandSidebar: string;
+  closeSidebar: string;
+  closeHistory: string;
+  noSearchResults: string;
+  noChatHistory: string;
+  connectingToExeChat: string;
+  verifyingSecureSession: string;
+  welcomeSignInPrompt: string;
+  chatSessionsSavedPrivately: string;
+  removeAttachment: string;
+  finalStep: string;
+  whatIsYourName: string;
+  chooseNicknameDesc: string;
+  nicknameLabel: string;
+  exampleNamePlaceholder: string;
+  saveAndContinue: string;
+  skipGoogleName: string;
+  deleteWarning: string;
+  confirmClearTitle: string;
+  confirmClearDesc: string;
+  clearChat: string;
+  noConversationsFoundFor: string;
+  matchingConversations: string;
+  clickToJump: string;
+  pressEscToClose: string;
+  cookieNotificationTitle: string;
+  cookieNotificationDesc: string;
+  storageDetailsTitle: string;
+  essentialStorageDesc: string;
+  preferencesStorageDesc: string;
+  privacyRespectNotice: string;
+  hideDetails: string;
+  learnDetails: string;
+  exeChatDisclaimer: string;
   
   // ExeCode Workspace
   workspaceTitle: string;
@@ -210,6 +248,44 @@ export const translations: Record<string, TranslationDict> = {
     selected: "Selected",
     compatible: "Compatible",
     active: "Active",
+    rename: "Rename",
+    delete: "Delete",
+    seeAll: "See all",
+    options: "Options",
+    expandSidebar: "Expand Sidebar",
+    closeSidebar: "Close Sidebar",
+    closeHistory: "Close History",
+    noSearchResults: "No search results found.",
+    noChatHistory: "No chat history yet.",
+    connectingToExeChat: "Connecting to ExeChat...",
+    verifyingSecureSession: "Verifying secure session...",
+    welcomeSignInPrompt: "Please sign in using your Google account to start your chat session.",
+    chatSessionsSavedPrivately: "Chat sessions are saved privately in your browser.",
+    removeAttachment: "Remove Attachment",
+    finalStep: "Final Step",
+    whatIsYourName: "What is Your Name?",
+    chooseNicknameDesc: "Choose a nickname to display in your chat sessions. Skip to use the name from your Google account.",
+    nicknameLabel: "Nickname",
+    exampleNamePlaceholder: "Example: John Doe",
+    saveAndContinue: "Save & Continue",
+    skipGoogleName: "Skip (Use Google Name)",
+    deleteWarning: "Delete Warning",
+    confirmClearTitle: "Clear Conversation",
+    confirmClearDesc: "Are you sure you want to delete all messages in this conversation? This action cannot be undone.",
+    clearChat: "Clear Chat",
+    noConversationsFoundFor: 'No conversations found for "{query}"',
+    matchingConversations: "Matching Conversations",
+    clickToJump: "Click on a conversation to jump to it",
+    pressEscToClose: "Press ESC to close",
+    cookieNotificationTitle: "Cookie & Storage Notification",
+    cookieNotificationDesc: "ExeChat uses cookies and local storage (localStorage) to remember your chat sessions, theme settings, and Google login verification to function optimally and securely.",
+    storageDetailsTitle: "Our Storage Details:",
+    essentialStorageDesc: "Essential (Required): Stores your chat session IDs, Google login status, and the API keys needed to interact with the AI.",
+    preferencesStorageDesc: "Preferences (Optional): Stores your theme choices (Dark/Light), assistant characters/presets, and nickname memory preferences.",
+    privacyRespectNotice: "We fully respect your privacy. All your chat data is stored locally on your own device.",
+    hideDetails: "Hide Details",
+    learnDetails: "Learn Details",
+    exeChatDisclaimer: "ExeChat can make mistakes. Verify important info.",
     
     workspaceTitle: "ExeCode Web AI Workstation",
     livePreview: "Live Preview",
@@ -315,6 +391,44 @@ export const translations: Record<string, TranslationDict> = {
     selected: "Dipilih",
     compatible: "Kompatibel",
     active: "Aktif",
+    rename: "Ubah Nama",
+    delete: "Hapus",
+    seeAll: "Lihat Semua",
+    options: "Opsi",
+    expandSidebar: "Buka Sidebar",
+    closeSidebar: "Tutup Sidebar",
+    closeHistory: "Tutup Riwayat",
+    noSearchResults: "Tidak ada hasil pencarian ditemukan.",
+    noChatHistory: "Belum ada riwayat percakapan.",
+    connectingToExeChat: "Menghubungkan ke ExeChat...",
+    verifyingSecureSession: "Memverifikasi sesi aman...",
+    welcomeSignInPrompt: "Silakan masuk dengan akun Google Anda untuk memulai sesi percakapan.",
+    chatSessionsSavedPrivately: "Sesi percakapan disimpan secara pribadi di peramban Anda.",
+    removeAttachment: "Hapus Lampiran",
+    finalStep: "Langkah Terakhir",
+    whatIsYourName: "Siapa Nama Anda?",
+    chooseNicknameDesc: "Pilih nama panggilan untuk ditampilkan dalam sesi percakapan. Lewati untuk menggunakan nama dari akun Google Anda.",
+    nicknameLabel: "Nama Panggilan",
+    exampleNamePlaceholder: "Contoh: Budi Santoso",
+    saveAndContinue: "Simpan & Lanjutkan",
+    skipGoogleName: "Lewati (Gunakan Nama Google)",
+    deleteWarning: "Peringatan Penghapusan",
+    confirmClearTitle: "Hapus Percakapan",
+    confirmClearDesc: "Apakah Anda yakin ingin menghapus semua pesan dalam percakapan ini? Tindakan ini tidak dapat dibatalkan.",
+    clearChat: "Hapus Chat",
+    noConversationsFoundFor: 'Tidak ada percakapan ditemukan untuk "{query}"',
+    matchingConversations: "Percakapan Cocok",
+    clickToJump: "Klik pada percakapan untuk langsung membukanya",
+    pressEscToClose: "Tekan ESC untuk menutup",
+    cookieNotificationTitle: "Pemberitahuan Cookie & Penyimpanan",
+    cookieNotificationDesc: "ExeChat menggunakan cookie dan penyimpanan lokal (localStorage) untuk mengingat sesi chat, pengaturan tema, dan verifikasi login Google agar berfungsi secara optimal dan aman.",
+    storageDetailsTitle: "Rincian Penyimpanan Kami:",
+    essentialStorageDesc: "Penting (Wajib): Menyimpan ID sesi chat, status login Google, dan kunci API untuk berinteraksi dengan AI.",
+    preferencesStorageDesc: "Preferensi (Opsional): Menyimpan pilihan tema (Gelap/Terang), preset asisten, dan preferensi memori nama panggilan.",
+    privacyRespectNotice: "Kami sepenuhnya menghormati privasi Anda. Semua data percakapan Anda disimpan secara lokal di perangkat Anda sendiri.",
+    hideDetails: "Sembunyikan Rincian",
+    learnDetails: "Pelajari Rincian",
+    exeChatDisclaimer: "ExeChat dapat membuat kesalahan. Verifikasi info penting.",
     
     workspaceTitle: "Workstation Web AI ExeCode",
     livePreview: "Pratinjau Langsung",
