@@ -423,20 +423,6 @@ export default function App() {
   }, [memories]);
 
   useEffect(() => {
-    const greetings = [
-      "any new ideas?",
-      "what should we discuss today?",
-      "what would you like to know?",
-      "is there anything I can help with?",
-      "let's create something great!",
-      "ask me anything.",
-      "any exciting topics today?"
-    ];
-    const randomIdx = Math.floor(Math.random() * greetings.length);
-    setWelcomeGreeting(greetings[randomIdx]);
-  }, []);
-
-  useEffect(() => {
     const handleGlobalClick = () => {
       setOpenMenuSessionId(null);
     };
@@ -513,6 +499,30 @@ export default function App() {
     return "en";
   });
   const [showLanguagePopup, setShowLanguagePopup] = useState(false);
+
+  useEffect(() => {
+    const greetingsId = [
+      "ada ide baru untuk dijelajahi?",
+      "apa yang ingin kita bahas hari ini?",
+      "apa yang ingin Anda ketahui?",
+      "ada yang bisa saya bantu?",
+      "mari buat sesuatu yang luar biasa!",
+      "tanyakan apa saja pada saya.",
+      "ada topik menarik hari ini?"
+    ];
+    const greetingsEn = [
+      "any new ideas?",
+      "what should we discuss today?",
+      "what would you like to know?",
+      "is there anything I can help with?",
+      "let's create something great!",
+      "ask me anything.",
+      "any exciting topics today?"
+    ];
+    const greetingsList = userLanguage === "id" ? greetingsId : greetingsEn;
+    const randomIdx = Math.floor(Math.random() * greetingsList.length);
+    setWelcomeGreeting(greetingsList[randomIdx]);
+  }, [userLanguage]);
 
   const [feedbackMessage, setFeedbackMessage] = useState("");
   const [feedbackCategory, setFeedbackCategory] = useState("Suggestion");
@@ -3835,9 +3845,13 @@ export default function App() {
                         transition={{ delay: 0.1, duration: 0.4 }}
                         className="font-display font-semibold text-2xl sm:text-3xl md:text-[42px] tracking-tight leading-tight bg-gradient-to-r from-[#59a6ff] via-[#c084fc] to-[#ff8da1] bg-clip-text text-transparent select-none"
                       >
-                        {userDisplayName || userName 
-                          ? `Hello ${userDisplayName || userName}, ${welcomeGreeting}` 
-                          : `Hello, ${welcomeGreeting.charAt(0).toUpperCase() + welcomeGreeting.slice(1)}`
+                        {userLanguage === "id"
+                          ? (userDisplayName || userName 
+                              ? `Halo ${userDisplayName || userName}, ${welcomeGreeting}` 
+                              : `Halo, ${welcomeGreeting.charAt(0).toUpperCase() + welcomeGreeting.slice(1)}`)
+                          : (userDisplayName || userName 
+                              ? `Hello ${userDisplayName || userName}, ${welcomeGreeting}` 
+                              : `Hello, ${welcomeGreeting.charAt(0).toUpperCase() + welcomeGreeting.slice(1)}`)
                         }
                       </motion.h2>
                     </div>
@@ -3919,7 +3933,7 @@ export default function App() {
                                     }`}
                                   >
                                     <Paperclip className="h-4 w-4 text-amber-500 shrink-0" />
-                                    <span>Upload File</span>
+                                    <span>{userLanguage === "id" ? "Unggah File" : "Upload File"}</span>
                                   </button>
                                 </motion.div>
                               </>
@@ -3937,7 +3951,7 @@ export default function App() {
                               handleSendMessage();
                             }
                           }}
-                          placeholder="Ask ExeChat anything..."
+                          placeholder={userLanguage === "id" ? "Tanyakan apa saja pada ExeChat..." : "Ask ExeChat anything..."}
                           disabled={isGenerating}
                           className={`flex-1 bg-transparent resize-none border-none outline-none focus:ring-0 text-[15px] sm:text-base md:text-base min-h-[44px] md:min-h-[50px] max-h-40 font-sans py-2.5 ${
                             isDark ? "text-zinc-250 placeholder-zinc-500" : "text-zinc-850 placeholder-zinc-400"
@@ -3976,7 +3990,7 @@ export default function App() {
                             title="Select Topic"
                           >
                             <Sparkles className="h-3 w-3 text-amber-500 shrink-0" />
-                            <span className="truncate">Topic: {activePreset.name}</span>
+                            <span className="truncate">{userLanguage === "id" ? "Topik: " : "Topic: "}{activePreset.name}</span>
                             <ChevronDown className="h-3 w-3 text-zinc-500 shrink-0" />
                           </button>
                         </div>
@@ -4008,7 +4022,7 @@ export default function App() {
                           : "bg-zinc-100 border-zinc-200 text-zinc-500"
                       }`}>
                         <Info className="h-3 w-3 md:h-3.5 md:w-3.5 text-zinc-450" />
-                        <span>Using model {activeModel.name} on the {activePreset.name} topic.</span>
+                        <span>{userLanguage === "id" ? `Menggunakan model ${activeModel.name} pada topik ${activePreset.name}.` : `Using model ${activeModel.name} on the ${activePreset.name} topic.`}</span>
                       </div>
                     </div>
                   </div>
@@ -4404,7 +4418,7 @@ export default function App() {
                         }`}
                       >
                         <Sparkles className="h-2.5 w-2.5 text-amber-500 shrink-0" />
-                        <span className="truncate">Topic: {activePreset.name}</span>
+                        <span className="truncate">{userLanguage === "id" ? "Topik: " : "Topic: "}{activePreset.name}</span>
                         <ChevronDown className="h-2.5 w-2.5 text-zinc-500 shrink-0" />
                       </button>
                     </div>
@@ -4483,7 +4497,7 @@ export default function App() {
                                   }`}
                                 >
                                   <Paperclip className="h-4 w-4 text-amber-500 shrink-0" />
-                                  <span>Upload File</span>
+                                  <span>{userLanguage === "id" ? "Unggah File" : "Upload File"}</span>
                                 </button>
                               </motion.div>
                             </>
@@ -4504,8 +4518,8 @@ export default function App() {
                        }}
                        placeholder={
                          isGenerating
-                           ? "Generating response..."
-                           : "Ask ExeChat anything..."
+                           ? (userLanguage === "id" ? "Menghasilkan respon..." : "Generating response...")
+                           : (userLanguage === "id" ? "Tanyakan apa saja pada ExeChat..." : "Ask ExeChat anything...")
                        }
                        disabled={isGenerating}
                        className={`flex-1 max-h-40 min-h-[36px] md:min-h-[40px] bg-transparent resize-none py-1.5 md:py-2 px-2 border-none outline-none focus:ring-0 text-[15px] sm:text-base md:text-base ${

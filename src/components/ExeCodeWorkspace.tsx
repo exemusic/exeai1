@@ -77,30 +77,35 @@ interface ExeCodeWorkspaceProps {
   userId?: string | null;
 }
 
-const EXECODE_MD_CONTENT = `# ExeCode Web AI Workstation
+const EXECODE_MD_CONTENT = `# ExeCode Web AI Workstation / Workspace Documentation
 
-## Overview & Purpose
-ExeCode is an interactive, multi-file web code editor and live preview workstation built with React, Tailwind CSS, and Supabase backend services.
-It enables developers to build, edit, test, and run complete web applications (\`index.html\`, \`app.js\`, \`style.css\`, etc.) in real-time within a secure sandboxed iframe environment.
+## Overview & Purpose / Gambaran Umum & Tujuan
+ExeCode (Hexky Workspace) adalah workstation dan editor kode web multi-berkas interaktif dengan pratinjau langsung yang dibangun dengan React, Tailwind CSS, dan layanan Supabase.
+Workstation ini memungkinkan pengembang dan pembuat aplikasi untuk membangun, mengedit, menguji, dan menjalankan aplikasi web lengkap (\`index.html\`, \`app.js\`, \`style.css\`, dll.) secara real-time di lingkungan iFrame yang aman.
 
-## Application Architecture & Key Features
-- **Multi-File Virtual Workspace**: Create, edit, and organize workspace files (\`index.html\`, \`app.js\`, \`style.css\`, \`execode.md\`, etc.) with real-time state tracking.
-- **AI-Powered Code Assistant**: Real-time streaming AI model that reads project files, understands multi-turn user prompt history, modifies workspace code atomically, and explains changes clearly.
-- **Atomic Supabase Cloud Persistence**: Instant synchronization and storage of user project bundles (\`project.json\`) in Supabase Storage (\`execode\` bucket).
-- **Live Preview Sandbox**: Interactive iframe execution environment supporting dynamic JavaScript execution, device switching (Desktop / Mobile), and full screen viewing.
-- **Multilingual Support**: Fully localized interface available in Indonesian, English, Spanish, Japanese, French, German, Chinese, and Arabic.
-- **Admin Security**: Secure feedback submission system with file attachments and owner-restricted administration endpoints.
+## Application Architecture & Key Features / Arsitektur & Fitur Utama
+- **Multi-File Virtual Workspace**: Buat, edit, dan kelola berkas proyek (\`index.html\`, \`app.js\`, \`style.css\`, \`execode.md\`, dll.) dengan pelacakan state real-time.
+- **AI-Powered Code Assistant**: Model AI streaming real-time yang membaca berkas proyek, memahami riwayat percakapan multi-turn, mengubah kode workspace secara atomik, dan menjelaskan perubahan secara jelas.
+- **Atomic Supabase Cloud Persistence**: Sinkronisasi dan penyimpanan berkas proyek (\`project.json\`) secara langsung di Supabase Storage (\`execode\` bucket).
+- **Live Preview Sandbox**: Lingkungan eksekusi iFrame interaktif dengan dukungan JavaScript dinamis, pengubahan tampilan perangkat (Desktop / Mobile), dan layar penuh.
+- **Full Language Localization / Bahasa Indonesia & Inggris**: Tampilan antarmuka dan respon AI otomatis menyesuaikan bahasa yang dipilih (misal: Bahasa Indonesia saat 'id' dipilih, atau Bahasa Inggris).
+- **Admin Security**: Sistem umpan balik dengan lampiran berkas dan endpoint administrasi yang dibatasi khusus untuk pemilik akun.
 
-## Recent Updates & Change History
-1. **Natural UI Refinement**: Modernized pure dark theme (\`#000000\`), sleek borders, crisp typography, and removal of all generic AI slop and premium badges.
-2. **Context-Aware AI Memory**: AI model now retains full multi-turn conversation history and reads \`execode.md\` for project background.
-3. **Atomic State Synchronization**: Sub-second project saving and loading via Supabase \`project.json\` state bundles.
-4. **Admin Endpoint Security**: Feedback list and delete APIs strictly restricted to authorized owner accounts.
+## Recent Updates & Change History / Perubahan Terakhir
+1. **Full Language Localization (Bahasa Indonesia & English)**:
+   - Pengaturan bahasa secara penuh pada antarmuka website (Hero greeting, tombol, menu, modal, dan asisten AI).
+   - Saat pengguna memilih Bahasa Indonesia ("id"), seluruh website dan asisten AI berinteraksi dalam Bahasa Indonesia secara alami.
+2. **Natural UI Refinement & Dark/Light Elegance**:
+   - Tema gelap murni (\`#000000\`) dan tema terang bertekstur bersih, dengan batas halus dan tipografi tajam tanpa elemen tidak perlu.
+3. **Context-Aware AI Memory & Context Propagation**:
+   - Model AI mempertahankan riwayat instruksi pengguna sebelumnya dan membaca dokumen \`execode.md\` ini sebagai konteks proyek.
+4. **Atomic State Synchronization**:
+   - Penyimpanan dan pemuatan proyek kurang dari satu detik melalui berkas bundel \`project.json\` Supabase.
 
-## Guidelines for AI Assistant
-- Always generate complete, production-ready code for edited files.
-- Provide clear, friendly explanations in the user's spoken language before writing the JSON file array.
-- Follow user prompt requests precisely without adding unrequested extra features or buttons.
+## Guidelines for AI Assistant / Petunjuk Asisten AI
+- **Penjelasan Ramah & Jelas**: SELALU berikan penjelasan dalam Bahasa Indonesia yang alami jika instruksi pengguna atau bahasa aktif menggunakan Bahasa Indonesia (atau Bahasa Inggris jika pengguna memilih English).
+- **Kode Lengkap Tanpa Ellipsis**: Selalu sediakan kode lengkap siap pakai tanpa placeholder "// sisa kode...".
+- **Fokus Pada Permintaan**: Buat atau ubah kode sesuai permintaan persis tanpa menambahkan tombol atau fitur yang tidak diminta.
 `;
 
 const DEFAULT_FILES: VirtualFile[] = [
@@ -1368,9 +1373,18 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId, us
     const execodeMdFile = files.find(f => f.path.toLowerCase() === "execode.md");
     const execodeMdContent = execodeMdFile ? execodeMdFile.content : EXECODE_MD_CONTENT;
 
+    const activeUserLang = (typeof window !== "undefined" ? localStorage.getItem("exechat_user_language") : null) || "en";
+    const languageInstruction = activeUserLang === "id"
+      ? "ACTIVE USER LANGUAGE IS INDONESIAN (Bahasa Indonesia). You MUST write your complete explanation in natural, fluent, and helpful Bahasa Indonesia."
+      : "ACTIVE USER LANGUAGE IS ENGLISH. Write your explanation in clear English.";
+
     const currentPromptTurn = {
       role: "user",
       content: `USER INSTRUCTION: "${promptToSend}"\n\n` +
+        `=========================================\n` +
+        `ACTIVE LANGUAGE DIRECTIVE:\n` +
+        `=========================================\n` +
+        `${languageInstruction}\n\n` +
         `=========================================\n` +
         `EXECODE WORKSPACE MANIFEST & DOCUMENTATION (execode.md):\n` +
         `=========================================\n` +
@@ -1382,7 +1396,7 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId, us
         `=========================================\n` +
         `SYSTEM & RESPONSE FORMAT INSTRUCTIONS:\n` +
         `=========================================\n` +
-        `1. MANDATORY: ALWAYS start your response with a clear, friendly, and comprehensive explanation of your changes in the SAME language as the User Instruction (e.g. if the user asked in Indonesian, explain in Indonesian; if English, explain in English). Act as an elite senior developer on ExeCode Workstation - warm, helpful, professional, and clear.\n` +
+        `1. MANDATORY: ALWAYS start your response with a clear, friendly, and comprehensive explanation of your changes in the SAME language as the User Instruction and Active Language Directive. Act as an elite senior developer on ExeCode Workstation - warm, helpful, professional, and clear.\n` +
         `2. NEVER output ONLY a JSON code block without plain-text explanation. Write 1 to 3 friendly paragraphs explaining what changes you made and why.\n` +
         `3. Follow user instructions precisely. DO NOT add unrequested extra features, buttons, or unasked visual components.\n` +
         `4. AFTER your natural explanation, provide a \`\`\`json code block containing an array of ONLY the files you modified or created.\n` +
