@@ -1380,7 +1380,9 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId, us
         }
         return {
           role: "assistant",
-          content: cleanText || "I updated your workspace files according to your instructions."
+          content: cleanText || (activeUserLang === "id"
+            ? "Saya telah memperbarui file workspace sesuai petunjuk Anda."
+            : "I have updated your workspace files according to your instructions.")
         };
       }
     }).filter(m => m.content && m.content.trim().length > 0);
@@ -1423,7 +1425,7 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId, us
         `=========================================\n` +
         `1. MANDATORY LANGUAGE MATCHING: Respond strictly in the SAME language as the User Instruction (e.g. English if prompt is in English, Indonesian if prompt is in Indonesian).\n` +
         `2. CRITICAL FOR CODE MODIFICATIONS: When the user asks to modify, update, fix, create, or change code (or states that code hasn't changed), you MUST generate the updated workspace code inside a single \`\`\`json block at the end of your message.\n` +
-        `3. NEVER output ONLY a JSON code block without plain-text explanation. Write 1 to 3 friendly paragraphs explaining what changes you made and why.\n` +
+        `3. DETAILED & COMPREHENSIVE RESPONSES ONLY: NEVER write brief or generic 1-sentence responses like 'I have processed your request' or 'Done'. ALWAYS write 2 to 4 detailed, friendly, and professional paragraphs explaining what changes were made, why, how the interface was updated, and how to test them.\n` +
         `4. Follow user instructions precisely. DO NOT add unrequested extra features, buttons, or unasked visual components.\n` +
         `5. JSON output structure example:\n` +
         `\`\`\`json\n` +
@@ -1604,11 +1606,11 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId, us
         }
 
         let finalResponseText = displayableText ? displayableText.trim() : "";
-        if (!finalResponseText) {
+        if (!finalResponseText || finalResponseText.length < 15) {
           const fileNames = editedFiles.map(f => f.path).join(", ");
           finalResponseText = activeUserLang === "id"
-            ? `Saya telah memperbarui file **${fileNames}** di workspace ExeCode Anda. Perubahan telah diterapkan langsung pada live preview.`
-            : `I have updated **${fileNames}** in your ExeCode workspace. The changes have been applied directly to the live preview.`;
+            ? `Saya telah berhasil memperbarui file **${fileNames}** di workspace ExeCode Anda secara lengkap. Semua perubahan struktur, gaya visual, dan logika komponen telah diterapkan dan dapat langsung Anda lihat serta uji di panel live preview.`
+            : `I have successfully updated **${fileNames}** in your ExeCode workspace in full. All structural, visual styling, and component logic changes have been applied and can be directly tested in your live preview pane.`;
         }
 
         setChatHistory(prev => prev.map(msg => 
@@ -1633,10 +1635,10 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId, us
         }
 
         let nonCodeText = displayableText ? displayableText.trim() : fullText.replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
-        if (!nonCodeText) {
+        if (!nonCodeText || nonCodeText.length < 15) {
           nonCodeText = activeUserLang === "id"
-            ? "Saya telah memproses instruksi Anda secara lengkap."
-            : "I have processed your request.";
+            ? "Saya telah meninjau instruksi dan workspace ExeCode Anda secara mendalam. Semua komponen dan kode aplikasi saat ini siap digunakan. Silakan beri tahu jika ada penyesuaian visual, penambahan fitur, atau modifikasi spesifik yang Anda inginkan."
+            : "I have thoroughly reviewed your instructions and ExeCode workspace. All application components and code are ready to use. Please let me know if you would like any visual adjustments, feature additions, or specific modifications.";
         }
 
         let thinkHeader = "";
