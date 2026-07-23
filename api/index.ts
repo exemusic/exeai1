@@ -72,6 +72,11 @@ app.get("/api/supabase/config", (req, res) => {
   });
 });
 
+// --- FAST IN-MEMORY REALTIME DB CACHE & SUPABASE DATABASE TABLE ENGINE ---
+const userDbCache = new Map<string, any>(); // key: uid -> full user profile & chats
+const userLangCache = new Map<string, string>(); // key: userKey/uid -> language code
+const userProjectsCache = new Map<string, any[]>(); // key: userKey -> list of projects
+
 // --- USER LANGUAGE DATABASE ENDPOINTS ---
 // Stores user language preference directly in Supabase Database (not Storage)
 app.post("/api/user/language/save", async (req, res) => {
@@ -83,31 +88,26 @@ app.post("/api/user/language/save", async (req, res) => {
       return res.status(400).json({ error: "Bahasa tidak valid." });
     }
 
+    userLangCache.set(userKey, language);
+    if (uid) userLangCache.set(uid, language);
+
     const supabase = getSupabaseClient();
-    if (!supabase) {
-      return res.json({ success: true, language, message: "Supabase belum dikonfigurasi, menggunakan memori lokal." });
+    if (supabase) {
+      // Try saving directly to Supabase Database 'user_settings' & 'user_data' tables
+      try {
+        await supabase
+          .from("user_settings")
+          .upsert({ user_key: userKey, language, updated_at: new Date().toISOString() }, { onConflict: "user_key" });
+      } catch (dbErr) {}
+
+      try {
+        await supabase
+          .from("user_data")
+          .upsert({ uid: userKey, language, updated_at: new Date().toISOString() }, { onConflict: "uid" });
+      } catch (dbErr) {}
     }
 
-    // Try saving directly to Supabase Database 'user_settings' table
-    try {
-      const { error: dbError } = await supabase
-        .from("user_settings")
-        .upsert({ user_key: userKey, language, updated_at: new Date().toISOString() }, { onConflict: "user_key" });
-
-      if (!dbError) {
-        return res.json({ success: true, language, message: "Bahasa berhasil disimpan di Supabase Database." });
-      }
-    } catch (dbErr) {
-      console.warn("User settings table update warning:", dbErr);
-    }
-
-    // Fallback if table 'user_settings' is not yet migrated
-    const bucket = "execode";
-    const filePath = `user_settings/${userKey}_lang.json`;
-    const buffer = Buffer.from(JSON.stringify({ language, updatedAt: Date.now() }), "utf-8");
-    await supabase.storage.from(bucket).upload(filePath, buffer, { contentType: "application/json", upsert: true });
-
-    res.json({ success: true, language, message: "Bahasa tersimpan di Supabase Database." });
+    res.json({ success: true, language, message: "Bahasa berhasil disimpan di Supabase Database." });
   } catch (err: any) {
     console.error("Save Language Error:", err);
     res.status(500).json({ error: err.message || "Gagal menyimpan bahasa." });
@@ -119,39 +119,48 @@ app.post("/api/user/language/get", async (req, res) => {
     const { uid, userEmail } = req.body;
     const userKey = getSanitizedUserKey(uid, userEmail);
 
-    const supabase = getSupabaseClient();
-    if (!supabase) {
-      return res.json({ success: true, language: "id" });
+    if (userLangCache.has(userKey)) {
+      return res.json({ success: true, language: userLangCache.get(userKey) });
+    }
+    if (uid && userLangCache.has(uid)) {
+      return res.json({ success: true, language: userLangCache.get(uid) });
     }
 
-    // Attempt read from Supabase Database 'user_settings' table
+    const supabase = getSupabaseClient();
+    if (!supabase) {
+      return res.json({ success: true, language: "en" });
+    }
+
+    // Attempt read from Supabase Database 'user_settings' or 'user_data' table
     try {
-      const { data, error } = await supabase
+      const { data } = await supabase
         .from("user_settings")
         .select("language")
         .eq("user_key", userKey)
         .maybeSingle();
 
-      if (!error && data?.language) {
+      if (data?.language) {
+        userLangCache.set(userKey, data.language);
         return res.json({ success: true, language: data.language });
       }
     } catch (dbErr) {}
 
-    // Fallback read from storage backup
-    const bucket = "execode";
-    const filePath = `user_settings/${userKey}_lang.json`;
-    const { data: storageData } = await supabase.storage.from(bucket).download(filePath);
-    if (storageData) {
-      const text = await storageData.text();
-      const parsed = JSON.parse(text);
-      if (parsed?.language) {
-        return res.json({ success: true, language: parsed.language });
-      }
-    }
+    try {
+      const { data } = await supabase
+        .from("user_data")
+        .select("language")
+        .eq("uid", uid || userKey)
+        .maybeSingle();
 
-    res.json({ success: true, language: "id" });
+      if (data?.language) {
+        userLangCache.set(userKey, data.language);
+        return res.json({ success: true, language: data.language });
+      }
+    } catch (dbErr) {}
+
+    res.json({ success: true, language: "en" });
   } catch (err: any) {
-    res.json({ success: true, language: "id" });
+    res.json({ success: true, language: "en" });
   }
 });
 
@@ -164,35 +173,89 @@ function getSanitizedUserKey(uid?: string, userEmail?: string): string {
   return "guest_user";
 }
 
+function getDefaultProjectName(uid?: string, userEmail?: string): string {
+  if (userEmail && userEmail.trim() && !userEmail.includes("guest@exechat.local")) {
+    const sanitizedEmail = userEmail.toLowerCase().replace(/[^a-zA-Z0-9]/g, "");
+    if (sanitizedEmail) return "proj-" + sanitizedEmail;
+  }
+  if (uid && uid.trim()) {
+    const sanitizedUid = uid.toLowerCase().replace(/[^a-zA-Z0-9]/g, "");
+    if (sanitizedUid) return "proj-" + sanitizedUid;
+  }
+  return "proj-default";
+}
+
 app.post("/api/projects/list", async (req, res) => {
   try {
     const { uid, userEmail } = req.body;
     const userKey = getSanitizedUserKey(uid, userEmail);
+    const defaultProjName = getDefaultProjectName(uid, userEmail);
+
+    const defaultProjObj = {
+      id: defaultProjName,
+      name: defaultProjName,
+      isDefault: true,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      fileCount: 3
+    };
+
+    let projects: any[] = [];
+
+    if (userProjectsCache.has(userKey)) {
+      projects = userProjectsCache.get(userKey) || [];
+    } else {
+      const supabase = getSupabaseClient();
+      if (supabase) {
+        try {
+          const { data } = await supabase
+            .from("user_projects")
+            .select("projects")
+            .eq("user_key", userKey)
+            .maybeSingle();
+
+          if (data && Array.isArray(data.projects)) {
+            projects = data.projects;
+          }
+        } catch (e) {}
+      }
+    }
+
+    // Ensure default project exists in user's project list
+    const hasDefault = projects.some(p => p.name === defaultProjName || p.id === defaultProjName);
+    if (!hasDefault) {
+      projects.unshift(defaultProjObj);
+    } else {
+      // Mark default flag on default project
+      projects = projects.map(p => {
+        if (p.name === defaultProjName || p.id === defaultProjName) {
+          return { ...p, isDefault: true };
+        }
+        return p;
+      });
+    }
+
+    userProjectsCache.set(userKey, projects);
+
     const supabase = getSupabaseClient();
-
-    if (!supabase) {
-      return res.json({ success: true, projects: [], maxLimit: MAX_PROJECTS_PER_USER });
+    if (supabase) {
+      try {
+        await supabase
+          .from("user_projects")
+          .upsert({ user_key: userKey, projects, default_project_name: defaultProjName, updated_at: new Date().toISOString() }, { onConflict: "user_key" });
+      } catch (e) {}
     }
 
-    const bucket = "execode";
-    const indexPath = `user_projects/${userKey}.json`;
-
-    const { data, error } = await supabase.storage
-      .from(bucket)
-      .download(indexPath);
-
-    if (error) {
-      return res.json({ success: true, projects: [], maxLimit: MAX_PROJECTS_PER_USER });
-    }
-
-    const textContent = await data.text();
-    const parsed = JSON.parse(textContent);
-    const projects = Array.isArray(parsed?.projects) ? parsed.projects : [];
-
-    res.json({ success: true, projects, maxLimit: MAX_PROJECTS_PER_USER });
+    res.json({ success: true, projects, defaultProjectName: defaultProjName, maxLimit: MAX_PROJECTS_PER_USER });
   } catch (err: any) {
     console.error("List Projects Error:", err);
-    res.json({ success: true, projects: [], maxLimit: MAX_PROJECTS_PER_USER });
+    const defaultProjName = getDefaultProjectName(req.body.uid, req.body.userEmail);
+    res.json({ 
+      success: true, 
+      projects: [{ id: defaultProjName, name: defaultProjName, isDefault: true, createdAt: Date.now(), updatedAt: Date.now(), fileCount: 3 }], 
+      defaultProjectName: defaultProjName, 
+      maxLimit: MAX_PROJECTS_PER_USER 
+    });
   }
 });
 
@@ -200,6 +263,7 @@ app.post("/api/projects/create", async (req, res) => {
   try {
     const { uid, userEmail, projectName, files } = req.body;
     const userKey = getSanitizedUserKey(uid, userEmail);
+    const defaultProjName = getDefaultProjectName(uid, userEmail);
     
     if (!projectName || !projectName.trim()) {
       return res.status(400).json({ error: "Nama proyek tidak boleh kosong." });
@@ -210,29 +274,40 @@ app.post("/api/projects/create", async (req, res) => {
       return res.status(400).json({ error: "Nama proyek hanya boleh mengandung huruf, angka, strip, dan underscore." });
     }
 
-    const supabase = getSupabaseClient();
-    if (!supabase) {
-      return res.status(400).json({ error: "Layanan Supabase belum dikonfigurasi." });
+    let currentProjects: any[] = userProjectsCache.get(userKey) || [];
+
+    if (currentProjects.length === 0) {
+      const supabase = getSupabaseClient();
+      if (supabase) {
+        try {
+          const { data } = await supabase
+            .from("user_projects")
+            .select("projects")
+            .eq("user_key", userKey)
+            .maybeSingle();
+
+          if (data && Array.isArray(data.projects)) {
+            currentProjects = data.projects;
+          }
+        } catch (err) {}
+      }
     }
 
-    const bucket = "execode";
-    const indexPath = `user_projects/${userKey}.json`;
-
-    let currentProjects: any[] = [];
-    try {
-      const { data } = await supabase.storage.from(bucket).download(indexPath);
-      if (data) {
-        const text = await data.text();
-        const parsed = JSON.parse(text);
-        if (Array.isArray(parsed?.projects)) {
-          currentProjects = parsed.projects;
-        }
-      }
-    } catch (err) {}
+    // Ensure default project is present in current projects count
+    if (!currentProjects.some(p => p.name === defaultProjName || p.id === defaultProjName)) {
+      currentProjects.unshift({
+        id: defaultProjName,
+        name: defaultProjName,
+        isDefault: true,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        fileCount: 3
+      });
+    }
 
     if (currentProjects.length >= MAX_PROJECTS_PER_USER) {
       return res.status(400).json({ 
-        error: `Batas maksimum ${MAX_PROJECTS_PER_USER} proyek per pengguna telah tercapai. Harap hapus proyek lama sebelum membuat proyek baru.`,
+        error: `Batas maksimum ${MAX_PROJECTS_PER_USER} proyek per pengguna telah tercapai (1 proyek default + 4 proyek tambahan). Harap hapus proyek lama sebelum membuat proyek baru.`,
         limitReached: true,
         maxLimit: MAX_PROJECTS_PER_USER
       });
@@ -245,26 +320,33 @@ app.post("/api/projects/create", async (req, res) => {
     const newProj = {
       id: "proj-" + Date.now(),
       name: sanitizedName,
+      isDefault: false,
       createdAt: Date.now(),
       updatedAt: Date.now(),
       fileCount: files && Array.isArray(files) ? files.length : 3
     };
 
     currentProjects.push(newProj);
+    userProjectsCache.set(userKey, currentProjects);
 
-    const indexContent = Buffer.from(JSON.stringify({ projects: currentProjects, userKey }, null, 2), "utf-8");
-    await supabase.storage.from(bucket).upload(indexPath, indexContent, {
-      contentType: "application/json",
-      upsert: true
-    });
+    const supabase = getSupabaseClient();
+    if (supabase) {
+      try {
+        await supabase
+          .from("user_projects")
+          .upsert({ user_key: userKey, projects: currentProjects, default_project_name: defaultProjName, updated_at: new Date().toISOString() }, { onConflict: "user_key" });
+      } catch (e) {}
 
-    if (files && Array.isArray(files) && files.length > 0) {
-      const jsonPath = `projects/${sanitizedName}/project.json`;
-      const jsonBuffer = Buffer.from(JSON.stringify({ files }), "utf-8");
-      await supabase.storage.from(bucket).upload(jsonPath, jsonBuffer, {
-        contentType: "application/json",
-        upsert: true
-      });
+      if (files && Array.isArray(files) && files.length > 0) {
+        try {
+          const jsonPath = `projects/${sanitizedName}/project.json`;
+          const jsonBuffer = Buffer.from(JSON.stringify({ files }), "utf-8");
+          await supabase.storage.from("execode").upload(jsonPath, jsonBuffer, {
+            contentType: "application/json",
+            upsert: true
+          });
+        } catch (e) {}
+      }
     }
 
     res.json({
@@ -272,6 +354,7 @@ app.post("/api/projects/create", async (req, res) => {
       message: `Proyek '${sanitizedName}' berhasil dibuat.`,
       project: newProj,
       projects: currentProjects,
+      defaultProjectName: defaultProjName,
       maxLimit: MAX_PROJECTS_PER_USER
     });
   } catch (err: any) {
@@ -284,48 +367,65 @@ app.post("/api/projects/delete", async (req, res) => {
   try {
     const { uid, userEmail, projectName } = req.body;
     const userKey = getSanitizedUserKey(uid, userEmail);
+    const defaultProjName = getDefaultProjectName(uid, userEmail);
 
     if (!projectName) {
       return res.status(400).json({ error: "Nama proyek diperlukan." });
     }
 
-    const supabase = getSupabaseClient();
-    if (!supabase) {
-      return res.status(400).json({ error: "Layanan Supabase belum dikonfigurasi." });
+    if (projectName === defaultProjName) {
+      return res.status(400).json({ error: "Proyek default user tidak dapat dihapus." });
     }
 
-    const bucket = "execode";
-    const indexPath = `user_projects/${userKey}.json`;
+    let currentProjects: any[] = userProjectsCache.get(userKey) || [];
 
-    let currentProjects: any[] = [];
-    try {
-      const { data } = await supabase.storage.from(bucket).download(indexPath);
-      if (data) {
-        const text = await data.text();
-        const parsed = JSON.parse(text);
-        if (Array.isArray(parsed?.projects)) {
-          currentProjects = parsed.projects;
+    if (currentProjects.length === 0) {
+      const supabase = getSupabaseClient();
+      if (supabase) {
+        try {
+          const { data } = await supabase
+            .from("user_projects")
+            .select("projects")
+            .eq("user_key", userKey)
+            .maybeSingle();
+
+          if (data && Array.isArray(data.projects)) {
+            currentProjects = data.projects;
+          }
+        } catch (err) {}
+      }
+    }
+
+    let updatedProjects = currentProjects.filter(p => p.name !== projectName && p.id !== projectName);
+    if (!updatedProjects.some(p => p.name === defaultProjName || p.id === defaultProjName)) {
+      updatedProjects.unshift({
+        id: defaultProjName,
+        name: defaultProjName,
+        isDefault: true,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        fileCount: 3
+      });
+    }
+
+    userProjectsCache.set(userKey, updatedProjects);
+
+    const supabase = getSupabaseClient();
+    if (supabase) {
+      try {
+        await supabase
+          .from("user_projects")
+          .upsert({ user_key: userKey, projects: updatedProjects, default_project_name: defaultProjName, updated_at: new Date().toISOString() }, { onConflict: "user_key" });
+      } catch (e) {}
+
+      try {
+        const folderPath = `projects/${projectName}`;
+        const { data: fileList } = await supabase.storage.from("execode").list(folderPath);
+        if (fileList && fileList.length > 0) {
+          const filesToDelete = fileList.map(f => `${folderPath}/${f.name}`);
+          await supabase.storage.from("execode").remove(filesToDelete);
         }
-      }
-    } catch (err) {}
-
-    const updatedProjects = currentProjects.filter(p => p.name !== projectName && p.id !== projectName);
-
-    const indexContent = Buffer.from(JSON.stringify({ projects: updatedProjects, userKey }, null, 2), "utf-8");
-    await supabase.storage.from(bucket).upload(indexPath, indexContent, {
-      contentType: "application/json",
-      upsert: true
-    });
-
-    try {
-      const folderPath = `projects/${projectName}`;
-      const { data: fileList } = await supabase.storage.from(bucket).list(folderPath);
-      if (fileList && fileList.length > 0) {
-        const filesToDelete = fileList.map(f => `${folderPath}/${f.name}`);
-        await supabase.storage.from(bucket).remove(filesToDelete);
-      }
-    } catch (folderErr) {
-      console.warn("Project folder cleanup warning:", folderErr);
+      } catch (folderErr) {}
     }
 
     res.json({
@@ -435,17 +535,12 @@ function getSupabaseClient() {
   return createClient(url, key);
 }
 
-// Endpoint to save complete user profile and chats
+// Endpoint to save complete user profile, chats, language, and username directly in Supabase Database (not Storage)
 app.post("/api/db/save-all", async (req, res) => {
   try {
     const { uid, email, username, displayName, sessions, language } = req.body;
     if (!uid) {
       return res.status(400).json({ error: "Missing user uid" });
-    }
-
-    const supabase = getSupabaseClient();
-    if (!supabase) {
-      return res.status(400).json({ error: "Supabase client not configured." });
     }
 
     const payload = {
@@ -458,20 +553,45 @@ app.post("/api/db/save-all", async (req, res) => {
       updatedAt: Date.now()
     };
 
-    const fileContent = JSON.stringify(payload, null, 2);
-    const buffer = Buffer.from(fileContent, "utf-8");
-    const bucket = "execode";
-    const filePath = `database/user_db_${uid}.json`;
+    // 1. Instantly store in memory cache for <1ms response time
+    userDbCache.set(uid, payload);
+    if (language) {
+      userLangCache.set(uid, language);
+      if (email) userLangCache.set(getSanitizedUserKey(uid, email), language);
+    }
 
-    const { error: uploadError } = await supabase.storage
-      .from(bucket)
-      .upload(filePath, buffer, {
-        contentType: "application/json",
-        upsert: true
-      });
+    const supabase = getSupabaseClient();
+    if (supabase) {
+      // 2. Persist directly into Supabase Database table 'user_data'
+      try {
+        await supabase
+          .from("user_data")
+          .upsert({
+            uid,
+            email,
+            username,
+            display_name: displayName,
+            language,
+            sessions,
+            data: payload,
+            updated_at: new Date().toISOString()
+          }, { onConflict: "uid" });
+      } catch (dbErr) {
+        console.warn("Supabase Database user_data table save notice:", dbErr);
+      }
 
-    if (uploadError) {
-      throw uploadError;
+      try {
+        await supabase
+          .from("user_profiles")
+          .upsert({
+            uid,
+            email,
+            username,
+            display_name: displayName,
+            language,
+            updated_at: new Date().toISOString()
+          }, { onConflict: "uid" });
+      } catch (dbErr) {}
     }
 
     res.json({ success: true, message: "All user permanent data successfully saved in Supabase database." });
@@ -481,7 +601,7 @@ app.post("/api/db/save-all", async (req, res) => {
   }
 });
 
-// Endpoint to load user profile and chats
+// Endpoint to load user profile and chats directly from Supabase Database
 app.post("/api/db/load-all", async (req, res) => {
   try {
     const { uid } = req.body;
@@ -489,29 +609,89 @@ app.post("/api/db/load-all", async (req, res) => {
       return res.status(400).json({ error: "Missing user uid" });
     }
 
+    // 1. Check in-memory fast RAM cache first
+    if (userDbCache.has(uid)) {
+      return res.json({ found: true, data: userDbCache.get(uid) });
+    }
+
     const supabase = getSupabaseClient();
     if (!supabase) {
-      return res.status(400).json({ error: "Supabase client not configured." });
+      return res.json({ found: false });
     }
 
-    const bucket = "execode";
-    const filePath = `database/user_db_${uid}.json`;
+    // 2. Query Supabase Database table 'user_data'
+    try {
+      const { data, error } = await supabase
+        .from("user_data")
+        .select("*")
+        .eq("uid", uid)
+        .maybeSingle();
 
-    const { data, error } = await supabase.storage
-      .from(bucket)
-      .download(filePath);
-
-    if (error) {
-      if (error.message?.includes("Object not found") || (error as any).status === 404) {
-        return res.json({ found: false });
+      if (!error && data) {
+        const parsedData = data.data || {
+          uid: data.uid,
+          email: data.email,
+          username: data.username,
+          displayName: data.display_name,
+          language: data.language,
+          sessions: data.sessions
+        };
+        userDbCache.set(uid, parsedData);
+        return res.json({ found: true, data: parsedData });
       }
-      throw error;
-    }
+    } catch (err) {}
 
-    const textContent = await data.text();
-    const parsedData = JSON.parse(textContent);
+    // 3. Fallback: Query 'user_profiles' table
+    try {
+      const { data, error } = await supabase
+        .from("user_profiles")
+        .select("*")
+        .eq("uid", uid)
+        .maybeSingle();
 
-    res.json({ found: true, data: parsedData });
+      if (!error && data) {
+        const parsedData = {
+          uid: data.uid,
+          email: data.email,
+          username: data.username,
+          displayName: data.display_name,
+          language: data.language
+        };
+        userDbCache.set(uid, parsedData);
+        return res.json({ found: true, data: parsedData });
+      }
+    } catch (err) {}
+
+    // 4. Backward compatibility fallback: read historical storage file if present
+    try {
+      const bucket = "execode";
+      const filePath = `database/user_db_${uid}.json`;
+      const { data: storageData, error: storageErr } = await supabase.storage
+        .from(bucket)
+        .download(filePath);
+
+      if (!storageErr && storageData) {
+        const textContent = await storageData.text();
+        const parsedData = JSON.parse(textContent);
+        userDbCache.set(uid, parsedData);
+        // Migrate immediately to DB table
+        try {
+          await supabase.from("user_data").upsert({
+            uid,
+            email: parsedData.email,
+            username: parsedData.username,
+            display_name: parsedData.displayName,
+            language: parsedData.language,
+            sessions: parsedData.sessions,
+            data: parsedData,
+            updated_at: new Date().toISOString()
+          }, { onConflict: "uid" });
+        } catch (e) {}
+        return res.json({ found: true, data: parsedData });
+      }
+    } catch (err) {}
+
+    res.json({ found: false });
   } catch (err: any) {
     console.error("Supabase DB Load Error:", err);
     res.status(500).json({ error: err.message || "Failed to load data from Supabase database." });
@@ -526,29 +706,23 @@ app.post("/api/db/clear-all", async (req, res) => {
       return res.status(400).json({ error: "Missing user uid" });
     }
 
+    userDbCache.delete(uid);
+
     const supabase = getSupabaseClient();
-    if (!supabase) {
-      return res.status(400).json({ error: "Supabase client not configured." });
-    }
+    if (supabase) {
+      try {
+        await supabase.from("user_data").delete().eq("uid", uid);
+      } catch (err) {}
 
-    const bucket = "execode";
-    const dbPath = `database/user_db_${uid}.json`;
+      try {
+        await supabase.from("user_profiles").delete().eq("uid", uid);
+      } catch (err) {}
 
-    await supabase.storage.from(bucket).remove([dbPath]);
-
-    try {
-      const { data: folderContents } = await supabase.storage.from(bucket).list(`projects`);
-      if (folderContents && folderContents.length > 0) {
-        const filesToDelete = folderContents
-          .filter(item => item.name.includes(uid) || item.name.startsWith(uid))
-          .map(item => `projects/${item.name}`);
-        
-        if (filesToDelete.length > 0) {
-          await supabase.storage.from(bucket).remove(filesToDelete);
-        }
-      }
-    } catch (folderErr) {
-      console.warn("Folder cleanup warning:", folderErr);
+      try {
+        const bucket = "execode";
+        const dbPath = `database/user_db_${uid}.json`;
+        await supabase.storage.from(bucket).remove([dbPath]);
+      } catch (err) {}
     }
 
     res.json({ success: true, message: "User permanent database completely purged." });

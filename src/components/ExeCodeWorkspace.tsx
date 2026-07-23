@@ -227,9 +227,15 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId, us
   const [showDeleteProjectConfirm, setShowDeleteProjectConfirm] = useState<boolean>(false);
 
   // Realtime Sync & Multi-Project Manager States (Max 5 projects per user limit)
-  const [appLanguage, setAppLanguage] = useState<string>("id");
+  const [appLanguage, setAppLanguage] = useState<string>("en");
   const [realtimeStatus, setRealtimeStatus] = useState<"connected" | "connecting" | "disconnected">("disconnected");
   const [userProjects, setUserProjects] = useState<any[]>([]);
+  const [defaultProjectName, setDefaultProjectName] = useState<string>(() => {
+    if (userEmail && !userEmail.includes("guest@exechat.local")) {
+      return "proj-" + userEmail.toLowerCase().replace(/[^a-zA-Z0-9]/g, "");
+    }
+    return "proj-default";
+  });
   const [isProjectsModalOpen, setIsProjectsModalOpen] = useState<boolean>(false);
   const [newProjInputName, setNewProjInputName] = useState<string>("");
   const [isCreatingProj, setIsCreatingProj] = useState<boolean>(false);
@@ -891,7 +897,8 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId, us
 
   const handleSaveLanguage = async (newLang: string) => {
     setAppLanguage(newLang);
-    triggerStatus(`Mengubah bahasa aplikasi ke ${newLang === "id" ? "Bahasa Indonesia" : "English"}...`, "info");
+    const isEnglish = newLang === "en";
+    triggerStatus(isEnglish ? `Changing app language to English...` : `Mengubah bahasa aplikasi ke Bahasa Indonesia...`, "info");
     try {
       const res = await fetch("/api/user/language/save", {
         method: "POST",
@@ -900,10 +907,10 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId, us
       });
       const data = await res.json();
       if (data.success) {
-        triggerStatus(`Bahasa berhasil diperbarui di Supabase Database!`, "success");
+        triggerStatus(isEnglish ? `Language saved directly in Supabase Database!` : `Bahasa berhasil diperbarui di Supabase Database!`, "success");
       }
     } catch (err: any) {
-      triggerStatus(`Gagal menyimpan pengaturan bahasa.`, "error");
+      triggerStatus(newLang === "en" ? `Failed to save language setting.` : `Gagal menyimpan pengaturan bahasa.`, "error");
     }
   };
 
@@ -918,6 +925,7 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId, us
       if (data.success && Array.isArray(data.projects)) {
         setUserProjects(data.projects);
         if (data.maxLimit) setMaxProjectLimit(data.maxLimit);
+        if (data.defaultProjectName) setDefaultProjectName(data.defaultProjectName);
       }
     } catch (err) {
       console.warn("Failed to list user projects:", err);
@@ -925,13 +933,14 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId, us
   };
 
   const handleCreateNewProject = async () => {
+    const isEn = appLanguage === "en";
     if (!newProjInputName.trim()) {
-      triggerStatus("Masukkan nama proyek baru!", "error");
+      triggerStatus(isEn ? "Please enter a name for the new project!" : "Masukkan nama proyek baru!", "error");
       return;
     }
 
     if (userProjects.length >= maxProjectLimit) {
-      triggerStatus(`Batas Maksimum ${maxProjectLimit} Proyek per User telah tercapai! Harap hapus proyek lama terlebih dahulu.`, "error");
+      triggerStatus(isEn ? `Maximum limit of ${maxProjectLimit} Projects per User reached! Delete an existing project first.` : `Batas Maksimum ${maxProjectLimit} Proyek per User telah tercapai! Harap hapus proyek lama terlebih dahulu.`, "error");
       return;
     }
 
@@ -951,29 +960,30 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId, us
 
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(data.error || "Gagal membuat proyek baru.");
+        throw new Error(data.error || (isEn ? "Failed to create project." : "Gagal membuat proyek baru."));
       }
 
-      triggerStatus(`Proyek '${sanitized}' berhasil dibuat!`, "success");
+      triggerStatus(isEn ? `Project '${sanitized}' created successfully!` : `Proyek '${sanitized}' berhasil dibuat!`, "success");
       setUserProjects(data.projects || []);
       setNewProjInputName("");
       setIsProjectsModalOpen(false);
 
       handleSwitchProject(sanitized);
     } catch (err: any) {
-      triggerStatus(err.message || "Gagal membuat proyek.", "error");
+      triggerStatus(err.message || (appLanguage === "en" ? "Failed to create project." : "Gagal membuat proyek."), "error");
     } finally {
       setIsCreatingProj(false);
     }
   };
 
   const handleSwitchProject = async (targetName: string) => {
+    const isEn = appLanguage === "en";
     setProjectName(targetName);
     localStorage.setItem("execode_persistent_project_id", targetName);
     localStorage.setItem("execode_project_name", targetName);
     window.history.pushState(null, "", `/project/${targetName}`);
 
-    triggerStatus(`Membuka proyek '${targetName}'...`, "info");
+    triggerStatus(isEn ? `Opening project '${targetName}'...` : `Membuka proyek '${targetName}'...`, "info");
     try {
       const res = await fetch("/api/supabase/load", {
         method: "POST",
@@ -985,7 +995,7 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId, us
         setFiles(data.files);
         setActiveFilePath("index.html");
         refreshPreview(data.files);
-        triggerStatus(`Proyek '${targetName}' berhasil dimuat!`, "success");
+        triggerStatus(isEn ? `Project '${targetName}' loaded successfully!` : `Proyek '${targetName}' berhasil dimuat!`, "success");
       }
     } catch (err) {
       console.warn("Failed to switch project:", err);
@@ -993,6 +1003,11 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId, us
   };
 
   const handleDeleteProjectFromManager = async (targetName: string) => {
+    const isEn = appLanguage === "en";
+    if (targetName === defaultProjectName || userProjects.some(p => p.name === targetName && p.isDefault)) {
+      triggerStatus(isEn ? "Default user project cannot be deleted." : "Proyek default user tidak dapat dihapus.", "error");
+      return;
+    }
     try {
       const res = await fetch("/api/projects/delete", {
         method: "POST",
@@ -1004,9 +1019,9 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId, us
         })
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Gagal menghapus proyek.");
+      if (!res.ok) throw new Error(data.error || (isEn ? "Failed to delete project." : "Gagal menghapus proyek."));
 
-      triggerStatus(`Proyek '${targetName}' berhasil dihapus.`, "success");
+      triggerStatus(isEn ? `Project '${targetName}' deleted successfully.` : `Proyek '${targetName}' berhasil dihapus.`, "success");
       setUserProjects(data.projects || []);
 
       if (projectName === targetName) {
@@ -1014,11 +1029,11 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId, us
         if (remaining) {
           handleSwitchProject(remaining.name);
         } else {
-          handleSwitchProject("default_project");
+          handleSwitchProject(data.defaultProjectName || defaultProjectName);
         }
       }
     } catch (err: any) {
-      triggerStatus(err.message || "Gagal menghapus proyek.", "error");
+      triggerStatus(err.message || (appLanguage === "en" ? "Failed to delete project." : "Gagal menghapus proyek."), "error");
     }
   };
 
@@ -2685,7 +2700,7 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId, us
                   ? "bg-zinc-900/60 border-transparent text-zinc-200 hover:bg-zinc-800" 
                   : "bg-white border-zinc-100 text-zinc-700 hover:bg-zinc-100"
               }`}
-              title="Kelola Proyek (Maksimal 5 Proyek per User)"
+              title={appLanguage === "en" ? "Manage Projects (Max 5 Projects per User)" : "Kelola Proyek (Maksimal 5 Proyek per User)"}
             >
               <Folder className="h-3.5 w-3.5 text-amber-500 shrink-0" />
               <span className="max-w-[110px] truncate font-semibold">{projectName}</span>
@@ -3767,8 +3782,12 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId, us
                     <Folder className="h-5 w-5" />
                   </div>
                   <div>
-                    <h3 className="text-base font-bold">Daftar Proyek Saya</h3>
-                    <p className="text-xs text-zinc-400">Maksimal 5 proyek per akun pengguna</p>
+                    <h3 className="text-base font-bold">
+                      {appLanguage === "en" ? "My Projects List" : "Daftar Proyek Saya"}
+                    </h3>
+                    <p className="text-xs text-zinc-400">
+                      {appLanguage === "en" ? "Maximum 5 projects per user account" : "Maksimal 5 proyek per akun pengguna"}
+                    </p>
                   </div>
                 </div>
                 <button
@@ -3782,13 +3801,15 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId, us
               {/* Capacity Usage Bar */}
               <div className="mb-5 p-3 rounded-xl bg-zinc-950/40 border border-zinc-800/40 flex flex-col gap-2">
                 <div className="flex items-center justify-between text-xs font-semibold">
-                  <span className="text-zinc-400">Penggunaan Kuota Proyek:</span>
+                  <span className="text-zinc-400">
+                    {appLanguage === "en" ? "Project Quota Usage:" : "Penggunaan Kuota Proyek:"}
+                  </span>
                   <span className={`px-2 py-0.5 rounded-full text-[11px] font-bold ${
                     userProjects.length >= 5
                       ? "bg-rose-500/10 text-rose-400 border border-rose-500/20"
                       : "bg-amber-500/10 text-amber-400 border border-amber-500/20"
                   }`}>
-                    {userProjects.length} / {maxProjectLimit} Proyek Terpakai
+                    {userProjects.length} / {maxProjectLimit} {appLanguage === "en" ? "Projects Used" : "Proyek Terpakai"}
                   </span>
                 </div>
                 <div className="w-full h-2 rounded-full bg-zinc-800 overflow-hidden">
@@ -3807,7 +3828,7 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId, us
                   type="text"
                   value={newProjInputName}
                   onChange={(e) => setNewProjInputName(e.target.value)}
-                  placeholder="Nama proyek baru (contoh: app_kasir)..."
+                  placeholder={appLanguage === "en" ? "New project name (e.g. cashier_app)..." : "Nama proyek baru (contoh: app_kasir)..."}
                   disabled={userProjects.length >= maxProjectLimit || isCreatingProj}
                   className={`flex-1 px-3.5 py-2 rounded-xl text-xs border outline-none transition-all ${
                     isDark 
@@ -3825,14 +3846,18 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId, us
                   }`}
                 >
                   <Plus className="h-4 w-4" />
-                  <span>Buat</span>
+                  <span>{appLanguage === "en" ? "Create" : "Buat"}</span>
                 </button>
               </div>
 
               {userProjects.length >= maxProjectLimit && (
                 <div className="mb-4 p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs flex items-center gap-2">
                   <AlertCircle className="h-4 w-4 shrink-0" />
-                  <span>Batas maksimum 5 proyek per user telah tercapai. Harap hapus proyek lama terlebih dahulu.</span>
+                  <span>
+                    {appLanguage === "en" 
+                      ? "Maximum limit of 5 projects per user reached. Please delete an old project first." 
+                      : "Batas maksimum 5 proyek per user telah tercapai. Harap hapus proyek lama terlebih dahulu."}
+                  </span>
                 </div>
               )}
 
@@ -3840,11 +3865,14 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId, us
               <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
                 {userProjects.length === 0 ? (
                   <div className="text-center py-6 text-xs text-zinc-500">
-                    Belum ada proyek tersimpan. Ketik nama di atas dan klik 'Buat'!
+                    {appLanguage === "en" 
+                      ? "No projects saved yet. Enter a name above and click 'Create'!" 
+                      : "Belum ada proyek tersimpan. Ketik nama di atas dan klik 'Buat'!"}
                   </div>
                 ) : (
                   userProjects.map((p) => {
                     const isActive = projectName === p.name;
+                    const isDefault = p.isDefault || p.name === defaultProjectName;
                     return (
                       <div
                         key={p.id || p.name}
@@ -3859,9 +3887,16 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId, us
                         <div className="flex items-center gap-3 min-w-0">
                           <Folder className={`h-4 w-4 shrink-0 ${isActive ? "text-amber-400" : "text-zinc-400"}`} />
                           <div className="flex flex-col min-w-0">
-                            <span className="text-xs font-semibold truncate">{p.name}</span>
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-xs font-semibold truncate">{p.name}</span>
+                              {isDefault && (
+                                <span className="px-1.5 py-0.2 text-[9px] font-bold rounded bg-sky-500/15 text-sky-400 border border-sky-500/20 uppercase tracking-wide">
+                                  Default
+                                </span>
+                              )}
+                            </div>
                             <span className="text-[10px] text-zinc-500">
-                              {p.fileCount || 3} file • Perubahan: {new Date(p.updatedAt || Date.now()).toLocaleDateString()}
+                              {p.fileCount || 3} {appLanguage === "en" ? "files" : "file"} • {appLanguage === "en" ? "Updated:" : "Perubahan:"} {new Date(p.updatedAt || Date.now()).toLocaleDateString()}
                             </span>
                           </div>
                         </div>
@@ -3875,21 +3910,30 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId, us
                               }}
                               className="px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-amber-500/10 text-amber-400 hover:bg-amber-500 hover:text-white transition-all cursor-pointer"
                             >
-                              Buka
+                              {appLanguage === "en" ? "Open" : "Buka"}
                             </button>
                           ) : (
                             <span className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-amber-500 text-white shadow-sm">
-                              Aktif
+                              {appLanguage === "en" ? "Active" : "Aktif"}
                             </span>
                           )}
 
-                          <button
-                            onClick={() => handleDeleteProjectFromManager(p.name)}
-                            className="p-1 rounded-lg hover:bg-rose-500/20 text-zinc-500 hover:text-rose-400 transition-colors cursor-pointer"
-                            title="Hapus proyek"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </button>
+                          {isDefault ? (
+                            <span 
+                              className="p-1 text-zinc-600 opacity-60 cursor-not-allowed" 
+                              title={appLanguage === "en" ? "Default user project cannot be deleted" : "Proyek default user tidak dapat dihapus"}
+                            >
+                              <Lock className="h-3.5 w-3.5" />
+                            </span>
+                          ) : (
+                            <button
+                              onClick={() => handleDeleteProjectFromManager(p.name)}
+                              className="p-1 rounded-lg hover:bg-rose-500/20 text-zinc-500 hover:text-rose-400 transition-colors cursor-pointer"
+                              title={appLanguage === "en" ? "Delete project" : "Hapus proyek"}
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          )}
                         </div>
                       </div>
                     );
@@ -3900,8 +3944,12 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId, us
               {/* Language Settings (Stored directly in Supabase Database) */}
               <div className="mb-4 p-3 rounded-xl bg-zinc-950/40 border border-zinc-800/40 flex items-center justify-between">
                 <div className="flex flex-col">
-                  <span className="text-xs font-semibold text-zinc-300">Pengaturan Bahasa (Supabase DB)</span>
-                  <span className="text-[10px] text-zinc-500">Tersimpan di tabel Supabase Database `user_settings`</span>
+                  <span className="text-xs font-semibold text-zinc-300">
+                    {appLanguage === "en" ? "Language Settings (Supabase DB)" : "Pengaturan Bahasa (Supabase DB)"}
+                  </span>
+                  <span className="text-[10px] text-zinc-500">
+                    {appLanguage === "en" ? "Saved in Supabase Database `user_settings` table" : "Tersimpan di tabel Supabase Database `user_settings`"}
+                  </span>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <button
@@ -3932,7 +3980,7 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId, us
                   onClick={() => setIsProjectsModalOpen(false)}
                   className="px-4 py-1.5 rounded-xl text-xs font-semibold bg-zinc-800 hover:bg-zinc-700 text-zinc-200 transition-all cursor-pointer"
                 >
-                  Tutup
+                  {appLanguage === "en" ? "Close" : "Tutup"}
                 </button>
               </div>
             </motion.div>
