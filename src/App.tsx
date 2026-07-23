@@ -199,7 +199,7 @@ function TypewriterMessage({
             onClick={() => setExpandedThoughts(prev => ({ ...prev, [msgId]: !prev[msgId] }))}
             className="flex items-center gap-2 text-xs text-zinc-500 dark:text-zinc-400 hover:text-zinc-750 dark:hover:text-zinc-200 transition-colors font-medium bg-zinc-100 dark:bg-zinc-900/40 px-3 py-1.5 rounded-xl border border-zinc-200 dark:border-zinc-800/80 cursor-pointer"
           >
-            <span className="animate-pulse shrink-0">💡</span>
+            <Lightbulb className="h-3.5 w-3.5 text-amber-500 animate-pulse shrink-0" />
             <span className="flex items-center gap-1">
               {`Thought for ${typeof duration === "number" ? duration.toFixed(1) : duration}s`}
             </span>
@@ -233,12 +233,10 @@ function TypewriterMessage({
           <span className="h-1.5 w-1.5 rounded-full bg-zinc-500 animate-[bounce_1s_infinite_300ms]" />
         </div>
       ) : !thinking && !isThinking ? (
-        <div className="text-zinc-400 dark:text-zinc-500 italic text-xs mt-1.5 select-none font-sans flex items-center gap-1.5">
-          <span className="text-sm">⚠️</span>
+        <div className="text-zinc-500 dark:text-zinc-400 italic text-xs mt-1.5 select-none font-sans flex items-center gap-1.5 bg-zinc-100/80 dark:bg-zinc-900/40 px-3 py-1.5 rounded-xl border border-zinc-200 dark:border-zinc-800/80 w-fit">
+          <Lightbulb className="h-3.5 w-3.5 text-amber-500 animate-pulse shrink-0" />
           <span>
-            {navigator.language?.toLowerCase()?.startsWith("id")
-              ? "Maaf, sistem tidak menghasilkan jawaban teks. Silakan coba kirim ulang atau ketik pertanyaan lain!"
-              : "Sorry, no text response was generated. Please try resending or rephrasing your message!"}
+            {`Thought for ${typeof duration === "number" ? duration.toFixed(1) : duration}s`}
           </span>
         </div>
       ) : null}
@@ -491,12 +489,6 @@ export default function App() {
   const [userLanguage, setUserLanguage] = useState<string>(() => {
     const saved = localStorage.getItem("exechat_user_language");
     if (saved) return saved;
-    if (typeof navigator !== "undefined") {
-      const browserLang = (navigator.language || (navigator.languages && navigator.languages[0]) || "").toLowerCase();
-      if (browserLang.startsWith("id") || browserLang.startsWith("in")) {
-        return "id";
-      }
-    }
     return "en";
   });
   const [showLanguagePopup, setShowLanguagePopup] = useState(false);
@@ -754,10 +746,7 @@ export default function App() {
 
   const getBrowserLanguageInstruction = () => {
     try {
-      const activeCode = userLanguage || (() => {
-        const primaryLang = (navigator.languages?.[0] || navigator.language || "en").toLowerCase();
-        return (primaryLang.startsWith("id") || primaryLang.startsWith("in")) ? "id" : "en";
-      })();
+      const activeCode = userLanguage || "en";
 
       const languageNames: Record<string, string> = {
         id: "Indonesian (Bahasa Indonesia)",
