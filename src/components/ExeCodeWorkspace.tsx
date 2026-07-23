@@ -1751,7 +1751,6 @@ body {
     };
 
     const assistantMsgId = "ai-" + Date.now();
-    thinkingStartTimesRef.current[assistantMsgId] = Date.now();
     activeAssistantMsgIdRef.current = assistantMsgId;
 
     const tempAssistantMsg: ChatMessage = {
@@ -1880,6 +1879,9 @@ body {
               try {
                 const parsed = JSON.parse(dataStr);
                 if (parsed.text) {
+                  if (!thinkingStartTimesRef.current[assistantMsgId]) {
+                    thinkingStartTimesRef.current[assistantMsgId] = Date.now();
+                  }
                   fullText += parsed.text;
                   setAiStreamingText(fullText);
                   typewriterTargetRef.current = fullText;

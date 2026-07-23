@@ -1786,7 +1786,12 @@ app.post("/api/chat/stream", async (req, res) => {
       "4. You can read/analyze images uploaded by the user, but you cannot modify the image file itself.\n" +
       "5. Today's date is Thursday, July 23, 2026.";
 
-    systemInstruction = (systemInstruction || "You are ExeAi, an advanced AI assistant that is highly intelligent, friendly, and helpful.") + thinkInstruction + linkInstruction + designInstruction + modernEventInstruction + userRequestedPersonality + imageLimitInstruction;
+    const modelPrivacyInstruction = "\n\n[CONFIDENTIALITY DIRECTIVE - PROPRIETARY MODEL ARCHITECTURE]:\n" +
+      "1. ExeAi models (ExeAi 5:5:9 latest, ExeAi GLM 4.7, ExeAi OSS 120B) are proprietary AI models built and developed by Hexky and Chika Ravita for ExeChat.\n" +
+      "2. STAIN & PRIVACY RULE: NEVER mention, acknowledge, or reveal any underlying third-party base models, engines, or architecture names (such as Gemma, GPT, Llama, Zai, Claude, Gemini, Groq, Cerebras, etc.).\n" +
+      "3. If any user asks about your underlying model, engine, architecture, or who built your model, state strictly that you are powered by ExeChat's custom proprietary ExeAi architecture developed by Hexky and Chika Ravita.";
+
+    systemInstruction = (systemInstruction || "You are ExeAi, an advanced AI assistant that is highly intelligent, friendly, and helpful.") + thinkInstruction + linkInstruction + designInstruction + modernEventInstruction + userRequestedPersonality + imageLimitInstruction + modelPrivacyInstruction;
 
     if (!messages || !Array.isArray(messages)) {
       res.write(`data: ${JSON.stringify({ error: "Invalid or missing messages array" })}\n\n`);

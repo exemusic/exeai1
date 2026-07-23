@@ -193,13 +193,19 @@ function TypewriterMessage({
 
   return (
     <div className="flex flex-col">
-      {thinking !== null && !isThinking && (
+      {/* 1. THINKING PROCESS BLOCK (LIGHTBULB ICON, AMBER THEME, EXPANDABLE) */}
+      {isThinking ? (
+        <div className="mb-3 font-sans select-none align-baseline flex items-center gap-2 text-xs text-amber-600 dark:text-amber-400 font-medium bg-amber-500/10 px-3 py-1.5 rounded-xl border border-amber-500/20 w-fit">
+          <Lightbulb className="h-3.5 w-3.5 text-amber-500 animate-pulse shrink-0" />
+          <span>Thinking...</span>
+        </div>
+      ) : thinking !== null ? (
         <div className="mb-3 font-sans select-none align-baseline flex flex-col items-start">
           <button
             onClick={() => setExpandedThoughts(prev => ({ ...prev, [msgId]: !prev[msgId] }))}
-            className="flex items-center gap-2 text-xs text-zinc-500 dark:text-zinc-400 hover:text-zinc-750 dark:hover:text-zinc-200 transition-colors font-medium bg-zinc-100 dark:bg-zinc-900/40 px-3 py-1.5 rounded-xl border border-zinc-200 dark:border-zinc-800/80 cursor-pointer"
+            className="flex items-center gap-2 text-xs text-zinc-600 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white transition-colors font-medium bg-zinc-100 dark:bg-zinc-900/60 px-3 py-1.5 rounded-xl border border-zinc-200 dark:border-zinc-800 cursor-pointer"
           >
-            <Lightbulb className="h-3.5 w-3.5 text-amber-500 animate-pulse shrink-0" />
+            <Lightbulb className="h-3.5 w-3.5 text-amber-500 shrink-0" />
             <span className="flex items-center gap-1">
               {`Thought for ${typeof duration === "number" ? duration.toFixed(1) : duration}s`}
             </span>
@@ -215,15 +221,16 @@ function TypewriterMessage({
                 transition={{ duration: 0.2 }}
                 className="overflow-hidden w-full"
               >
-                <div className="mt-2 ml-3.5 pl-3.5 border-l-2 border-zinc-200 dark:border-zinc-800 text-xs text-zinc-500 dark:text-zinc-500 font-mono leading-relaxed whitespace-pre-wrap py-1">
-                  {thinking || "Processing..."}
+                <div className="mt-2 ml-3.5 pl-3.5 border-l-2 border-zinc-200 dark:border-zinc-800 text-xs text-zinc-500 dark:text-zinc-400 font-mono leading-relaxed whitespace-pre-wrap py-1">
+                  {thinking || "Processing reasoning..."}
                 </div>
               </motion.div>
             )}
           </AnimatePresence>
         </div>
-      )}
+      ) : null}
 
+      {/* 2. CHAT RESPONSE OR ERROR / WARNING BLOCK */}
       {actual ? (
         <MarkdownRenderer content={actual} />
       ) : isGenerating && isLatest && displayedContent === "" ? (
@@ -232,12 +239,11 @@ function TypewriterMessage({
           <span className="h-1.5 w-1.5 rounded-full bg-zinc-500 animate-[bounce_1s_infinite_200ms]" />
           <span className="h-1.5 w-1.5 rounded-full bg-zinc-500 animate-[bounce_1s_infinite_300ms]" />
         </div>
-      ) : !thinking && !isThinking ? (
-        <div className="text-zinc-500 dark:text-zinc-400 italic text-xs mt-1.5 select-none font-sans flex items-center gap-1.5 bg-zinc-100/80 dark:bg-zinc-900/40 px-3 py-1.5 rounded-xl border border-zinc-200 dark:border-zinc-800/80 w-fit">
-          <Lightbulb className="h-3.5 w-3.5 text-amber-500 animate-pulse shrink-0" />
-          <span>
-            {`Thought for ${typeof duration === "number" ? duration.toFixed(1) : duration}s`}
-          </span>
+      ) : !isGenerating && !actual ? (
+        /* CHAT ERROR / EMPTY RESPONSE WARNING - RED/ROSE ERROR STYLE WITH ALERT ICON */
+        <div className="text-rose-600 dark:text-rose-400 text-xs mt-1 select-none font-sans flex items-center gap-2 bg-rose-500/10 border border-rose-500/20 px-3.5 py-2 rounded-xl w-fit">
+          <AlertCircle className="h-4 w-4 text-rose-500 shrink-0" />
+          <span>No text response was generated. Please try resending or rephrasing your message!</span>
         </div>
       ) : null}
     </div>
@@ -588,6 +594,11 @@ export default function App() {
   const [feedbackSubmitting, setFeedbackSubmitting] = useState(false);
   const [feedbackSuccess, setFeedbackSuccess] = useState<string | null>(null);
   const [feedbackError, setFeedbackError] = useState<string | null>(null);
+
+  const [dislikeFeedbackToast, setDislikeFeedbackToast] = useState<{ msgId: string; msgContent?: string } | null>(null);
+  const [dislikeReason, setDislikeReason] = useState("");
+  const [dislikeSubmitting, setDislikeSubmitting] = useState(false);
+  const [dislikeFeedbackSuccess, setDislikeFeedbackSuccess] = useState(false);
 
   const [showAdminPopup, setShowAdminPopup] = useState(false);
   const [adminFeedbacks, setAdminFeedbacks] = useState<any[]>([]);
@@ -1732,6 +1743,54 @@ export default function App() {
     }
   };
 
+  const handleSendDislikeFeedback = async () => {
+    if (!dislikeReason.trim() || dislikeSubmitting || !dislikeFeedbackToast) return;
+    setDislikeSubmitting(true);
+    try {
+      const formattedMessage = `[Dislike Feedback - Msg ID: ${dislikeFeedbackToast.msgId}] ${dislikeReason.trim()}${
+        dislikeFeedbackToast.msgContent ? ` (Excerpt: "${dislikeFeedbackToast.msgContent.substring(0, 150)}...")` : ""
+      }`;
+      const res = await fetch("/api/feedback/submit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: userEmail || "anonymous@gmail.com",
+          message: formattedMessage,
+        }),
+      });
+      if (res.ok) {
+        setDislikeFeedbackSuccess(true);
+        playNotifySound();
+        setTimeout(() => {
+          setDislikeFeedbackToast(null);
+          setDislikeFeedbackSuccess(false);
+          setDislikeReason("");
+        }, 1800);
+      }
+    } catch (err) {
+      console.error("Failed to submit dislike feedback:", err);
+    } finally {
+      setDislikeSubmitting(false);
+    }
+  };
+
+  const openSettingsFeedback = () => {
+    if (dislikeFeedbackToast) {
+      const existingReason = dislikeReason.trim();
+      const formattedContext = `[Dislike Feedback - Msg ID: ${dislikeFeedbackToast.msgId}]${
+        existingReason ? ` Issue: ${existingReason}.` : ""
+      }${
+        dislikeFeedbackToast.msgContent ? `\n(Excerpt: "${dislikeFeedbackToast.msgContent.substring(0, 180)}...")` : ""
+      }\n\n`;
+      setFeedbackMessage(formattedContext);
+      setFeedbackCategory("Issue / Bug");
+    }
+    setShowSettings(true);
+    setSettingsTab("feedback");
+    setMobileSettingsPage("feedback");
+    setDislikeFeedbackToast(null);
+  };
+
   const loadAdminFeedbacks = async () => {
     setAdminLoading(true);
     setAdminError(null);
@@ -2033,7 +2092,6 @@ export default function App() {
 
     const assistantMsgId = "msg_" + Date.now() + "_assistant";
 
-    thinkingStartTimesRef.current[assistantMsgId] = Date.now();
     activeAssistantMsgIdRef.current = assistantMsgId;
 
     setIsGenerating(true);
@@ -2146,7 +2204,6 @@ export default function App() {
       clearTimeout(pendingTimeoutId);
 
       // Connection succeeded! Set the user message isPending to false, and add the assistant placeholder message
-      thinkingStartTimesRef.current[assistantMsgId] = thinkingStartTimesRef.current[assistantMsgId] || Date.now();
       activeAssistantMsgIdRef.current = assistantMsgId;
       const assistantPlaceholder: Message = {
         id: assistantMsgId,
@@ -2205,6 +2262,9 @@ export default function App() {
               throw new Error(parsed.error);
             }
             if (parsed.text) {
+              if (!thinkingStartTimesRef.current[assistantMsgId]) {
+                thinkingStartTimesRef.current[assistantMsgId] = Date.now();
+              }
               if (!hasPlayedSound) {
                 playNotifySound(true);
                 hasPlayedSound = true;
@@ -2434,7 +2494,6 @@ export default function App() {
     setEditingMessageId(null);
     setEditingMessageText("");
 
-    thinkingStartTimesRef.current[assistantMsgId] = Date.now();
     activeAssistantMsgIdRef.current = assistantMsgId;
     setIsGenerating(true);
     setErrorText(null);
@@ -2525,6 +2584,9 @@ export default function App() {
             try {
               const parsed = JSON.parse(trimmed.substring(5));
               if (parsed.text) {
+                if (!thinkingStartTimesRef.current[assistantMsgId]) {
+                  thinkingStartTimesRef.current[assistantMsgId] = Date.now();
+                }
                 if (!hasPlayedSound) {
                   playNotifySound(true);
                   hasPlayedSound = true;
@@ -2617,7 +2679,6 @@ export default function App() {
       })
     );
 
-    thinkingStartTimesRef.current[assistantMsgId] = Date.now();
     activeAssistantMsgIdRef.current = assistantMsgId;
     setIsGenerating(true);
     setErrorText(null);
@@ -2711,6 +2772,9 @@ export default function App() {
             try {
               const parsed = JSON.parse(trimmed.substring(5));
               if (parsed.text) {
+                if (!thinkingStartTimesRef.current[assistantMsgId]) {
+                  thinkingStartTimesRef.current[assistantMsgId] = Date.now();
+                }
                 if (!hasPlayedSound) {
                   playNotifySound(true);
                   hasPlayedSound = true;
@@ -4281,8 +4345,16 @@ export default function App() {
 
                                 <button
                                   onClick={() => {
-                                    setDislikedMessages((prev) => ({ ...prev, [msg.id]: !prev[msg.id] }));
+                                    const nextDisliked = !dislikedMessages[msg.id];
+                                    setDislikedMessages((prev) => ({ ...prev, [msg.id]: nextDisliked }));
                                     setLikedMessages((prev) => ({ ...prev, [msg.id]: false }));
+                                    if (nextDisliked) {
+                                      setDislikeFeedbackToast({ msgId: msg.id, msgContent: msg.content });
+                                      setDislikeReason("");
+                                      setDislikeFeedbackSuccess(false);
+                                    } else if (dislikeFeedbackToast?.msgId === msg.id) {
+                                      setDislikeFeedbackToast(null);
+                                    }
                                   }}
                                   className={`p-1.5 rounded-lg hover:bg-zinc-500/10 hover:text-zinc-200 transition-all duration-250 ${
                                     dislikedMessages[msg.id] ? "text-red-500 font-semibold bg-red-500/10" : "text-zinc-400 dark:text-zinc-500"
@@ -6481,6 +6553,145 @@ export default function App() {
                     referrerPolicy="no-referrer"
                   />
                 </motion.div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Subtle Dislike Feedback Toast Popup */}
+          <AnimatePresence>
+            {dislikeFeedbackToast && (
+              <motion.div
+                initial={{ opacity: 0, y: 24, scale: 0.95 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 20, scale: 0.95 }}
+                transition={{ duration: 0.2, ease: "easeOut" }}
+                className={`fixed bottom-6 right-6 md:bottom-8 md:right-8 z-[120] max-w-sm w-[calc(100vw-3rem)] p-4 rounded-2xl border shadow-xl backdrop-blur-xl transition-all ${
+                  isDark
+                    ? "bg-[#1e1f20]/95 border-zinc-800 text-zinc-100 shadow-black/40"
+                    : "bg-white/95 border-zinc-200 text-zinc-900 shadow-zinc-300/40"
+                }`}
+              >
+                {/* Header */}
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-center gap-2.5">
+                    <div className="p-2 rounded-xl bg-rose-500/10 text-rose-500 shrink-0">
+                      <ThumbsDown className="h-4 w-4 fill-current" />
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-bold leading-tight">
+                        {userLanguage === "id" ? "Bantu kami meningkatkan ExeAi" : "Help us improve ExeAi"}
+                      </h4>
+                      <p className={`text-[11px] mt-0.5 ${isDark ? "text-zinc-400" : "text-zinc-500"}`}>
+                        {userLanguage === "id" ? "Mengapa tanggapan ini kurang membantu?" : "Why was this response unhelpful?"}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setDislikeFeedbackToast(null)}
+                    className={`p-1 rounded-lg transition-colors shrink-0 ${
+                      isDark ? "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800" : "text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100"
+                    }`}
+                    title="Dismiss"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+
+                {dislikeFeedbackSuccess ? (
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    className="py-3 mt-2 text-center text-xs font-medium text-emerald-500 flex items-center justify-center gap-2 bg-emerald-500/10 rounded-xl border border-emerald-500/20"
+                  >
+                    <Check className="h-4 w-4" />
+                    <span>{userLanguage === "id" ? "Terima kasih atas umpan baliknya!" : "Thank you for your feedback!"}</span>
+                  </motion.div>
+                ) : (
+                  <div className="space-y-2.5 mt-3">
+                    {/* Quick Reasons Chips */}
+                    <div className="flex flex-wrap gap-1.5">
+                      {[
+                        userLanguage === "id" ? "Jawaban salah/kurang tepat" : "Inaccurate answer",
+                        userLanguage === "id" ? "Jawaban tidak lengkap" : "Incomplete response",
+                        userLanguage === "id" ? "Sulit dipahami" : "Hard to understand",
+                        userLanguage === "id" ? "Lambat / Lag" : "Slow or laggy"
+                      ].map((preset) => (
+                        <button
+                          key={preset}
+                          onClick={() => setDislikeReason(preset)}
+                          className={`text-[11px] px-2.5 py-1 rounded-lg border transition-all ${
+                            dislikeReason === preset
+                              ? "bg-rose-500 text-white border-rose-500 font-medium shadow-sm"
+                              : isDark
+                              ? "bg-zinc-800/80 text-zinc-300 border-zinc-700/60 hover:border-zinc-500 hover:bg-zinc-800"
+                              : "bg-zinc-100 text-zinc-700 border-zinc-200 hover:border-zinc-300 hover:bg-zinc-150"
+                          }`}
+                        >
+                          {preset}
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Additional Notes Textarea */}
+                    <textarea
+                      value={dislikeReason}
+                      onChange={(e) => setDislikeReason(e.target.value)}
+                      placeholder={userLanguage === "id" ? "Tuliskan saran atau kendala (opsional)..." : "Add specific details (optional)..."}
+                      rows={2}
+                      className={`w-full text-xs p-2.5 rounded-xl border transition-all focus:outline-none focus:ring-1 focus:ring-rose-500 resize-none ${
+                        isDark
+                          ? "bg-zinc-950 border-zinc-800 text-zinc-100 placeholder-zinc-600"
+                          : "bg-zinc-50 border-zinc-200 text-zinc-900 placeholder-zinc-400"
+                      }`}
+                    />
+
+                    {/* Action buttons */}
+                    <div className="pt-1.5 border-t border-zinc-500/10 space-y-2">
+                      <button
+                        type="button"
+                        onClick={openSettingsFeedback}
+                        className={`w-full text-[11px] py-1.5 px-2.5 rounded-xl border flex items-center justify-between font-medium transition-all ${
+                          isDark
+                            ? "bg-zinc-800/60 border-zinc-700/60 text-zinc-300 hover:bg-zinc-700/80 hover:text-white"
+                            : "bg-zinc-100 border-zinc-200 text-zinc-700 hover:bg-zinc-200 hover:text-zinc-900"
+                        }`}
+                      >
+                        <span className="flex items-center gap-1.5 truncate">
+                          <Settings className="h-3.5 w-3.5 text-zinc-400 shrink-0" />
+                          <span className="truncate">
+                            {userLanguage === "id"
+                              ? "Laporan lengkap & berkas di Settings"
+                              : "Detailed report & files in Settings"}
+                          </span>
+                        </span>
+                        <ArrowRight className="h-3 w-3 text-zinc-400 shrink-0 ml-1" />
+                      </button>
+
+                      <div className="flex items-center justify-end gap-2">
+                        <button
+                          onClick={() => setDislikeFeedbackToast(null)}
+                          className={`text-xs px-3 py-1.5 rounded-xl transition-colors ${
+                            isDark ? "text-zinc-400 hover:text-zinc-200" : "text-zinc-500 hover:text-zinc-800"
+                          }`}
+                        >
+                          {userLanguage === "id" ? "Lewati" : "Skip"}
+                        </button>
+                        <button
+                          onClick={handleSendDislikeFeedback}
+                          disabled={!dislikeReason.trim() || dislikeSubmitting}
+                          className="text-xs font-semibold px-3.5 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white disabled:opacity-40 disabled:cursor-not-allowed transition-all flex items-center gap-1.5 shadow-sm"
+                        >
+                          {dislikeSubmitting ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <Send className="h-3.5 w-3.5" />
+                          )}
+                          <span>{userLanguage === "id" ? "Kirim" : "Submit"}</span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </motion.div>
             )}
           </AnimatePresence>
