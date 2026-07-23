@@ -5713,19 +5713,6 @@ export default function App() {
                       );
                     })}
                   </div>
-
-                  <div className="mt-6 flex justify-end">
-                    <button
-                      onClick={() => setShowPresetModal(false)}
-                      className={`text-xs font-semibold py-2 px-5 rounded-xl border transition-all ${
-                        isDark 
-                          ? "border-zinc-850 hover:bg-zinc-900 text-zinc-300" 
-                          : "border-zinc-200 hover:bg-zinc-100 text-zinc-600"
-                      }`}
-                    >
-                      {getTranslation("cancel", userLanguage)}
-                    </button>
-                  </div>
                 </motion.div>
               </div>
             )}
@@ -5836,19 +5823,6 @@ export default function App() {
                         </div>
                       );
                     })}
-                  </div>
-
-                  <div className="mt-6 flex justify-end">
-                    <button
-                      onClick={() => setShowModelModal(false)}
-                      className={`text-xs font-semibold py-2 px-5 rounded-xl border transition-all ${
-                        isDark 
-                          ? "border-zinc-850 hover:bg-zinc-900 text-zinc-300" 
-                          : "border-zinc-200 hover:bg-zinc-100 text-zinc-600"
-                      }`}
-                    >
-                      {getTranslation("cancel", userLanguage)}
-                    </button>
                   </div>
                 </motion.div>
               </div>

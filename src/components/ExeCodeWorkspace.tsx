@@ -3884,15 +3884,6 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId, us
                   })
                 )}
               </div>
-
-              <div className="mt-5 pt-3 border-t border-zinc-800/30 flex justify-end">
-                <button
-                  onClick={() => setIsProjectsModalOpen(false)}
-                  className="px-4 py-1.5 rounded-xl text-xs font-semibold bg-zinc-800 hover:bg-zinc-700 text-zinc-200 transition-all cursor-pointer"
-                >
-                  {appLanguage === "en" ? "Close" : "Tutup"}
-                </button>
-              </div>
             </motion.div>
           </div>
         )}

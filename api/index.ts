@@ -1367,22 +1367,22 @@ async function streamGemini(
 
     res.write(`data: ${JSON.stringify({ text: `• Menghubungkan dengan API Key ${keyLabel}...\n` })}\n\n`);
 
-    // Model 1: gemini-3.5-flash (with up to 2 retry attempts)
+    // Model 1: gemini-3.6-flash (with up to 2 retry attempts)
     let successModel1 = false;
     for (let attempt = 1; attempt <= 2; attempt++) {
       const model1Start = Date.now();
       const attemptLabel = attempt > 1 ? ` (Percobaan ${attempt})` : "";
-      res.write(`data: ${JSON.stringify({ text: `  - Mencoba menghubungkan ke model: gemini-3.5-flash${attemptLabel}...\n` })}\n\n`);
+      res.write(`data: ${JSON.stringify({ text: `  - Mencoba menghubungkan ke model: gemini-3.6-flash${attemptLabel}...\n` })}\n\n`);
       try {
-        await runGeminiModel(ai, "gemini-3.5-flash", contents, config, webSearchEnabled, res, true, (duration) => {
-          res.write(`data: ${JSON.stringify({ text: `  - [Sukses] Terhubung ke gemini-3.5-flash dalam ${duration}ms.\n  - [Sistem] Memulai analisis visual dan pemrosesan jawaban...\n\n` })}\n\n`);
+        await runGeminiModel(ai, "gemini-3.6-flash", contents, config, webSearchEnabled, res, true, (duration) => {
+          res.write(`data: ${JSON.stringify({ text: `  - [Sukses] Terhubung ke gemini-3.6-flash dalam ${duration}ms.\n  - [Sistem] Memulai analisis visual dan pemrosesan jawaban...\n\n` })}\n\n`);
         });
         successModel1 = true;
         break;
       } catch (err1: any) {
         const duration1 = Date.now() - model1Start;
         const errStr1 = String(err1.message || JSON.stringify(err1));
-        res.write(`data: ${JSON.stringify({ text: `  - [Gagal] gemini-3.5-flash${attemptLabel} (${duration1}ms): ${errStr1.substring(0, 100)}\n` })}\n\n`);
+        res.write(`data: ${JSON.stringify({ text: `  - [Gagal] gemini-3.6-flash${attemptLabel} (${duration1}ms): ${errStr1.substring(0, 100)}\n` })}\n\n`);
         
         const isSevereKeyError = errStr1.toLowerCase().includes("not valid") || 
                                  errStr1.toLowerCase().includes("invalid") || 
@@ -1598,7 +1598,7 @@ function handleGeminiError(err: any, res: any) {
   if (errString.includes("API key not valid") || errString.includes("API_KEY_INVALID") || errString.includes("INVALID_ARGUMENT")) {
     errMsg = "Your Gemini API Key (GEMINI_API_KEY) is invalid or has expired. Please check or update your API Key in the Settings > Secrets menu at the top right.";
   } else if (errString.includes("PERMISSION_DENIED")) {
-    errMsg = "Access denied (Permission Denied) by Gemini API. Make sure the gemini-3.5-flash model is enabled for your API Key in the Settings > Secrets menu.";
+    errMsg = "Access denied (Permission Denied) by Gemini API. Make sure the gemini-3.6-flash model is enabled for your API Key in the Settings > Secrets menu.";
   } else if (errString.includes("RESOURCE_EXHAUSTED") || errString.includes("quota")) {
     errMsg = "Gemini API rate limit reached (Rate Limit). Please try again in a moment or use an API Key with active billing enabled in the Settings > Secrets menu.";
   } else {
@@ -1811,7 +1811,7 @@ app.post("/api/chat/stream", async (req, res) => {
     }
 
     // If an image is detected or activeModel is a Gemini model, route to Gemini
-    const isGeminiModel = (activeModel === "gemini-ai" || activeModel === "gemini-3.5-flash" || webSearchEnabled || hasImageAttachment);
+    const isGeminiModel = (activeModel === "gemini-ai" || activeModel === "gemini-3.6-flash" || webSearchEnabled || hasImageAttachment);
     if (isGeminiModel) {
       await streamGemini(messages, systemInstruction, temperature, webSearchEnabled, res, hasImageAttachment);
       res.write("data: [DONE]\n\n");
