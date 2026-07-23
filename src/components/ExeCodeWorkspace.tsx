@@ -80,35 +80,7 @@ interface ExeCodeWorkspaceProps {
   appLanguage?: string;
 }
 
-const EXECODE_MD_CONTENT = `# ExeCode Web AI Workstation / Workspace Documentation
-
-## Overview & Purpose / Gambaran Umum & Tujuan
-ExeCode (Hexky Workspace) adalah workstation dan editor kode web multi-berkas interaktif dengan pratinjau langsung yang dibangun dengan React, Tailwind CSS, dan layanan Supabase.
-Workstation ini memungkinkan pengembang dan pembuat aplikasi untuk membangun, mengedit, menguji, dan menjalankan aplikasi web lengkap (\`index.html\`, \`app.js\`, \`style.css\`, dll.) secara real-time di lingkungan iFrame yang aman.
-
-## Application Architecture & Key Features / Arsitektur & Fitur Utama
-- **Multi-File Virtual Workspace**: Buat, edit, dan kelola berkas proyek (\`index.html\`, \`app.js\`, \`style.css\`, \`execode.md\`, dll.) dengan pelacakan state real-time.
-- **AI-Powered Code Assistant**: Model AI streaming real-time yang membaca berkas proyek, memahami riwayat percakapan multi-turn, mengubah kode workspace secara atomik, dan menjelaskan perubahan secara jelas.
-- **Atomic Supabase Cloud Persistence**: Sinkronisasi dan penyimpanan berkas proyek (\`project.json\`) secara langsung di Supabase Storage (\`execode\` bucket).
-- **Live Preview Sandbox**: Lingkungan eksekusi iFrame interaktif dengan dukungan JavaScript dinamis, pengubahan tampilan perangkat (Desktop / Mobile), dan layar penuh.
-- **Full Language Localization / Bahasa Indonesia & Inggris**: Tampilan antarmuka dan respon AI otomatis menyesuaikan bahasa yang dipilih (misal: Bahasa Indonesia saat 'id' dipilih, atau Bahasa Inggris).
-- **Admin Security**: Sistem umpan balik dengan lampiran berkas dan endpoint administrasi yang dibatasi khusus untuk pemilik akun.
-
-## Recent Updates & Change History / Perubahan Terakhir
-1. **Full Language Localization (Bahasa Indonesia & English)**:
-   - Pengaturan bahasa secara penuh pada antarmuka website (Hero greeting, tombol, menu, modal, dan asisten AI).
-   - Saat pengguna memilih Bahasa Indonesia ("id"), seluruh website dan asisten AI berinteraksi dalam Bahasa Indonesia secara alami.
-2. **Natural UI Refinement & Dark/Light Elegance**:
-   - Tema gelap murni (\`#000000\`) dan tema terang bertekstur bersih, dengan batas halus dan tipografi tajam tanpa elemen tidak perlu.
-3. **Context-Aware AI Memory & Context Propagation**:
-   - Model AI mempertahankan riwayat instruksi pengguna sebelumnya dan membaca dokumen \`execode.md\` ini sebagai konteks proyek.
-4. **Atomic State Synchronization**:
-   - Penyimpanan dan pemuatan proyek kurang dari satu detik melalui berkas bundel \`project.json\` Supabase.
-
-## Guidelines for AI Assistant / Petunjuk Asisten AI
-- **Penjelasan Ramah & Jelas**: SELALU berikan penjelasan dalam Bahasa Indonesia yang alami jika instruksi pengguna atau bahasa aktif menggunakan Bahasa Indonesia (atau Bahasa Inggris jika pengguna memilih English).
-- **Kode Lengkap Tanpa Ellipsis**: Selalu sediakan kode lengkap siap pakai tanpa placeholder "// sisa kode...".
-- **Fokus Pada Permintaan**: Buat atau ubah kode sesuai permintaan persis tanpa menambahkan tombol atau fitur yang tidak diminta.
+const EXECODE_MD_CONTENT = `# ExeCode Web AI Workstation
 `;
 
 const DEFAULT_FILES: VirtualFile[] = [
