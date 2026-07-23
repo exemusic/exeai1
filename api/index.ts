@@ -535,17 +535,20 @@ function getSupabaseClient() {
   return createClient(url, key);
 }
 
-// Endpoint to save complete user profile, chats, language, and username directly in Supabase Database (not Storage)
+// Endpoint to save complete user profile, chats, language, and username directly in Supabase Database & Storage fallback
 app.post("/api/db/save-all", async (req, res) => {
   try {
-    const { uid, email, username, displayName, sessions, language } = req.body;
+    const { uid, email, userEmail, username, displayName, sessions, language } = req.body;
     if (!uid) {
       return res.status(400).json({ error: "Missing user uid" });
     }
 
+    const effEmail = email || userEmail || "";
+    const userKey = getSanitizedUserKey(uid, effEmail);
+
     const payload = {
       uid,
-      email,
+      email: effEmail,
       username,
       displayName,
       sessions,
@@ -555,20 +558,41 @@ app.post("/api/db/save-all", async (req, res) => {
 
     // 1. Instantly store in memory cache for <1ms response time
     userDbCache.set(uid, payload);
+    if (userKey) userDbCache.set(userKey, payload);
+    if (effEmail) userDbCache.set(effEmail.toLowerCase(), payload);
+
     if (language) {
       userLangCache.set(uid, language);
-      if (email) userLangCache.set(getSanitizedUserKey(uid, email), language);
+      if (userKey) userLangCache.set(userKey, language);
     }
 
     const supabase = getSupabaseClient();
     if (supabase) {
-      // 2. Persist directly into Supabase Database table 'user_data'
+      // 2. Persist to Supabase Storage ('execode' bucket) for guaranteed cross-device persistence
+      try {
+        const bucket = "execode";
+        const buffer = Buffer.from(JSON.stringify(payload, null, 2), "utf-8");
+        await supabase.storage.from(bucket).upload(`database/user_db_${uid}.json`, buffer, {
+          contentType: "application/json",
+          upsert: true
+        });
+        if (userKey && userKey !== uid) {
+          await supabase.storage.from(bucket).upload(`database/user_db_${userKey}.json`, buffer, {
+            contentType: "application/json",
+            upsert: true
+          });
+        }
+      } catch (storageErr) {
+        console.warn("Supabase Storage save warning:", storageErr);
+      }
+
+      // 3. Persist into Supabase Database table 'user_data' & 'user_profiles'
       try {
         await supabase
           .from("user_data")
           .upsert({
             uid,
-            email,
+            email: effEmail,
             username,
             display_name: displayName,
             language,
@@ -585,7 +609,7 @@ app.post("/api/db/save-all", async (req, res) => {
           .from("user_profiles")
           .upsert({
             uid,
-            email,
+            email: effEmail,
             username,
             display_name: displayName,
             language,
@@ -601,17 +625,26 @@ app.post("/api/db/save-all", async (req, res) => {
   }
 });
 
-// Endpoint to load user profile and chats directly from Supabase Database
+// Endpoint to load user profile and chats directly from Supabase Database & Storage fallback
 app.post("/api/db/load-all", async (req, res) => {
   try {
-    const { uid } = req.body;
-    if (!uid) {
-      return res.status(400).json({ error: "Missing user uid" });
+    const { uid, email, userEmail } = req.body;
+    if (!uid && !email && !userEmail) {
+      return res.status(400).json({ error: "Missing user identification" });
     }
 
+    const effEmail = email || userEmail || "";
+    const userKey = getSanitizedUserKey(uid, effEmail);
+
     // 1. Check in-memory fast RAM cache first
-    if (userDbCache.has(uid)) {
+    if (uid && userDbCache.has(uid)) {
       return res.json({ found: true, data: userDbCache.get(uid) });
+    }
+    if (userKey && userDbCache.has(userKey)) {
+      return res.json({ found: true, data: userDbCache.get(userKey) });
+    }
+    if (effEmail && userDbCache.has(effEmail.toLowerCase())) {
+      return res.json({ found: true, data: userDbCache.get(effEmail.toLowerCase()) });
     }
 
     const supabase = getSupabaseClient();
@@ -619,13 +652,18 @@ app.post("/api/db/load-all", async (req, res) => {
       return res.json({ found: false });
     }
 
-    // 2. Query Supabase Database table 'user_data'
+    // 2. Query Supabase Database table 'user_data' by uid OR email
     try {
-      const { data, error } = await supabase
-        .from("user_data")
-        .select("*")
-        .eq("uid", uid)
-        .maybeSingle();
+      let query = supabase.from("user_data").select("*");
+      if (uid && effEmail) {
+        query = query.or(`uid.eq.${uid},email.eq.${effEmail}`);
+      } else if (uid) {
+        query = query.eq("uid", uid);
+      } else if (effEmail) {
+        query = query.eq("email", effEmail);
+      }
+
+      const { data, error } = await query.maybeSingle();
 
       if (!error && data) {
         const parsedData = data.data || {
@@ -636,12 +674,37 @@ app.post("/api/db/load-all", async (req, res) => {
           language: data.language,
           sessions: data.sessions
         };
-        userDbCache.set(uid, parsedData);
+        if (uid) userDbCache.set(uid, parsedData);
+        if (userKey) userDbCache.set(userKey, parsedData);
+        if (effEmail) userDbCache.set(effEmail.toLowerCase(), parsedData);
         return res.json({ found: true, data: parsedData });
       }
     } catch (err) {}
 
-    // 3. Fallback: Query 'user_profiles' table
+    // 3. Fallback: Query Supabase Storage files
+    try {
+      const bucket = "execode";
+      const filePaths = [];
+      if (uid) filePaths.push(`database/user_db_${uid}.json`);
+      if (userKey) filePaths.push(`database/user_db_${userKey}.json`);
+
+      for (const filePath of filePaths) {
+        const { data: storageData, error: storageErr } = await supabase.storage
+          .from(bucket)
+          .download(filePath);
+
+        if (!storageErr && storageData) {
+          const textContent = await storageData.text();
+          const parsedData = JSON.parse(textContent);
+          if (uid) userDbCache.set(uid, parsedData);
+          if (userKey) userDbCache.set(userKey, parsedData);
+          if (effEmail) userDbCache.set(effEmail.toLowerCase(), parsedData);
+          return res.json({ found: true, data: parsedData });
+        }
+      }
+    } catch (err) {}
+
+    // 4. Fallback: Query 'user_profiles' table
     try {
       const { data, error } = await supabase
         .from("user_profiles")
@@ -657,36 +720,7 @@ app.post("/api/db/load-all", async (req, res) => {
           displayName: data.display_name,
           language: data.language
         };
-        userDbCache.set(uid, parsedData);
-        return res.json({ found: true, data: parsedData });
-      }
-    } catch (err) {}
-
-    // 4. Backward compatibility fallback: read historical storage file if present
-    try {
-      const bucket = "execode";
-      const filePath = `database/user_db_${uid}.json`;
-      const { data: storageData, error: storageErr } = await supabase.storage
-        .from(bucket)
-        .download(filePath);
-
-      if (!storageErr && storageData) {
-        const textContent = await storageData.text();
-        const parsedData = JSON.parse(textContent);
-        userDbCache.set(uid, parsedData);
-        // Migrate immediately to DB table
-        try {
-          await supabase.from("user_data").upsert({
-            uid,
-            email: parsedData.email,
-            username: parsedData.username,
-            display_name: parsedData.displayName,
-            language: parsedData.language,
-            sessions: parsedData.sessions,
-            data: parsedData,
-            updated_at: new Date().toISOString()
-          }, { onConflict: "uid" });
-        } catch (e) {}
+        if (uid) userDbCache.set(uid, parsedData);
         return res.json({ found: true, data: parsedData });
       }
     } catch (err) {}

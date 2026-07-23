@@ -1062,11 +1062,11 @@ export default function App() {
     if (!userId || userId.startsWith("guest_") || userId.startsWith("guest-")) return;
     
     const handler = setTimeout(() => {
-      saveToSupabase(userId, userEmail, userName, userDisplayName, sessions);
+      saveToSupabase(userId, userEmail, userName, userDisplayName, sessions, userLanguage);
     }, 1500); // Debounce saves to prevent rate limits or flickering
 
     return () => clearTimeout(handler);
-  }, [sessions, userId, userEmail, userName, userDisplayName]);
+  }, [sessions, userId, userEmail, userName, userDisplayName, userLanguage]);
 
   useEffect(() => {
     if (showAdminPopup && userEmail === "nairicintia@gmail.com") {
@@ -1175,7 +1175,7 @@ export default function App() {
         fetch("/api/db/load-all", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ uid: savedUserId })
+          body: JSON.stringify({ uid: savedUserId, email, userEmail: email })
         })
           .then((res) => res.json())
           .then((loadData) => {
@@ -1491,7 +1491,7 @@ export default function App() {
         const loadRes = await fetch("/api/db/load-all", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ uid })
+          body: JSON.stringify({ uid, email, userEmail: email })
         });
         const loadData = await loadRes.json();
 
