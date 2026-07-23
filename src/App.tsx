@@ -5606,6 +5606,7 @@ export default function App() {
                 defaultModelId={selectedModelId}
                 userEmail={userEmail}
                 userId={userId}
+                appLanguage={userLanguage}
               />
             )}
           </AnimatePresence>

@@ -77,6 +77,7 @@ interface ExeCodeWorkspaceProps {
   defaultModelId?: string;
   userEmail?: string | null;
   userId?: string | null;
+  appLanguage?: string;
 }
 
 const EXECODE_MD_CONTENT = `# ExeCode Web AI Workstation / Workspace Documentation
@@ -144,7 +145,7 @@ if (button) {
   }
 ];
 
-export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId, userEmail, userId }: ExeCodeWorkspaceProps) {
+export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId, userEmail, userId, appLanguage: propAppLanguage = "en" }: ExeCodeWorkspaceProps) {
   const [files, setFiles] = useState<VirtualFile[]>(() => {
     const saved = localStorage.getItem("execode_files");
     let loaded: VirtualFile[] = saved ? JSON.parse(saved) : DEFAULT_FILES;
@@ -873,46 +874,17 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId, us
     };
   }, [projectName]);
 
-  // Fetch user's multi-projects list & language setting on load
+  // Sync app language directly from global Settings
+  useEffect(() => {
+    if (propAppLanguage) {
+      setAppLanguage(propAppLanguage);
+    }
+  }, [propAppLanguage]);
+
+  // Fetch user's multi-projects list on load
   useEffect(() => {
     fetchUserProjects();
-    fetchUserLanguage();
   }, [userId, userEmail]);
-
-  const fetchUserLanguage = async () => {
-    try {
-      const res = await fetch("/api/user/language/get", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ uid: userId, userEmail })
-      });
-      const data = await res.json();
-      if (data.success && data.language) {
-        setAppLanguage(data.language);
-      }
-    } catch (err) {
-      console.warn("Failed to fetch user language setting:", err);
-    }
-  };
-
-  const handleSaveLanguage = async (newLang: string) => {
-    setAppLanguage(newLang);
-    const isEnglish = newLang === "en";
-    triggerStatus(isEnglish ? `Changing app language to English...` : `Mengubah bahasa aplikasi ke Bahasa Indonesia...`, "info");
-    try {
-      const res = await fetch("/api/user/language/save", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ uid: userId, userEmail, language: newLang })
-      });
-      const data = await res.json();
-      if (data.success) {
-        triggerStatus(isEnglish ? `Language saved directly in Supabase Database!` : `Bahasa berhasil diperbarui di Supabase Database!`, "success");
-      }
-    } catch (err: any) {
-      triggerStatus(newLang === "en" ? `Failed to save language setting.` : `Gagal menyimpan pengaturan bahasa.`, "error");
-    }
-  };
 
   const fetchUserProjects = async () => {
     try {
@@ -3939,40 +3911,6 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId, us
                     );
                   })
                 )}
-              </div>
-
-              {/* Language Settings (Stored directly in Supabase Database) */}
-              <div className="mb-4 p-3 rounded-xl bg-zinc-950/40 border border-zinc-800/40 flex items-center justify-between">
-                <div className="flex flex-col">
-                  <span className="text-xs font-semibold text-zinc-300">
-                    {appLanguage === "en" ? "Language Settings (Supabase DB)" : "Pengaturan Bahasa (Supabase DB)"}
-                  </span>
-                  <span className="text-[10px] text-zinc-500">
-                    {appLanguage === "en" ? "Saved in Supabase Database `user_settings` table" : "Tersimpan di tabel Supabase Database `user_settings`"}
-                  </span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <button
-                    onClick={() => handleSaveLanguage("id")}
-                    className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-                      appLanguage === "id"
-                        ? "bg-amber-500 text-white shadow-sm"
-                        : "bg-zinc-800 hover:bg-zinc-700 text-zinc-400"
-                    }`}
-                  >
-                    🇮🇩 ID
-                  </button>
-                  <button
-                    onClick={() => handleSaveLanguage("en")}
-                    className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-                      appLanguage === "en"
-                        ? "bg-amber-500 text-white shadow-sm"
-                        : "bg-zinc-800 hover:bg-zinc-700 text-zinc-400"
-                    }`}
-                  >
-                    🇬🇧 EN
-                  </button>
-                </div>
               </div>
 
               <div className="mt-5 pt-3 border-t border-zinc-800/30 flex justify-end">
