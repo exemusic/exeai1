@@ -336,17 +336,6 @@ app.post("/api/projects/create", async (req, res) => {
           .from("user_projects")
           .upsert({ user_key: userKey, projects: currentProjects, default_project_name: defaultProjName, updated_at: new Date().toISOString() }, { onConflict: "user_key" });
       } catch (e) {}
-
-      if (files && Array.isArray(files) && files.length > 0) {
-        try {
-          const jsonPath = `projects/${sanitizedName}/project.json`;
-          const jsonBuffer = Buffer.from(JSON.stringify({ files }), "utf-8");
-          await supabase.storage.from("execode").upload(jsonPath, jsonBuffer, {
-            contentType: "application/json",
-            upsert: true
-          });
-        } catch (e) {}
-      }
     }
 
     res.json({
@@ -417,15 +406,6 @@ app.post("/api/projects/delete", async (req, res) => {
           .from("user_projects")
           .upsert({ user_key: userKey, projects: updatedProjects, default_project_name: defaultProjName, updated_at: new Date().toISOString() }, { onConflict: "user_key" });
       } catch (e) {}
-
-      try {
-        const folderPath = `projects/${projectName}`;
-        const { data: fileList } = await supabase.storage.from("execode").list(folderPath);
-        if (fileList && fileList.length > 0) {
-          const filesToDelete = fileList.map(f => `${folderPath}/${f.name}`);
-          await supabase.storage.from("execode").remove(filesToDelete);
-        }
-      } catch (folderErr) {}
     }
 
     res.json({
@@ -535,7 +515,7 @@ function getSupabaseClient() {
   return createClient(url, key);
 }
 
-// Endpoint to save complete user profile, chats, language, and username directly in Supabase Database & Storage fallback
+// Endpoint to save complete user profile, chats, language, and username directly in Supabase Database tables
 app.post("/api/db/save-all", async (req, res) => {
   try {
     const { uid, email, userEmail, username, displayName, sessions, language } = req.body;
@@ -568,25 +548,7 @@ app.post("/api/db/save-all", async (req, res) => {
 
     const supabase = getSupabaseClient();
     if (supabase) {
-      // 2. Persist to Supabase Storage ('execode' bucket) for guaranteed cross-device persistence
-      try {
-        const bucket = "execode";
-        const buffer = Buffer.from(JSON.stringify(payload, null, 2), "utf-8");
-        await supabase.storage.from(bucket).upload(`database/user_db_${uid}.json`, buffer, {
-          contentType: "application/json",
-          upsert: true
-        });
-        if (userKey && userKey !== uid) {
-          await supabase.storage.from(bucket).upload(`database/user_db_${userKey}.json`, buffer, {
-            contentType: "application/json",
-            upsert: true
-          });
-        }
-      } catch (storageErr) {
-        console.warn("Supabase Storage save warning:", storageErr);
-      }
-
-      // 3. Persist into Supabase Database table 'user_data' & 'user_profiles'
+      // 2. Persist directly into Supabase Database table 'user_data' & 'user_profiles' (NO Storage bucket used)
       try {
         await supabase
           .from("user_data")
@@ -618,14 +580,14 @@ app.post("/api/db/save-all", async (req, res) => {
       } catch (dbErr) {}
     }
 
-    res.json({ success: true, message: "All user permanent data successfully saved in Supabase database." });
+    res.json({ success: true, message: "All user permanent data successfully saved in Supabase database tables." });
   } catch (err: any) {
     console.error("Supabase DB Save Error:", err);
     res.status(500).json({ error: err.message || "Failed to save data to Supabase database." });
   }
 });
 
-// Endpoint to load user profile and chats directly from Supabase Database & Storage fallback
+// Endpoint to load user profile and chats directly from Supabase Database tables
 app.post("/api/db/load-all", async (req, res) => {
   try {
     const { uid, email, userEmail } = req.body;
@@ -681,30 +643,7 @@ app.post("/api/db/load-all", async (req, res) => {
       }
     } catch (err) {}
 
-    // 3. Fallback: Query Supabase Storage files
-    try {
-      const bucket = "execode";
-      const filePaths = [];
-      if (uid) filePaths.push(`database/user_db_${uid}.json`);
-      if (userKey) filePaths.push(`database/user_db_${userKey}.json`);
-
-      for (const filePath of filePaths) {
-        const { data: storageData, error: storageErr } = await supabase.storage
-          .from(bucket)
-          .download(filePath);
-
-        if (!storageErr && storageData) {
-          const textContent = await storageData.text();
-          const parsedData = JSON.parse(textContent);
-          if (uid) userDbCache.set(uid, parsedData);
-          if (userKey) userDbCache.set(userKey, parsedData);
-          if (effEmail) userDbCache.set(effEmail.toLowerCase(), parsedData);
-          return res.json({ found: true, data: parsedData });
-        }
-      }
-    } catch (err) {}
-
-    // 4. Fallback: Query 'user_profiles' table
+    // 3. Fallback: Query 'user_profiles' table
     try {
       const { data, error } = await supabase
         .from("user_profiles")
@@ -751,12 +690,6 @@ app.post("/api/db/clear-all", async (req, res) => {
       try {
         await supabase.from("user_profiles").delete().eq("uid", uid);
       } catch (err) {}
-
-      try {
-        const bucket = "execode";
-        const dbPath = `database/user_db_${uid}.json`;
-        await supabase.storage.from(bucket).remove([dbPath]);
-      } catch (err) {}
     }
 
     res.json({ success: true, message: "User permanent database completely purged." });
@@ -766,7 +699,7 @@ app.post("/api/db/clear-all", async (req, res) => {
   }
 });
 
-// Endpoint to fetch storage capacity metrics for settings
+// Endpoint to fetch storage capacity metrics for settings (based on Database records)
 app.post("/api/db/metrics", async (req, res) => {
   try {
     const { uid } = req.body;
@@ -776,25 +709,9 @@ app.post("/api/db/metrics", async (req, res) => {
     }
 
     let totalBytes = 0;
-    const bucket = "execode";
-
-    if (uid) {
-      const { data, error } = await supabase.storage.from(bucket).list("database");
-      if (data) {
-        const file = data.find(item => item.name === `user_db_${uid}.json`);
-        if (file) {
-          totalBytes += file.metadata?.size || (file as any).size || 0;
-        }
-      }
-
-      const { data: projectFiles } = await supabase.storage.from(bucket).list(`projects`);
-      if (projectFiles) {
-        projectFiles.forEach(f => {
-          if (f.name.includes(uid) || f.name.startsWith(uid)) {
-            totalBytes += f.metadata?.size || (f as any).size || 0;
-          }
-        });
-      }
+    if (uid && userDbCache.has(uid)) {
+      const cached = userDbCache.get(uid);
+      totalBytes = JSON.stringify(cached).length;
     }
 
     res.json({
@@ -821,7 +738,7 @@ app.post("/api/feedback/submit", async (req, res) => {
       return res.status(400).json({ error: "Supabase client not configured." });
     }
 
-    const bucket = "execode";
+    const bucket = "feedback";
     
     // 1. SPAM PROTECTION CHECK (30-minute delay per Google account stored securely in Supabase)
     const sanitizedEmail = email.replace(/[^a-zA-Z0-9]/g, "_");
@@ -944,7 +861,7 @@ app.get("/api/feedback/attachment", async (req, res) => {
       return res.status(400).json({ error: "Supabase client not configured." });
     }
 
-    const bucket = "execode";
+    const bucket = "feedback";
     const { data, error } = await supabase.storage.from(bucket).download(filePath);
     
     if (error) {
@@ -973,7 +890,7 @@ app.post("/api/feedback/list", async (req, res) => {
       return res.status(400).json({ error: "Supabase client not configured." });
     }
 
-    const bucket = "execode";
+    const bucket = "feedback";
     const { data: fileList, error: listError } = await supabase.storage
       .from(bucket)
       .list("feedback");
@@ -1030,7 +947,7 @@ app.post("/api/feedback/delete", async (req, res) => {
       return res.status(400).json({ error: "Supabase client not configured." });
     }
 
-    const bucket = "execode";
+    const bucket = "feedback";
     const feedbackPath = `feedback/${feedbackId}.json`;
 
     // 1. Try to download the feedback JSON to see if there is an attachment to delete
