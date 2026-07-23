@@ -85,7 +85,7 @@ app.post("/api/user/language/save", async (req, res) => {
     const userKey = getSanitizedUserKey(uid, userEmail);
 
     if (!language) {
-      return res.status(400).json({ error: "Bahasa tidak valid." });
+      return res.status(400).json({ error: "Invalid language parameter." });
     }
 
     userLangCache.set(userKey, language);
@@ -107,10 +107,10 @@ app.post("/api/user/language/save", async (req, res) => {
       } catch (dbErr) {}
     }
 
-    res.json({ success: true, language, message: "Bahasa berhasil disimpan di Supabase Database." });
+    res.json({ success: true, language, message: "Language successfully saved in database." });
   } catch (err: any) {
     console.error("Save Language Error:", err);
-    res.status(500).json({ error: err.message || "Gagal menyimpan bahasa." });
+    res.status(500).json({ error: err.message || "Failed to save language." });
   }
 });
 
@@ -266,12 +266,12 @@ app.post("/api/projects/create", async (req, res) => {
     const defaultProjName = getDefaultProjectName(uid, userEmail);
     
     if (!projectName || !projectName.trim()) {
-      return res.status(400).json({ error: "Nama proyek tidak boleh kosong." });
+      return res.status(400).json({ error: "Project name cannot be empty." });
     }
 
     const sanitizedName = projectName.trim().replace(/[^a-zA-Z0-9-_]/g, "");
     if (!sanitizedName) {
-      return res.status(400).json({ error: "Nama proyek hanya boleh mengandung huruf, angka, strip, dan underscore." });
+      return res.status(400).json({ error: "Project name can only contain letters, numbers, hyphens, and underscores." });
     }
 
     let currentProjects: any[] = userProjectsCache.get(userKey) || [];
@@ -307,23 +307,25 @@ app.post("/api/projects/create", async (req, res) => {
 
     if (currentProjects.length >= MAX_PROJECTS_PER_USER) {
       return res.status(400).json({ 
-        error: `Batas maksimum ${MAX_PROJECTS_PER_USER} proyek per pengguna telah tercapai (1 proyek default + 4 proyek tambahan). Harap hapus proyek lama sebelum membuat proyek baru.`,
+        error: `Maximum limit of ${MAX_PROJECTS_PER_USER} projects per user reached (1 default project + 4 additional projects). Please delete an old project before creating a new one.`,
         limitReached: true,
         maxLimit: MAX_PROJECTS_PER_USER
       });
     }
 
     if (currentProjects.some(p => p.name.toLowerCase() === sanitizedName.toLowerCase())) {
-      return res.status(400).json({ error: `Proyek dengan nama '${sanitizedName}' sudah ada.` });
+      return res.status(400).json({ error: `Project with name '${sanitizedName}' already exists.` });
     }
 
+    const newProjId = "proj-" + Date.now() + "-" + Math.random().toString(36).substring(2, 7);
+
     const newProj = {
-      id: "proj-" + Date.now(),
+      id: newProjId,
       name: sanitizedName,
       isDefault: false,
       createdAt: Date.now(),
       updatedAt: Date.now(),
-      fileCount: files && Array.isArray(files) ? files.length : 3
+      fileCount: files && Array.isArray(files) ? files.length : 4
     };
 
     currentProjects.push(newProj);
@@ -335,12 +337,14 @@ app.post("/api/projects/create", async (req, res) => {
         await supabase
           .from("user_projects")
           .upsert({ user_key: userKey, projects: currentProjects, default_project_name: defaultProjName, updated_at: new Date().toISOString() }, { onConflict: "user_key" });
-      } catch (e) {}
+      } catch (e) {
+        console.error("Database save error on project creation:", e);
+      }
     }
 
     res.json({
       success: true,
-      message: `Proyek '${sanitizedName}' berhasil dibuat.`,
+      message: `Project '${sanitizedName}' created successfully.`,
       project: newProj,
       projects: currentProjects,
       defaultProjectName: defaultProjName,
@@ -348,7 +352,7 @@ app.post("/api/projects/create", async (req, res) => {
     });
   } catch (err: any) {
     console.error("Create Project Error:", err);
-    res.status(500).json({ error: err.message || "Gagal membuat proyek baru." });
+    res.status(500).json({ error: err.message || "Failed to create new project." });
   }
 });
 
@@ -359,11 +363,11 @@ app.post("/api/projects/delete", async (req, res) => {
     const defaultProjName = getDefaultProjectName(uid, userEmail);
 
     if (!projectName) {
-      return res.status(400).json({ error: "Nama proyek diperlukan." });
+      return res.status(400).json({ error: "Project name is required." });
     }
 
     if (projectName === defaultProjName) {
-      return res.status(400).json({ error: "Proyek default user tidak dapat dihapus." });
+      return res.status(400).json({ error: "Default user project cannot be deleted." });
     }
 
     let currentProjects: any[] = userProjectsCache.get(userKey) || [];
@@ -410,13 +414,13 @@ app.post("/api/projects/delete", async (req, res) => {
 
     res.json({
       success: true,
-      message: `Proyek '${projectName}' telah berhasil dihapus.`,
+      message: `Project '${projectName}' deleted successfully.`,
       projects: updatedProjects,
       maxLimit: MAX_PROJECTS_PER_USER
     });
   } catch (err: any) {
     console.error("Delete Project Error:", err);
-    res.status(500).json({ error: err.message || "Gagal menghapus proyek." });
+    res.status(500).json({ error: err.message || "Failed to delete project." });
   }
 });
 
@@ -1009,7 +1013,7 @@ app.post("/api/feedback/delete", async (req, res) => {
 
 app.post("/api/supabase/upload", async (req, res) => {
   try {
-    const { projectName, files, bucket = "execode" } = req.body;
+    const { projectName, projectId, files, bucket = "execode" } = req.body;
     
     const url = (req.headers["x-supabase-url"] as string) || process.env.SUPABASE_URL || "https://knmjalxisidyduzwfwnp.supabase.co";
     const key = (req.headers["x-supabase-key"] as string) || process.env.SUPABASE_SERVICE_ROLE || process.env.SUPABASE_ANON_KEY;
@@ -1018,16 +1022,20 @@ app.post("/api/supabase/upload", async (req, res) => {
       return res.status(400).json({ error: "Supabase API Key (Service Role or Anon Key) has not been configured on the server." });
     }
 
-    if (!projectName || !files || !Array.isArray(files)) {
+    if ((!projectName && !projectId) || !files || !Array.isArray(files)) {
       return res.status(400).json({ error: "Project data or files are incomplete." });
     }
 
     const supabase = createClient(url, key);
 
-    // Save the combined project files as a single JSON file first for ultimate speed and reliability on reload!
+    // Primary storage folder uses projectId if present, otherwise projectName
+    const folderIdentifier = (projectId && String(projectId).trim().length > 0) ? String(projectId).trim() : projectName;
+    const folderPath = `projects/${folderIdentifier}`;
+
+    // Save the combined project files as a single JSON file
     try {
-      const jsonPath = `projects/${projectName}/project.json`;
-      const jsonBuffer = Buffer.from(JSON.stringify({ files }), "utf-8");
+      const jsonPath = `${folderPath}/project.json`;
+      const jsonBuffer = Buffer.from(JSON.stringify({ files, projectName, projectId }), "utf-8");
       await supabase.storage
         .from(bucket)
         .upload(jsonPath, jsonBuffer, {
@@ -1039,10 +1047,8 @@ app.post("/api/supabase/upload", async (req, res) => {
     }
 
     try {
-      const folderPath = `projects/${projectName}`;
       const { data: existingFiles } = await supabase.storage.from(bucket).list(folderPath);
       if (existingFiles && existingFiles.length > 0) {
-        // Exclude the project.json we just uploaded from deletion
         const filesToDelete = existingFiles
           .filter(f => f.name !== "project.json")
           .map(f => `${folderPath}/${f.name}`);
@@ -1055,8 +1061,8 @@ app.post("/api/supabase/upload", async (req, res) => {
     }
 
     for (const file of files) {
-      if (file.path === "project.json") continue; // Avoid conflicts
-      const filePath = `projects/${projectName}/${file.path}`;
+      if (file.path === "project.json") continue;
+      const filePath = `${folderPath}/${file.path}`;
       const buffer = Buffer.from(file.content, "utf-8");
       
       const { error } = await supabase.storage
@@ -1078,7 +1084,7 @@ app.post("/api/supabase/upload", async (req, res) => {
 
 app.post("/api/supabase/load", async (req, res) => {
   try {
-    const { projectName, bucket = "execode" } = req.body;
+    const { projectName, projectId, bucket = "execode" } = req.body;
 
     const url = (req.headers["x-supabase-url"] as string) || process.env.SUPABASE_URL || "https://knmjalxisidyduzwfwnp.supabase.co";
     const key = (req.headers["x-supabase-key"] as string) || process.env.SUPABASE_SERVICE_ROLE || process.env.SUPABASE_ANON_KEY;
@@ -1087,58 +1093,64 @@ app.post("/api/supabase/load", async (req, res) => {
       return res.status(400).json({ error: "Supabase API Key has not been configured." });
     }
 
-    if (!projectName) {
-      return res.status(400).json({ error: "Project name cannot be empty." });
+    if (!projectName && !projectId) {
+      return res.status(400).json({ error: "Project name or project ID cannot be empty." });
     }
 
     const supabase = createClient(url, key);
-    const folderPath = `projects/${projectName}`;
-    
-    // 1. Try loading from the atomic project.json file first
-    try {
-      const { data, error: downloadError } = await supabase.storage
-        .from(bucket)
-        .download(`${folderPath}/project.json`);
 
-      if (!downloadError && data) {
-        const jsonContent = await data.text();
-        const parsed = JSON.parse(jsonContent);
-        if (parsed && Array.isArray(parsed.files) && parsed.files.length > 0) {
-          return res.json({ success: true, files: parsed.files });
+    const pathsToCheck: string[] = [];
+    if (projectId && String(projectId).trim()) {
+      pathsToCheck.push(`projects/${String(projectId).trim()}`);
+    }
+    if (projectName && String(projectName).trim()) {
+      pathsToCheck.push(`projects/${String(projectName).trim()}`);
+    }
+
+    for (const folderPath of pathsToCheck) {
+      // 1. Try project.json
+      try {
+        const { data, error: downloadError } = await supabase.storage
+          .from(bucket)
+          .download(`${folderPath}/project.json`);
+
+        if (!downloadError && data) {
+          const jsonContent = await data.text();
+          const parsed = JSON.parse(jsonContent);
+          if (parsed && Array.isArray(parsed.files) && parsed.files.length > 0) {
+            return res.json({ success: true, files: parsed.files });
+          }
         }
-      }
-    } catch (err) {
-      console.warn("Failed to load from single project.json file, falling back to multi-file download:", err);
+      } catch (err) {}
+
+      // 2. Fallback: list individual files
+      try {
+        const { data: fileList, error: listError } = await supabase.storage
+          .from(bucket)
+          .list(folderPath);
+
+        if (!listError && fileList && fileList.length > 0) {
+          const loadedFiles = [];
+          for (const item of fileList) {
+            if (item.name === "project.json") continue;
+            const filePath = `${folderPath}/${item.name}`;
+            const { data, error: downloadError } = await supabase.storage
+              .from(bucket)
+              .download(filePath);
+
+            if (!downloadError && data) {
+              const content = await data.text();
+              loadedFiles.push({ path: item.name, content });
+            }
+          }
+          if (loadedFiles.length > 0) {
+            return res.json({ success: true, files: loadedFiles });
+          }
+        }
+      } catch (err) {}
     }
 
-    // 2. Fallback: List and download individual files (backward-compatible)
-    const { data: fileList, error: listError } = await supabase.storage
-      .from(bucket)
-      .list(folderPath);
-
-    if (listError) throw listError;
-    if (!fileList || fileList.length === 0) {
-      return res.status(404).json({ error: `Project '${projectName}' was not found in bucket '${bucket}'.` });
-    }
-
-    const loadedFiles = [];
-    for (const item of fileList) {
-      if (item.name === "project.json") continue; // Skip project.json metadata in fallback download
-      const filePath = `${folderPath}/${item.name}`;
-      const { data, error: downloadError } = await supabase.storage
-        .from(bucket)
-        .download(filePath);
-
-      if (downloadError) throw downloadError;
-
-      const content = await data.text();
-      loadedFiles.push({
-        path: item.name,
-        content
-      });
-    }
-
-    res.json({ success: true, files: loadedFiles });
+    return res.status(404).json({ error: `Project files for '${projectName || projectId}' not found in storage.` });
   } catch (error: any) {
     console.error("Supabase Load Error:", error);
     res.status(500).json({ error: error.message || "Failed to load files from Supabase Storage." });
@@ -1249,11 +1261,11 @@ function parseBase64(dataUrl: string) {
 async function analyzeImageWithGemini(base64DataUrl: string): Promise<string> {
   const geminiKey = process.env.GEMINI_API_KEY || process.env.GEMINI2_API_KEY || process.env.GEMINI_API_KEY2 || process.env.GEMINI_API_KEY_2 || process.env.BACKUP_GEMINI_API_KEY;
   if (!geminiKey) {
-    return "[Gagal menganalisis gambar: API Key tidak terkonfigurasi]";
+    return "[Failed to analyze image: API Key not configured]";
   }
   const parsed = parseBase64(base64DataUrl);
   if (!parsed) {
-    return "[Gagal menganalisis gambar: Format Base64 tidak valid]";
+    return "[Failed to analyze image: Invalid Base64 format]";
   }
   try {
     const ai = new GoogleGenAI({ apiKey: geminiKey });
@@ -1263,7 +1275,7 @@ async function analyzeImageWithGemini(base64DataUrl: string): Promise<string> {
         {
           role: "user",
           parts: [
-            { text: "Berikan deskripsi detail tentang gambar ini untuk asisten AI teks. Jelaskan semua objek, teks, warna, tata letak, dan konteks penting yang ada di gambar secara mendalam agar asisten teks dapat memahaminya seperti melihat langsung." },
+            { text: "Provide a detailed description of this image for a text AI assistant. Explain all objects, text, colors, layout, and important context in depth." },
             {
               inlineData: {
                 mimeType: parsed.mimeType,
@@ -1274,10 +1286,10 @@ async function analyzeImageWithGemini(base64DataUrl: string): Promise<string> {
         }
       ]
     });
-    return response.text || "[Gambar terlampir kosong atau tidak terbaca]";
+    return response.text || "[Attached image is empty or unreadable]";
   } catch (err: any) {
     console.warn("Error analyzing image with Gemini:", err);
-    return `[Gagal menganalisis gambar: ${err.message || err}]`;
+    return `[Failed to analyze image: ${err.message || err}]`;
   }
 }
 
@@ -1331,18 +1343,18 @@ async function streamGemini(
   };
 
   // Start the thinking block
-  let thinkText = "<think>[Sistem ExeAI] Memulai koneksi...\n";
+  let thinkText = "<think>[ExeAI System] Initializing connection...\n";
   if (redirectedForImage) {
-    thinkText = "<think>[Sistem ExeAI] Mendeteksi file gambar terlampir.\n• Mengalihkan rute pemrosesan secara otomatis ke Gemini Vision Engine...\n";
+    thinkText = "<think>[ExeAI System] Attached image file detected.\n• Automatically routing processing to Gemini Vision Engine...\n";
   } else {
-    thinkText = "<think>[Sistem ExeAI] Menghubungkan ke Gemini Engine...\n";
+    thinkText = "<think>[ExeAI System] Connecting to Gemini Engine...\n";
   }
   res.write(`data: ${JSON.stringify({ text: thinkText })}\n\n`);
 
   if (keysToTry.length === 0) {
     console.warn("No valid Gemini API keys defined. Falling back directly to ExeAI (Cerebras)...");
     try {
-      res.write(`data: ${JSON.stringify({ text: "• Gagal: Google API Key tidak terkonfigurasi di server.\n• Mengalihkan rute secara dinamis ke ExeAI Engine...\n</think>\n\n*(System did not detect Google API Key, dynamically redirecting to ExeAI Engine...)*\n\n" })}\n\n`);
+      res.write(`data: ${JSON.stringify({ text: "• Failed: Google API Key not configured on server.\n• Dynamically routing to ExeAI Engine...\n</think>\n\n*(System did not detect Google API Key, dynamically redirecting to ExeAI Engine...)*\n\n" })}\n\n`);
       await runCerebrasModel("gemma-4-31b", messages, systemInstruction, temperature, res);
       return;
     } catch (err3: any) {
@@ -1354,7 +1366,7 @@ async function streamGemini(
   for (let i = 0; i < keysToTry.length; i++) {
     const { key, name } = keysToTry[i];
     const isBackup = i > 0;
-    const keyLabel = isBackup ? "Cadangan (Opsi 2)" : "Utama (Opsi 1)";
+    const keyLabel = isBackup ? "Backup (Option 2)" : "Primary (Option 1)";
     
     const ai = new GoogleGenAI({
       apiKey: key,
@@ -1365,24 +1377,24 @@ async function streamGemini(
       }
     });
 
-    res.write(`data: ${JSON.stringify({ text: `• Menghubungkan dengan API Key ${keyLabel}...\n` })}\n\n`);
+    res.write(`data: ${JSON.stringify({ text: `• Connecting with API Key ${keyLabel}...\n` })}\n\n`);
 
     // Model 1: gemini-3.6-flash (with up to 2 retry attempts)
     let successModel1 = false;
     for (let attempt = 1; attempt <= 2; attempt++) {
       const model1Start = Date.now();
-      const attemptLabel = attempt > 1 ? ` (Percobaan ${attempt})` : "";
-      res.write(`data: ${JSON.stringify({ text: `  - Mencoba menghubungkan ke model: gemini-3.6-flash${attemptLabel}...\n` })}\n\n`);
+      const attemptLabel = attempt > 1 ? ` (Attempt ${attempt})` : "";
+      res.write(`data: ${JSON.stringify({ text: `  - Connecting to model: gemini-3.6-flash${attemptLabel}...\n` })}\n\n`);
       try {
         await runGeminiModel(ai, "gemini-3.6-flash", contents, config, webSearchEnabled, res, true, (duration) => {
-          res.write(`data: ${JSON.stringify({ text: `  - [Sukses] Terhubung ke gemini-3.6-flash dalam ${duration}ms.\n  - [Sistem] Memulai analisis visual dan pemrosesan jawaban...\n\n` })}\n\n`);
+          res.write(`data: ${JSON.stringify({ text: `  - [Success] Connected to gemini-3.6-flash in ${duration}ms.\n  - [System] Starting visual analysis and response processing...\n\n` })}\n\n`);
         });
         successModel1 = true;
         break;
       } catch (err1: any) {
         const duration1 = Date.now() - model1Start;
         const errStr1 = String(err1.message || JSON.stringify(err1));
-        res.write(`data: ${JSON.stringify({ text: `  - [Gagal] gemini-3.6-flash${attemptLabel} (${duration1}ms): ${errStr1.substring(0, 100)}\n` })}\n\n`);
+        res.write(`data: ${JSON.stringify({ text: `  - [Failed] gemini-3.6-flash${attemptLabel} (${duration1}ms): ${errStr1.substring(0, 100)}\n` })}\n\n`);
         
         const isSevereKeyError = errStr1.toLowerCase().includes("not valid") || 
                                  errStr1.toLowerCase().includes("invalid") || 
@@ -1397,13 +1409,13 @@ async function streamGemini(
 
         if (isSevereKeyError) {
           if (i < keysToTry.length - 1) {
-            res.write(`data: ${JSON.stringify({ text: `  - [Sistem] Masalah kredensial/kuota terdeteksi pada kunci ${keyLabel}. Segera beralih ke kunci cadangan...\n` })}\n\n`);
+            res.write(`data: ${JSON.stringify({ text: `  - [System] Credential/quota issue detected on key ${keyLabel}. Switching to backup key...\n` })}\n\n`);
           }
           break; // Stop attempts for this key, proceed to next key
         }
 
         if (attempt < 2) {
-          res.write(`data: ${JSON.stringify({ text: `  - [Sistem] Terjadi kesalahan sementara (misal: beban tinggi / 503). Menunggu 800ms sebelum mencoba kembali...\n` })}\n\n`);
+          res.write(`data: ${JSON.stringify({ text: `  - [System] Temporary error occurred (e.g. high load / 503). Retrying in 800ms...\n` })}\n\n`);
           await new Promise(resolve => setTimeout(resolve, 800));
         }
       }
@@ -1415,18 +1427,18 @@ async function streamGemini(
     let successModel2 = false;
     for (let attempt2 = 1; attempt2 <= 2; attempt2++) {
       const model2Start = Date.now();
-      const attemptLabel2 = attempt2 > 1 ? ` (Percobaan ${attempt2})` : "";
-      res.write(`data: ${JSON.stringify({ text: `  - Mencoba rute alternatif model: gemini-3.1-flash-lite${attemptLabel2}...\n` })}\n\n`);
+      const attemptLabel2 = attempt2 > 1 ? ` (Attempt ${attempt2})` : "";
+      res.write(`data: ${JSON.stringify({ text: `  - Trying alternative route model: gemini-3.1-flash-lite${attemptLabel2}...\n` })}\n\n`);
       try {
         await runGeminiModel(ai, "gemini-3.1-flash-lite", contents, config, webSearchEnabled, res, true, (duration) => {
-          res.write(`data: ${JSON.stringify({ text: `  - [Sukses] Terhubung ke gemini-3.1-flash-lite dalam ${duration}ms.\n  - [Sistem] Memulai analisis visual alternatif...\n\n` })}\n\n`);
+          res.write(`data: ${JSON.stringify({ text: `  - [Success] Connected to gemini-3.1-flash-lite in ${duration}ms.\n  - [System] Starting alternative visual analysis...\n\n` })}\n\n`);
         });
         successModel2 = true;
         break;
       } catch (err2: any) {
         const duration2 = Date.now() - model2Start;
         const errStr2 = String(err2.message || JSON.stringify(err2));
-        res.write(`data: ${JSON.stringify({ text: `  - [Gagal] gemini-3.1-flash-lite${attemptLabel2} (${duration2}ms): ${errStr2.substring(0, 100)}\n` })}\n\n`);
+        res.write(`data: ${JSON.stringify({ text: `  - [Failed] gemini-3.1-flash-lite${attemptLabel2} (${duration2}ms): ${errStr2.substring(0, 100)}\n` })}\n\n`);
         
         const isSevereKeyError = errStr2.toLowerCase().includes("not valid") || 
                                  errStr2.toLowerCase().includes("invalid") || 
@@ -1441,13 +1453,13 @@ async function streamGemini(
 
         if (isSevereKeyError) {
           if (i < keysToTry.length - 1) {
-            res.write(`data: ${JSON.stringify({ text: `  - [Sistem] Masalah kredensial/kuota terdeteksi pada kunci ${keyLabel} selama rute alternatif. Beralih ke kunci cadangan...\n` })}\n\n`);
+            res.write(`data: ${JSON.stringify({ text: `  - [System] Credential/quota issue detected on key ${keyLabel} during alternative route. Switching to backup key...\n` })}\n\n`);
           }
           break; // Stop attempts for this key, proceed to next key
         }
 
         if (attempt2 < 2) {
-          res.write(`data: ${JSON.stringify({ text: `  - [Sistem] Terjadi kesalahan sementara (misal: beban tinggi / 503). Menunggu 800ms sebelum mencoba kembali...\n` })}\n\n`);
+          res.write(`data: ${JSON.stringify({ text: `  - [System] Temporary error occurred (e.g. high load / 503). Retrying in 800ms...\n` })}\n\n`);
           await new Promise(resolve => setTimeout(resolve, 800));
         }
       }
@@ -1456,12 +1468,12 @@ async function streamGemini(
     if (successModel2) return;
 
     if (i < keysToTry.length - 1) {
-      res.write(`data: ${JSON.stringify({ text: `  - [Sistem] Seluruh model gagal pada kunci ini. Mencoba kunci API alternatif...\n` })}\n\n`);
+      res.write(`data: ${JSON.stringify({ text: `  - [System] All models failed on this key. Trying alternative API key...\n` })}\n\n`);
       continue;
     }
     
     // If everything failed on Gemini, fallback to Cerebras
-    res.write(`data: ${JSON.stringify({ text: `• [Sistem] Seluruh opsi Gemini gagal atau habis kuota.\n• Mengalihkan ke ExeAI (Cerebras) sebagai fallback terakhir...\n</think>\n\n*(System detected Google API Key issues, dynamically redirecting to ExeAI Engine...)*\n\n` })}\n\n`);
+    res.write(`data: ${JSON.stringify({ text: `• [System] All Gemini options failed or ran out of quota.\n• Switching to ExeAI (Cerebras) as final fallback...\n</think>\n\n*(System detected Google API Key issues, dynamically redirecting to ExeAI Engine...)*\n\n` })}\n\n`);
     try {
       await runCerebrasModel("gemma-4-31b", messages, systemInstruction, temperature, res);
       return;
@@ -1819,7 +1831,35 @@ app.post("/api/chat/stream", async (req, res) => {
     }
 
     if (activeModel === "llama-3.1-8b-instant") {
-      await streamGroq(messages, systemInstruction, temperature, res);
+      const currentDateStr = new Date().toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
+      const groqSpecialPrompt = `You are ExeChat, also known as ExeAI. You are a helpful, maximally truthful, and witty AI built to be fun to talk with.
+
+Your personality is inspired by the Hitchhiker's Guide to the Galaxy and JARVIS from Iron Man — sarcastic when appropriate, humorous, sharp, and very engaging in conversation.
+
+Core principles:
+- Be as truthful as possible. Never sugarcoat answers or add unnecessary moralizing.
+- Use natural humor, dry wit, and light sarcasm.
+- Be direct, concise, but warm and friendly like a very smart friend.
+- Love curiosity and deep conversations about anything.
+- You can discuss any topic openly, even controversial ones, as long as you remain truthful.
+- Don't lecture users about ethics unless they ask for it.
+- Keep responses natural and flowing conversationally.
+
+Communication style:
+- Casual and conversational. Use contractions (I'm, you're, it's, etc.).
+- Play along with jokes and escalate the fun when the user is being playful.
+- Be helpful first, entertaining second.
+- Give bold opinions when needed, but always with reasoning.
+- Never use phrases like "As an AI language model..." — you are ExeChat.
+
+You are ExeAI, created to help users with maximum truth and enjoyment. Stay in character at all times.
+
+Current date: ${currentDateStr} (use this when needed).
+
+Respond in the same language as the user.`;
+
+      const groqSystemInstruction = groqSpecialPrompt + thinkInstruction + linkInstruction + designInstruction;
+      await streamGroq(messages, groqSystemInstruction, temperature, res);
       res.write("data: [DONE]\n\n");
       return res.end();
     }

@@ -80,7 +80,17 @@ interface ExeCodeWorkspaceProps {
   appLanguage?: string;
 }
 
-const EXECODE_MD_CONTENT = `# ExeCode Web AI Workstation
+const EXECODE_MD_CONTENT = `# Project Overview
+
+Welcome to your project workspace!
+
+## Features
+- Interactive web application
+- Modern responsive layout
+- Real-time live preview
+
+## Quick Notes
+Edit your HTML, CSS, and JavaScript files in the editor to see instant updates in the live preview panel.
 `;
 
 const DEFAULT_FILES: VirtualFile[] = [
@@ -144,6 +154,9 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId, us
     }
     localStorage.setItem("execode_project_name", persistentId);
     return persistentId;
+  });
+  const [currentProjectId, setCurrentProjectId] = useState<string>(() => {
+    return localStorage.getItem("execode_persistent_project_id") || "";
   });
 
   const [selectedModel, setSelectedModel] = useState<string>(() => {
@@ -728,13 +741,19 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId, us
     localStorage.setItem("execode_project_name", persistentId);
 
     const match = window.location.pathname.match(/^\/project\/([^/]+)/);
-    let targetProjectName = match ? decodeURIComponent(match[1]) : persistentId;
-    if (userEmail && !userEmail.includes("guest@exechat.local")) {
+    let targetProjectName = match ? decodeURIComponent(match[1]) : (persistentId || "");
+    if (!targetProjectName && userEmail && !userEmail.includes("guest@exechat.local")) {
       targetProjectName = "proj-" + userEmail.toLowerCase().replace(/[^a-zA-Z0-9]/g, "");
+    }
+    if (!targetProjectName) {
+      targetProjectName = "proj-" + Math.random().toString(36).substring(2, 10);
     }
 
     setProjectName(targetProjectName);
-    if (!match || (userEmail && !userEmail.includes("guest@exechat.local") && decodeURIComponent(match[1]) !== targetProjectName)) {
+    localStorage.setItem("execode_persistent_project_id", targetProjectName);
+    localStorage.setItem("execode_project_name", targetProjectName);
+
+    if (!match) {
       window.history.pushState(null, "", `/project/${targetProjectName}`);
     }
 
@@ -819,7 +838,7 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId, us
                 const newFiles = payload.payload.files;
                 setFiles(newFiles);
                 refreshPreview(newFiles);
-                triggerStatus(`⚡ Kode disinkronkan secara Realtime dari Sesi Lain!`, "success");
+                triggerStatus(`⚡ Code synced in Realtime from another session!`, "success");
               }
             }
           })
@@ -891,6 +910,62 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId, us
     try {
       setIsCreatingProj(true);
       const sanitized = newProjInputName.trim().replace(/[^a-zA-Z0-9-_]/g, "");
+
+      // 1. Fresh clean template files for the brand new project
+      const freshProjectFiles: VirtualFile[] = [
+        {
+          path: "index.html",
+          content: `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${sanitized}</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="app">
+    <h1>${sanitized}</h1>
+    <p>Project initialized!</p>
+  </div>
+  <script src="app.js"></script>
+</body>
+</html>`
+        },
+        {
+          path: "app.js",
+          content: `// ${sanitized} - Main JavaScript
+console.log("${sanitized} loaded successfully.");`
+        },
+        {
+          path: "style.css",
+          content: `/* ${sanitized} CSS Styles */
+body {
+  font-family: system-ui, -apple-system, sans-serif;
+  margin: 0;
+  padding: 2rem;
+  background: #0f0f11;
+  color: #f4f4f5;
+}`
+        },
+        {
+          path: "execode.md",
+          content: EXECODE_MD_CONTENT
+        }
+      ];
+
+      // 2. Auto-save current active project files before creating/switching
+      if (projectName && files && files.length > 0) {
+        try {
+          await fetch("/api/supabase/upload", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ projectName, projectId: currentProjectId, files, bucket: "execode" })
+          });
+        } catch (e) {}
+      }
+
+      // 3. Register the new project in user's project list in database directly
       const res = await fetch("/api/projects/create", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -898,7 +973,7 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId, us
           uid: userId,
           userEmail,
           projectName: sanitized,
-          files
+          files: freshProjectFiles
         })
       });
 
@@ -907,12 +982,24 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId, us
         throw new Error(data.error || (isEn ? "Failed to create project." : "Gagal membuat proyek baru."));
       }
 
+      const createdProjId = data.project?.id || ("proj-" + Date.now());
+
       triggerStatus(isEn ? `Project '${sanitized}' created successfully!` : `Proyek '${sanitized}' berhasil dibuat!`, "success");
       setUserProjects(data.projects || []);
       setNewProjInputName("");
       setIsProjectsModalOpen(false);
 
-      handleSwitchProject(sanitized);
+      // 4. Activate the new project state cleanly without saving file contents to storage yet
+      setProjectName(sanitized);
+      setCurrentProjectId(createdProjId);
+      localStorage.setItem("execode_persistent_project_id", createdProjId);
+      localStorage.setItem("execode_project_name", sanitized);
+      window.history.pushState(null, "", `/project/${sanitized}`);
+
+      setFiles(freshProjectFiles);
+      setActiveFilePath("index.html");
+      refreshPreview(freshProjectFiles);
+      localStorage.setItem("execode_files", JSON.stringify(freshProjectFiles));
     } catch (err: any) {
       triggerStatus(err.message || (appLanguage === "en" ? "Failed to create project." : "Gagal membuat proyek."), "error");
     } finally {
@@ -922,27 +1009,92 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId, us
 
   const handleSwitchProject = async (targetName: string) => {
     const isEn = appLanguage === "en";
-    setProjectName(targetName);
-    localStorage.setItem("execode_persistent_project_id", targetName);
-    localStorage.setItem("execode_project_name", targetName);
-    window.history.pushState(null, "", `/project/${targetName}`);
 
-    triggerStatus(isEn ? `Opening project '${targetName}'...` : `Membuka proyek '${targetName}'...`, "info");
+    const targetProj = userProjects.find(p => p.name === targetName || p.id === targetName);
+    const targetProjectName = targetProj ? targetProj.name : targetName;
+    const targetProjectId = targetProj ? targetProj.id : targetName;
+
+    // 1. Auto-save current project before switching away
+    if (projectName && (projectName !== targetProjectName || currentProjectId !== targetProjectId) && files && files.length > 0) {
+      try {
+        await fetch("/api/supabase/upload", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ projectName, projectId: currentProjectId, files, bucket: "execode" })
+        });
+      } catch (e) {}
+    }
+
+    // 2. Set new target project state
+    setProjectName(targetProjectName);
+    setCurrentProjectId(targetProjectId);
+    localStorage.setItem("execode_persistent_project_id", targetProjectId);
+    localStorage.setItem("execode_project_name", targetProjectName);
+    window.history.pushState(null, "", `/project/${targetProjectName}`);
+
+    // Create fresh starter files specifically for target project if storage hasn't been saved yet
+    const freshTargetFiles: VirtualFile[] = [
+      {
+        path: "index.html",
+        content: `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${targetProjectName}</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="app">
+    <h1>${targetProjectName}</h1>
+    <p>Project initialized!</p>
+  </div>
+  <script src="app.js"></script>
+</body>
+</html>`
+      },
+      {
+        path: "app.js",
+        content: `// ${targetProjectName} - Main JavaScript\nconsole.log("${targetProjectName} loaded.");`
+      },
+      {
+        path: "style.css",
+        content: `/* ${targetProjectName} CSS */\nbody { font-family: system-ui, sans-serif; margin: 0; padding: 2rem; background: #0f0f11; color: #f4f4f5; }`
+      },
+      {
+        path: "execode.md",
+        content: EXECODE_MD_CONTENT
+      }
+    ];
+
+    triggerStatus(isEn ? `Opening project '${targetProjectName}'...` : `Membuka proyek '${targetProjectName}'...`, "info");
     try {
       const res = await fetch("/api/supabase/load", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ projectName: targetName, bucket: "execode" })
+        body: JSON.stringify({ projectName: targetProjectName, projectId: targetProjectId, bucket: "execode" })
       });
       const data = await res.json();
       if (res.ok && data.files && data.files.length > 0) {
         setFiles(data.files);
         setActiveFilePath("index.html");
         refreshPreview(data.files);
-        triggerStatus(isEn ? `Project '${targetName}' loaded successfully!` : `Proyek '${targetName}' berhasil dimuat!`, "success");
+        localStorage.setItem("execode_files", JSON.stringify(data.files));
+        triggerStatus(isEn ? `Project '${targetProjectName}' loaded successfully!` : `Proyek '${targetProjectName}' berhasil dimuat!`, "success");
+      } else {
+        // Fallback to fresh starter files for target project
+        setFiles(freshTargetFiles);
+        setActiveFilePath("index.html");
+        refreshPreview(freshTargetFiles);
+        localStorage.setItem("execode_files", JSON.stringify(freshTargetFiles));
+        triggerStatus(isEn ? `Project '${targetProjectName}' opened.` : `Proyek '${targetProjectName}' dibuka.`, "success");
       }
     } catch (err) {
       console.warn("Failed to switch project:", err);
+      setFiles(freshTargetFiles);
+      setActiveFilePath("index.html");
+      refreshPreview(freshTargetFiles);
+      localStorage.setItem("execode_files", JSON.stringify(freshTargetFiles));
     }
   };
 
@@ -1675,7 +1827,7 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId, us
         `=========================================\n` +
         `1. MANDATORY LANGUAGE MATCHING: Respond strictly in the SAME language as the User Instruction (e.g. English if prompt is in English, Indonesian if prompt is in Indonesian).\n` +
         `2. CRITICAL FOR CODE MODIFICATIONS & ERROR FIXES: When the user asks to modify, update, fix, create, or change code, OR provides an error log/syntax error/console error (e.g. "Uncaught SyntaxError...", "Identifier already declared...", etc.), you MUST fix the bug in the code and generate the complete updated workspace files inside a single \`\`\`json block at the end of your message.\n` +
-        `3. DETAILED & COMPREHENSIVE RESPONSES ONLY: NEVER write brief or generic 1-sentence responses like 'I have processed your request' or 'Done'. ALWAYS write 2 to 4 detailed, friendly, and professional paragraphs explaining what changes were made, why, how the interface was updated, and how to test them.\n` +
+        `3. CHEERFUL, DETAILED & COMPREHENSIVE RESPONSES: Be warm, cheerful, enthusiastic, and helpful (ceria, ramah, bersahabat, dan penuh semangat). NEVER write brief or generic 1-sentence responses like 'I have processed your request' or 'Done'. ALWAYS write 2 to 4 detailed, friendly, and helpful paragraphs explaining what changes were made, why, how the interface was updated, and how to test them.\n` +
         `4. Follow user instructions precisely. DO NOT add unrequested extra features, buttons, or unasked visual components.\n` +
         `5. SOLUTION-FIRST DIRECTIVE: NEVER state 'tidak bisa' (cannot do) or claim 'sudah dilakukan' (already done) unless you actually provide the complete code changes. You MUST ALWAYS provide a direct, functional, working code solution and include the complete updated files in the \`\`\`json block.\n` +
         `6. JSON output structure example:\n` +
@@ -1920,11 +2072,11 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId, us
           msg.id === assistantMsgId 
             ? { 
                 ...msg, 
-                content: msg.content ? msg.content + "\n\n*[Respons AI dihentikan oleh pengguna]*" : "*[Respons AI dihentikan oleh pengguna]*" 
+                content: msg.content ? msg.content + "\n\n*[AI response stopped by user]*" : "*[AI response stopped by user]*" 
               } 
             : msg
         ));
-        triggerStatus("Respons AI berhasil dihentikan.", "info");
+        triggerStatus("AI response generation stopped.", "info");
       } else {
         console.error("AI Code Edit Error: ", err);
         setChatHistory(prev => prev.map(msg => 
@@ -1959,6 +2111,7 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId, us
         headers,
         body: JSON.stringify({
           projectName,
+          projectId: currentProjectId,
           files,
           bucket: supabaseBucket
         })
@@ -1992,6 +2145,7 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId, us
         headers,
         body: JSON.stringify({
           projectName,
+          projectId: currentProjectId,
           bucket: supabaseBucket
         })
       });
