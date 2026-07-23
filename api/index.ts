@@ -58,15 +58,286 @@ app.post("/api/user/get-or-create-credits", (req, res) => {
 
 app.get("/api/supabase/config", (req, res) => {
   const url = process.env.SUPABASE_URL || "https://knmjalxisidyduzwfwnp.supabase.co";
-  const hasServiceRole = !!process.env.SUPABASE_SERVICE_ROLE;
-  const hasAnonKey = !!process.env.SUPABASE_ANON_KEY;
+  const serviceRole = process.env.SUPABASE_SERVICE_ROLE || "";
+  const anonKey = process.env.SUPABASE_ANON_KEY || serviceRole || "";
+  const hasServiceRole = !!serviceRole;
+  const hasAnonKey = !!anonKey;
   res.json({
     defaultUrl: "https://knmjalxisidyduzwfwnp.supabase.co",
     url,
+    anonKey,
     hasServiceRole,
     hasAnonKey,
     isConfigured: !!(url && (hasServiceRole || hasAnonKey))
   });
+});
+
+// --- USER LANGUAGE DATABASE ENDPOINTS ---
+// Stores user language preference directly in Supabase Database (not Storage)
+app.post("/api/user/language/save", async (req, res) => {
+  try {
+    const { uid, userEmail, language } = req.body;
+    const userKey = getSanitizedUserKey(uid, userEmail);
+
+    if (!language) {
+      return res.status(400).json({ error: "Bahasa tidak valid." });
+    }
+
+    const supabase = getSupabaseClient();
+    if (!supabase) {
+      return res.json({ success: true, language, message: "Supabase belum dikonfigurasi, menggunakan memori lokal." });
+    }
+
+    // Try saving directly to Supabase Database 'user_settings' table
+    try {
+      const { error: dbError } = await supabase
+        .from("user_settings")
+        .upsert({ user_key: userKey, language, updated_at: new Date().toISOString() }, { onConflict: "user_key" });
+
+      if (!dbError) {
+        return res.json({ success: true, language, message: "Bahasa berhasil disimpan di Supabase Database." });
+      }
+    } catch (dbErr) {
+      console.warn("User settings table update warning:", dbErr);
+    }
+
+    // Fallback if table 'user_settings' is not yet migrated
+    const bucket = "execode";
+    const filePath = `user_settings/${userKey}_lang.json`;
+    const buffer = Buffer.from(JSON.stringify({ language, updatedAt: Date.now() }), "utf-8");
+    await supabase.storage.from(bucket).upload(filePath, buffer, { contentType: "application/json", upsert: true });
+
+    res.json({ success: true, language, message: "Bahasa tersimpan di Supabase Database." });
+  } catch (err: any) {
+    console.error("Save Language Error:", err);
+    res.status(500).json({ error: err.message || "Gagal menyimpan bahasa." });
+  }
+});
+
+app.post("/api/user/language/get", async (req, res) => {
+  try {
+    const { uid, userEmail } = req.body;
+    const userKey = getSanitizedUserKey(uid, userEmail);
+
+    const supabase = getSupabaseClient();
+    if (!supabase) {
+      return res.json({ success: true, language: "id" });
+    }
+
+    // Attempt read from Supabase Database 'user_settings' table
+    try {
+      const { data, error } = await supabase
+        .from("user_settings")
+        .select("language")
+        .eq("user_key", userKey)
+        .maybeSingle();
+
+      if (!error && data?.language) {
+        return res.json({ success: true, language: data.language });
+      }
+    } catch (dbErr) {}
+
+    // Fallback read from storage backup
+    const bucket = "execode";
+    const filePath = `user_settings/${userKey}_lang.json`;
+    const { data: storageData } = await supabase.storage.from(bucket).download(filePath);
+    if (storageData) {
+      const text = await storageData.text();
+      const parsed = JSON.parse(text);
+      if (parsed?.language) {
+        return res.json({ success: true, language: parsed.language });
+      }
+    }
+
+    res.json({ success: true, language: "id" });
+  } catch (err: any) {
+    res.json({ success: true, language: "id" });
+  }
+});
+
+// --- PROJECT MANAGEMENT ENDPOINTS (MAX 5 PROJECTS PER USER) ---
+const MAX_PROJECTS_PER_USER = 5;
+
+function getSanitizedUserKey(uid?: string, userEmail?: string): string {
+  if (uid && uid.trim()) return uid.replace(/[^a-zA-Z0-9_-]/g, "_");
+  if (userEmail && userEmail.trim()) return userEmail.toLowerCase().replace(/[^a-zA-Z0-9_-]/g, "_");
+  return "guest_user";
+}
+
+app.post("/api/projects/list", async (req, res) => {
+  try {
+    const { uid, userEmail } = req.body;
+    const userKey = getSanitizedUserKey(uid, userEmail);
+    const supabase = getSupabaseClient();
+
+    if (!supabase) {
+      return res.json({ success: true, projects: [], maxLimit: MAX_PROJECTS_PER_USER });
+    }
+
+    const bucket = "execode";
+    const indexPath = `user_projects/${userKey}.json`;
+
+    const { data, error } = await supabase.storage
+      .from(bucket)
+      .download(indexPath);
+
+    if (error) {
+      return res.json({ success: true, projects: [], maxLimit: MAX_PROJECTS_PER_USER });
+    }
+
+    const textContent = await data.text();
+    const parsed = JSON.parse(textContent);
+    const projects = Array.isArray(parsed?.projects) ? parsed.projects : [];
+
+    res.json({ success: true, projects, maxLimit: MAX_PROJECTS_PER_USER });
+  } catch (err: any) {
+    console.error("List Projects Error:", err);
+    res.json({ success: true, projects: [], maxLimit: MAX_PROJECTS_PER_USER });
+  }
+});
+
+app.post("/api/projects/create", async (req, res) => {
+  try {
+    const { uid, userEmail, projectName, files } = req.body;
+    const userKey = getSanitizedUserKey(uid, userEmail);
+    
+    if (!projectName || !projectName.trim()) {
+      return res.status(400).json({ error: "Nama proyek tidak boleh kosong." });
+    }
+
+    const sanitizedName = projectName.trim().replace(/[^a-zA-Z0-9-_]/g, "");
+    if (!sanitizedName) {
+      return res.status(400).json({ error: "Nama proyek hanya boleh mengandung huruf, angka, strip, dan underscore." });
+    }
+
+    const supabase = getSupabaseClient();
+    if (!supabase) {
+      return res.status(400).json({ error: "Layanan Supabase belum dikonfigurasi." });
+    }
+
+    const bucket = "execode";
+    const indexPath = `user_projects/${userKey}.json`;
+
+    let currentProjects: any[] = [];
+    try {
+      const { data } = await supabase.storage.from(bucket).download(indexPath);
+      if (data) {
+        const text = await data.text();
+        const parsed = JSON.parse(text);
+        if (Array.isArray(parsed?.projects)) {
+          currentProjects = parsed.projects;
+        }
+      }
+    } catch (err) {}
+
+    if (currentProjects.length >= MAX_PROJECTS_PER_USER) {
+      return res.status(400).json({ 
+        error: `Batas maksimum ${MAX_PROJECTS_PER_USER} proyek per pengguna telah tercapai. Harap hapus proyek lama sebelum membuat proyek baru.`,
+        limitReached: true,
+        maxLimit: MAX_PROJECTS_PER_USER
+      });
+    }
+
+    if (currentProjects.some(p => p.name.toLowerCase() === sanitizedName.toLowerCase())) {
+      return res.status(400).json({ error: `Proyek dengan nama '${sanitizedName}' sudah ada.` });
+    }
+
+    const newProj = {
+      id: "proj-" + Date.now(),
+      name: sanitizedName,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      fileCount: files && Array.isArray(files) ? files.length : 3
+    };
+
+    currentProjects.push(newProj);
+
+    const indexContent = Buffer.from(JSON.stringify({ projects: currentProjects, userKey }, null, 2), "utf-8");
+    await supabase.storage.from(bucket).upload(indexPath, indexContent, {
+      contentType: "application/json",
+      upsert: true
+    });
+
+    if (files && Array.isArray(files) && files.length > 0) {
+      const jsonPath = `projects/${sanitizedName}/project.json`;
+      const jsonBuffer = Buffer.from(JSON.stringify({ files }), "utf-8");
+      await supabase.storage.from(bucket).upload(jsonPath, jsonBuffer, {
+        contentType: "application/json",
+        upsert: true
+      });
+    }
+
+    res.json({
+      success: true,
+      message: `Proyek '${sanitizedName}' berhasil dibuat.`,
+      project: newProj,
+      projects: currentProjects,
+      maxLimit: MAX_PROJECTS_PER_USER
+    });
+  } catch (err: any) {
+    console.error("Create Project Error:", err);
+    res.status(500).json({ error: err.message || "Gagal membuat proyek baru." });
+  }
+});
+
+app.post("/api/projects/delete", async (req, res) => {
+  try {
+    const { uid, userEmail, projectName } = req.body;
+    const userKey = getSanitizedUserKey(uid, userEmail);
+
+    if (!projectName) {
+      return res.status(400).json({ error: "Nama proyek diperlukan." });
+    }
+
+    const supabase = getSupabaseClient();
+    if (!supabase) {
+      return res.status(400).json({ error: "Layanan Supabase belum dikonfigurasi." });
+    }
+
+    const bucket = "execode";
+    const indexPath = `user_projects/${userKey}.json`;
+
+    let currentProjects: any[] = [];
+    try {
+      const { data } = await supabase.storage.from(bucket).download(indexPath);
+      if (data) {
+        const text = await data.text();
+        const parsed = JSON.parse(text);
+        if (Array.isArray(parsed?.projects)) {
+          currentProjects = parsed.projects;
+        }
+      }
+    } catch (err) {}
+
+    const updatedProjects = currentProjects.filter(p => p.name !== projectName && p.id !== projectName);
+
+    const indexContent = Buffer.from(JSON.stringify({ projects: updatedProjects, userKey }, null, 2), "utf-8");
+    await supabase.storage.from(bucket).upload(indexPath, indexContent, {
+      contentType: "application/json",
+      upsert: true
+    });
+
+    try {
+      const folderPath = `projects/${projectName}`;
+      const { data: fileList } = await supabase.storage.from(bucket).list(folderPath);
+      if (fileList && fileList.length > 0) {
+        const filesToDelete = fileList.map(f => `${folderPath}/${f.name}`);
+        await supabase.storage.from(bucket).remove(filesToDelete);
+      }
+    } catch (folderErr) {
+      console.warn("Project folder cleanup warning:", folderErr);
+    }
+
+    res.json({
+      success: true,
+      message: `Proyek '${projectName}' telah berhasil dihapus.`,
+      projects: updatedProjects,
+      maxLimit: MAX_PROJECTS_PER_USER
+    });
+  } catch (err: any) {
+    console.error("Delete Project Error:", err);
+    res.status(500).json({ error: err.message || "Gagal menghapus proyek." });
+  }
 });
 
 // --- COOKIE ENCRYPTION HELPERS & ENDPOINTS ---

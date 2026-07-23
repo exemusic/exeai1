@@ -9,21 +9,21 @@ export const MODEL_OPTIONS: ModelOption[] = [
   },
   {
     id: "gemma-4-31b",
-    name: "exeai-e5:5:9 (latest)",
+    name: "ExeAi 5:5:9 (latest)",
     badge: "Preview",
-    description: "31B size exeai-e5:5:9 model with a 65,536 token context limit. Fast and efficient.",
+    description: "exeai-e5:5:9. Fast and efficient.",
   },
   {
     id: "gpt-oss-120b",
-    name: "exeai-oss-120b",
+    name: "ExeAi OSS 120B",
     badge: "Production",
-    description: "Super large 120B exeai-oss-120b model for high-level reasoning and maximum accuracy.",
+    description: "exeai-oss-120b model for high-level reasoning and maximum accuracy.",
   },
   {
     id: "zai-glm-4.7",
-    name: "exeai-glm-4.7",
+    name: "ExeAi GLM 4.7",
     badge: "Preview",
-    description: "Efficiently sized exeai-glm-4.7 model with an 8,192 token context limit for lightning-fast responses.",
+    description: "exeai-glm-4.7 model for lightning-fast responses.",
   },
   {
     id: "gemini-ai",
@@ -34,7 +34,7 @@ export const MODEL_OPTIONS: ModelOption[] = [
   {
     id: "llama-3.1-8b-instant",
     name: "Llama 3.1 8B Instant",
-    badge: "FAST",
+    badge: "META",
     description: "Super-fast Llama 3.1 8B Instant model with near-instantaneous response times.",
   }
 ];

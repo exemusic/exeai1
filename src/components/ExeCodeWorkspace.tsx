@@ -43,6 +43,7 @@ import {
   Square
 } from "lucide-react";
 import JSZip from "jszip";
+import { createClient } from "@supabase/supabase-js";
 import { MODEL_OPTIONS } from "../presets";
 import { motion, AnimatePresence } from "motion/react";
 import { MarkdownRenderer } from "./MarkdownRenderer";
@@ -224,6 +225,17 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId, us
   const [dislikedMessages, setDislikedMessages] = useState<Record<string, boolean>>({});
   const [showClearChatConfirm, setShowClearChatConfirm] = useState<boolean>(false);
   const [showDeleteProjectConfirm, setShowDeleteProjectConfirm] = useState<boolean>(false);
+
+  // Realtime Sync & Multi-Project Manager States (Max 5 projects per user limit)
+  const [appLanguage, setAppLanguage] = useState<string>("id");
+  const [realtimeStatus, setRealtimeStatus] = useState<"connected" | "connecting" | "disconnected">("disconnected");
+  const [userProjects, setUserProjects] = useState<any[]>([]);
+  const [isProjectsModalOpen, setIsProjectsModalOpen] = useState<boolean>(false);
+  const [newProjInputName, setNewProjInputName] = useState<string>("");
+  const [isCreatingProj, setIsCreatingProj] = useState<boolean>(false);
+  const [maxProjectLimit, setMaxProjectLimit] = useState<number>(5);
+  const realtimeChannelRef = useRef<any>(null);
+  const mySessionIdRef = useRef<string>("sess-" + Math.random().toString(36).substring(2, 9));
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const fileUploadRef = useRef<HTMLInputElement>(null);
@@ -784,6 +796,231 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId, us
       triggerStatus(`Connected. Start editing and save your changes.`, "success");
     });
   }, []);
+
+  // --- REALTIME SYNC & MULTI-PROJECT MANAGER LOGIC ---
+  const broadcastRealtimeSync = (updatedFiles: VirtualFile[]) => {
+    if (realtimeChannelRef.current && realtimeStatus === "connected") {
+      realtimeChannelRef.current.send({
+        type: "broadcast",
+        event: "CODE_REALTIME_SYNC",
+        payload: {
+          files: updatedFiles,
+          senderId: mySessionIdRef.current,
+          timestamp: Date.now()
+        }
+      }).catch((err: any) => console.warn("Realtime broadcast send warning:", err));
+    }
+  };
+
+  // Connect to Supabase Realtime channel whenever active project changes
+  useEffect(() => {
+    if (!projectName) return;
+
+    fetch("/api/supabase/config")
+      .then(res => res.json())
+      .then(config => {
+        const sbUrl = config.url || "https://knmjalxisidyduzwfwnp.supabase.co";
+        const sbAnonKey = config.anonKey || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtubWphbnhpc2lkeWR1endmd25wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDEyMzQ1NjcsImV4cCI6MjA1NjgxMDU2N30...";
+
+        if (realtimeChannelRef.current) {
+          realtimeChannelRef.current.unsubscribe();
+          realtimeChannelRef.current = null;
+        }
+
+        setRealtimeStatus("connecting");
+        const client = createClient(sbUrl, sbAnonKey);
+        const channel = client.channel(`project:${projectName}`, {
+          config: { broadcast: { self: false } }
+        });
+
+        channel
+          .on("broadcast", { event: "CODE_REALTIME_SYNC" }, (payload: any) => {
+            if (payload && payload.payload && Array.isArray(payload.payload.files)) {
+              if (payload.payload.senderId !== mySessionIdRef.current) {
+                const newFiles = payload.payload.files;
+                setFiles(newFiles);
+                refreshPreview(newFiles);
+                triggerStatus(`⚡ Kode disinkronkan secara Realtime dari Sesi Lain!`, "success");
+              }
+            }
+          })
+          .subscribe((status: string) => {
+            if (status === "SUBSCRIBED") {
+              setRealtimeStatus("connected");
+            } else {
+              setRealtimeStatus("disconnected");
+            }
+          });
+
+        realtimeChannelRef.current = channel;
+      })
+      .catch(err => {
+        console.warn("Realtime setup warning:", err);
+        setRealtimeStatus("disconnected");
+      });
+
+    return () => {
+      if (realtimeChannelRef.current) {
+        realtimeChannelRef.current.unsubscribe();
+        realtimeChannelRef.current = null;
+      }
+    };
+  }, [projectName]);
+
+  // Fetch user's multi-projects list & language setting on load
+  useEffect(() => {
+    fetchUserProjects();
+    fetchUserLanguage();
+  }, [userId, userEmail]);
+
+  const fetchUserLanguage = async () => {
+    try {
+      const res = await fetch("/api/user/language/get", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ uid: userId, userEmail })
+      });
+      const data = await res.json();
+      if (data.success && data.language) {
+        setAppLanguage(data.language);
+      }
+    } catch (err) {
+      console.warn("Failed to fetch user language setting:", err);
+    }
+  };
+
+  const handleSaveLanguage = async (newLang: string) => {
+    setAppLanguage(newLang);
+    triggerStatus(`Mengubah bahasa aplikasi ke ${newLang === "id" ? "Bahasa Indonesia" : "English"}...`, "info");
+    try {
+      const res = await fetch("/api/user/language/save", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ uid: userId, userEmail, language: newLang })
+      });
+      const data = await res.json();
+      if (data.success) {
+        triggerStatus(`Bahasa berhasil diperbarui di Supabase Database!`, "success");
+      }
+    } catch (err: any) {
+      triggerStatus(`Gagal menyimpan pengaturan bahasa.`, "error");
+    }
+  };
+
+  const fetchUserProjects = async () => {
+    try {
+      const res = await fetch("/api/projects/list", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ uid: userId, userEmail })
+      });
+      const data = await res.json();
+      if (data.success && Array.isArray(data.projects)) {
+        setUserProjects(data.projects);
+        if (data.maxLimit) setMaxProjectLimit(data.maxLimit);
+      }
+    } catch (err) {
+      console.warn("Failed to list user projects:", err);
+    }
+  };
+
+  const handleCreateNewProject = async () => {
+    if (!newProjInputName.trim()) {
+      triggerStatus("Masukkan nama proyek baru!", "error");
+      return;
+    }
+
+    if (userProjects.length >= maxProjectLimit) {
+      triggerStatus(`Batas Maksimum ${maxProjectLimit} Proyek per User telah tercapai! Harap hapus proyek lama terlebih dahulu.`, "error");
+      return;
+    }
+
+    try {
+      setIsCreatingProj(true);
+      const sanitized = newProjInputName.trim().replace(/[^a-zA-Z0-9-_]/g, "");
+      const res = await fetch("/api/projects/create", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          uid: userId,
+          userEmail,
+          projectName: sanitized,
+          files
+        })
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Gagal membuat proyek baru.");
+      }
+
+      triggerStatus(`Proyek '${sanitized}' berhasil dibuat!`, "success");
+      setUserProjects(data.projects || []);
+      setNewProjInputName("");
+      setIsProjectsModalOpen(false);
+
+      handleSwitchProject(sanitized);
+    } catch (err: any) {
+      triggerStatus(err.message || "Gagal membuat proyek.", "error");
+    } finally {
+      setIsCreatingProj(false);
+    }
+  };
+
+  const handleSwitchProject = async (targetName: string) => {
+    setProjectName(targetName);
+    localStorage.setItem("execode_persistent_project_id", targetName);
+    localStorage.setItem("execode_project_name", targetName);
+    window.history.pushState(null, "", `/project/${targetName}`);
+
+    triggerStatus(`Membuka proyek '${targetName}'...`, "info");
+    try {
+      const res = await fetch("/api/supabase/load", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ projectName: targetName, bucket: "execode" })
+      });
+      const data = await res.json();
+      if (res.ok && data.files && data.files.length > 0) {
+        setFiles(data.files);
+        setActiveFilePath("index.html");
+        refreshPreview(data.files);
+        triggerStatus(`Proyek '${targetName}' berhasil dimuat!`, "success");
+      }
+    } catch (err) {
+      console.warn("Failed to switch project:", err);
+    }
+  };
+
+  const handleDeleteProjectFromManager = async (targetName: string) => {
+    try {
+      const res = await fetch("/api/projects/delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          uid: userId,
+          userEmail,
+          projectName: targetName
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Gagal menghapus proyek.");
+
+      triggerStatus(`Proyek '${targetName}' berhasil dihapus.`, "success");
+      setUserProjects(data.projects || []);
+
+      if (projectName === targetName) {
+        const remaining = (data.projects || [])[0];
+        if (remaining) {
+          handleSwitchProject(remaining.name);
+        } else {
+          handleSwitchProject("default_project");
+        }
+      }
+    } catch (err: any) {
+      triggerStatus(err.message || "Gagal menghapus proyek.", "error");
+    }
+  };
 
   const handleProjectNameChange = (newName: string) => {
     const sanitized = newName.replace(/[^a-zA-Z0-9-_]/g, "");
@@ -1647,6 +1884,7 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId, us
         setPreviewKey(prev => prev + 1);
         
         refreshPreview(mergedFiles);
+        broadcastRealtimeSync(mergedFiles);
         
         const startTime = thinkingStartTimesRef.current[assistantMsgId];
         let finalDur = startTime ? Math.max(0.1, Number(((Date.now() - startTime) / 1000).toFixed(1))) : 0.1;
@@ -1770,7 +2008,10 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId, us
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Failed to upload.");
 
-      triggerStatus("Project successfully saved to Cloud ExeChat!", "success");
+      // Broadcast changes live via Supabase Realtime WebSocket
+      broadcastRealtimeSync(files);
+
+      triggerStatus("Project successfully saved to Cloud ExeChat & synced via Realtime!", "success");
     } catch (err: any) {
       console.error(err);
       triggerStatus(`Failed to upload: ${err.message}`, "error");
@@ -2429,6 +2670,40 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId, us
                   </div>
                 </div>
               )}
+            </div>
+
+            <div className="h-4 w-px bg-zinc-900 mx-0.5 hidden sm:block" />
+
+            {/* Project Switcher Button (Max 5 Limit) */}
+            <button
+              onClick={() => {
+                fetchUserProjects();
+                setIsProjectsModalOpen(true);
+              }}
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-2 border transition-all cursor-pointer ${
+                isDark 
+                  ? "bg-zinc-900/60 border-transparent text-zinc-200 hover:bg-zinc-800" 
+                  : "bg-white border-zinc-100 text-zinc-700 hover:bg-zinc-100"
+              }`}
+              title="Kelola Proyek (Maksimal 5 Proyek per User)"
+            >
+              <Folder className="h-3.5 w-3.5 text-amber-500 shrink-0" />
+              <span className="max-w-[110px] truncate font-semibold">{projectName}</span>
+              <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-amber-500/10 text-amber-400 font-bold border border-amber-500/20">
+                {userProjects.length}/5
+              </span>
+            </button>
+
+            {/* Realtime Connection Status Indicator */}
+            <div className={`hidden md:flex items-center gap-1.5 px-2.5 py-1 rounded-xl border text-[11px] font-medium ${
+              realtimeStatus === "connected"
+                ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400"
+                : isDark ? "bg-zinc-900/60 border-transparent text-zinc-400" : "bg-zinc-100 border-zinc-200 text-zinc-600"
+            }`}>
+              <span className={`h-2 w-2 rounded-full ${
+                realtimeStatus === "connected" ? "bg-emerald-500 animate-pulse" : "bg-zinc-500"
+              }`} />
+              <span>{realtimeStatus === "connected" ? "Realtime Sync" : "Connecting..."}</span>
             </div>
           </div>
 
@@ -3458,6 +3733,206 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId, us
                   className="px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-rose-500 hover:bg-rose-600 text-white shadow-md transition-all active:scale-95"
                 >
                   Delete Storage
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Multi-Project Manager Modal (Max 5 Projects per User) */}
+      <AnimatePresence>
+        {isProjectsModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsProjectsModalOpen(false)}
+              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className={`relative w-full max-w-lg rounded-2xl border p-6 shadow-2xl transition-all duration-200 z-10 ${
+                isDark 
+                  ? "bg-zinc-900 border-zinc-800 text-zinc-100" 
+                  : "bg-white border-zinc-200 text-zinc-800"
+              }`}
+            >
+              <div className="flex items-center justify-between pb-4 mb-4 border-b border-zinc-800/30">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 rounded-xl bg-amber-500/10 text-amber-500 border border-amber-500/20">
+                    <Folder className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-bold">Daftar Proyek Saya</h3>
+                    <p className="text-xs text-zinc-400">Maksimal 5 proyek per akun pengguna</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setIsProjectsModalOpen(false)}
+                  className="p-1.5 rounded-lg hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 transition-colors"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+
+              {/* Capacity Usage Bar */}
+              <div className="mb-5 p-3 rounded-xl bg-zinc-950/40 border border-zinc-800/40 flex flex-col gap-2">
+                <div className="flex items-center justify-between text-xs font-semibold">
+                  <span className="text-zinc-400">Penggunaan Kuota Proyek:</span>
+                  <span className={`px-2 py-0.5 rounded-full text-[11px] font-bold ${
+                    userProjects.length >= 5
+                      ? "bg-rose-500/10 text-rose-400 border border-rose-500/20"
+                      : "bg-amber-500/10 text-amber-400 border border-amber-500/20"
+                  }`}>
+                    {userProjects.length} / {maxProjectLimit} Proyek Terpakai
+                  </span>
+                </div>
+                <div className="w-full h-2 rounded-full bg-zinc-800 overflow-hidden">
+                  <div
+                    className={`h-full transition-all duration-300 ${
+                      userProjects.length >= 5 ? "bg-rose-500" : "bg-amber-500"
+                    }`}
+                    style={{ width: `${(Math.min(userProjects.length, 5) / 5) * 100}%` }}
+                  />
+                </div>
+              </div>
+
+              {/* Create New Project Section */}
+              <div className="mb-4 flex items-center gap-2">
+                <input
+                  type="text"
+                  value={newProjInputName}
+                  onChange={(e) => setNewProjInputName(e.target.value)}
+                  placeholder="Nama proyek baru (contoh: app_kasir)..."
+                  disabled={userProjects.length >= maxProjectLimit || isCreatingProj}
+                  className={`flex-1 px-3.5 py-2 rounded-xl text-xs border outline-none transition-all ${
+                    isDark 
+                      ? "bg-black/60 border-zinc-800 focus:border-amber-500/50 text-zinc-200 placeholder:text-zinc-600" 
+                      : "bg-zinc-50 border-zinc-200 focus:border-amber-500 text-zinc-800 placeholder:text-zinc-400"
+                  }`}
+                />
+                <button
+                  onClick={handleCreateNewProject}
+                  disabled={userProjects.length >= maxProjectLimit || isCreatingProj || !newProjInputName.trim()}
+                  className={`px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
+                    userProjects.length >= maxProjectLimit
+                      ? "bg-zinc-800 text-zinc-500 cursor-not-allowed"
+                      : "bg-amber-500 hover:bg-amber-450 text-white shadow-md active:scale-95"
+                  }`}
+                >
+                  <Plus className="h-4 w-4" />
+                  <span>Buat</span>
+                </button>
+              </div>
+
+              {userProjects.length >= maxProjectLimit && (
+                <div className="mb-4 p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs flex items-center gap-2">
+                  <AlertCircle className="h-4 w-4 shrink-0" />
+                  <span>Batas maksimum 5 proyek per user telah tercapai. Harap hapus proyek lama terlebih dahulu.</span>
+                </div>
+              )}
+
+              {/* Projects List */}
+              <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+                {userProjects.length === 0 ? (
+                  <div className="text-center py-6 text-xs text-zinc-500">
+                    Belum ada proyek tersimpan. Ketik nama di atas dan klik 'Buat'!
+                  </div>
+                ) : (
+                  userProjects.map((p) => {
+                    const isActive = projectName === p.name;
+                    return (
+                      <div
+                        key={p.id || p.name}
+                        className={`p-3 rounded-xl border flex items-center justify-between gap-3 transition-all ${
+                          isActive
+                            ? "bg-amber-500/10 border-amber-500/30 text-amber-300"
+                            : isDark
+                              ? "bg-zinc-950/40 border-zinc-800/60 hover:bg-zinc-800/40"
+                              : "bg-zinc-50 border-zinc-200 hover:bg-zinc-100"
+                        }`}
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          <Folder className={`h-4 w-4 shrink-0 ${isActive ? "text-amber-400" : "text-zinc-400"}`} />
+                          <div className="flex flex-col min-w-0">
+                            <span className="text-xs font-semibold truncate">{p.name}</span>
+                            <span className="text-[10px] text-zinc-500">
+                              {p.fileCount || 3} file • Perubahan: {new Date(p.updatedAt || Date.now()).toLocaleDateString()}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          {!isActive ? (
+                            <button
+                              onClick={() => {
+                                handleSwitchProject(p.name);
+                                setIsProjectsModalOpen(false);
+                              }}
+                              className="px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-amber-500/10 text-amber-400 hover:bg-amber-500 hover:text-white transition-all cursor-pointer"
+                            >
+                              Buka
+                            </button>
+                          ) : (
+                            <span className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-amber-500 text-white shadow-sm">
+                              Aktif
+                            </span>
+                          )}
+
+                          <button
+                            onClick={() => handleDeleteProjectFromManager(p.name)}
+                            className="p-1 rounded-lg hover:bg-rose-500/20 text-zinc-500 hover:text-rose-400 transition-colors cursor-pointer"
+                            title="Hapus proyek"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+
+              {/* Language Settings (Stored directly in Supabase Database) */}
+              <div className="mb-4 p-3 rounded-xl bg-zinc-950/40 border border-zinc-800/40 flex items-center justify-between">
+                <div className="flex flex-col">
+                  <span className="text-xs font-semibold text-zinc-300">Pengaturan Bahasa (Supabase DB)</span>
+                  <span className="text-[10px] text-zinc-500">Tersimpan di tabel Supabase Database `user_settings`</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    onClick={() => handleSaveLanguage("id")}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                      appLanguage === "id"
+                        ? "bg-amber-500 text-white shadow-sm"
+                        : "bg-zinc-800 hover:bg-zinc-700 text-zinc-400"
+                    }`}
+                  >
+                    🇮🇩 ID
+                  </button>
+                  <button
+                    onClick={() => handleSaveLanguage("en")}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                      appLanguage === "en"
+                        ? "bg-amber-500 text-white shadow-sm"
+                        : "bg-zinc-800 hover:bg-zinc-700 text-zinc-400"
+                    }`}
+                  >
+                    🇬🇧 EN
+                  </button>
+                </div>
+              </div>
+
+              <div className="mt-5 pt-3 border-t border-zinc-800/30 flex justify-end">
+                <button
+                  onClick={() => setIsProjectsModalOpen(false)}
+                  className="px-4 py-1.5 rounded-xl text-xs font-semibold bg-zinc-800 hover:bg-zinc-700 text-zinc-200 transition-all cursor-pointer"
+                >
+                  Tutup
                 </button>
               </div>
             </motion.div>
