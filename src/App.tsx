@@ -80,7 +80,7 @@ const LANGUAGES = [
 
 const ExeChatLogo = ({ className = "h-8 w-8", size = 32 }: { className?: string; size?: number }) => (
   <img 
-    src="/exechat.png" 
+    src="/exechat.svg" 
     alt="ExeChat Logo" 
     className={`${className} object-contain`} 
     style={{ width: size, height: size, display: "inline-block", verticalAlign: "middle" }}

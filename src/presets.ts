@@ -5,7 +5,7 @@ export const MODEL_OPTIONS: ModelOption[] = [
     id: "automatic",
     name: "Automatic (Recommended)",
     badge: "Auto AI",
-    description: "Smart system selects the best model based on topic (e.g. Gemini AI for image analysis or web search, exeai-e5 for fast reasoning).",
+    description: "Automatically selects the best model for precise and efficient answers.",
   },
   {
     id: "gemma-4-31b",
