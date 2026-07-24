@@ -202,11 +202,12 @@ function TypewriterMessage({
 
   return (
     <div className="flex flex-col">
-      {/* 1. THINKING PROCESS BLOCK (LIGHTBULB ICON, AMBER THEME, EXPANDABLE) */}
+      {/* 1. THINKING PROCESS BLOCK (3-DOT ANIMATION, EXPANDABLE WHEN COMPLETE) */}
       {effectiveIsThinking ? (
-        <div className="mb-3 font-sans select-none align-baseline flex items-center gap-2 text-xs text-amber-600 dark:text-amber-400 font-medium bg-amber-500/10 px-3 py-1.5 rounded-xl border border-amber-500/20 w-fit">
-          <Lightbulb className="h-3.5 w-3.5 text-amber-500 animate-pulse shrink-0" />
-          <span>Thinking...</span>
+        <div className="mb-3 font-sans select-none align-baseline flex items-center gap-1.5 text-xs text-amber-500 dark:text-amber-400 font-medium bg-amber-500/10 px-3.5 py-2 rounded-xl border border-amber-500/20 w-fit">
+          <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-[bounce_1s_infinite_100ms]" />
+          <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-[bounce_1s_infinite_200ms]" />
+          <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-[bounce_1s_infinite_300ms]" />
         </div>
       ) : effectiveThinking !== null ? (
         <div className="mb-3 font-sans select-none align-baseline flex flex-col items-start">
@@ -1355,10 +1356,10 @@ export default function App() {
       name: "Light (White)",
       outerBg: "bg-white",
       mainBg: "bg-white",
-      sidebarBg: "bg-zinc-50",
-      sectionBg: "bg-zinc-100/60",
-      border: "border-zinc-200",
-      bubbleUser: "bg-zinc-100 border border-zinc-250/60 text-zinc-800",
+      sidebarBg: "bg-zinc-100",
+      sectionBg: "bg-zinc-100/80",
+      border: "border-zinc-300",
+      bubbleUser: "bg-zinc-100 border border-zinc-250/80 text-zinc-800",
       bubbleAssistant: "bg-transparent border-transparent text-zinc-800",
       textMuted: "text-zinc-500",
       textBase: "text-zinc-800",
@@ -2266,12 +2267,11 @@ export default function App() {
 
     const pendingTimeoutId = setTimeout(() => {
       if (!connectionSucceeded && !controller.signal.aborted) {
-        thinkingStartTimesRef.current[assistantMsgId] = thinkingStartTimesRef.current[assistantMsgId] || Date.now();
         activeAssistantMsgIdRef.current = assistantMsgId;
         const assistantPlaceholder: Message = {
           id: assistantMsgId,
           role: "model",
-          content: "<think>Thinking...",
+          content: "",
           timestamp: Date.now(),
           thinkingDuration: 0.1,
           routedModelId: rawModel === "automatic" ? apiModel : undefined,

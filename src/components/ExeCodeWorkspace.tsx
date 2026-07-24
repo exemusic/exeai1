@@ -3018,9 +3018,17 @@ body {
                       <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
                       <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
                     </span>
-                    <span className="text-xs text-amber-600 dark:text-amber-400 font-medium truncate">
-                      {isStillThinking ? `Thinking (${elapsed}s)...` : "Applying code modifications..."}
-                    </span>
+                    {isStillThinking ? (
+                      <div className="flex gap-1 items-center">
+                        <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-[bounce_1s_infinite_100ms]" />
+                        <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-[bounce_1s_infinite_200ms]" />
+                        <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-[bounce_1s_infinite_300ms]" />
+                      </div>
+                    ) : (
+                      <span className="text-xs text-amber-600 dark:text-amber-400 font-medium truncate">
+                        Applying code modifications...
+                      </span>
+                    )}
                   </div>
 
                   <button
