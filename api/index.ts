@@ -1,7 +1,10 @@
 import express from "express";
 import dotenv from "dotenv";
 import path from "path";
+import fs from "fs";
 import * as crypto from "crypto";
+import { initializeApp, cert, getApps } from "firebase-admin/app";
+import { getDatabase, Database } from "firebase-admin/database";
 import { GoogleGenAI } from "@google/genai";
 import { createClient } from "@supabase/supabase-js";
 
@@ -72,13 +75,57 @@ app.get("/api/supabase/config", (req, res) => {
   });
 });
 
-// --- FAST IN-MEMORY REALTIME DB CACHE & SUPABASE DATABASE TABLE ENGINE ---
+// --- FIREBASE REALTIME DATABASE ENGINE ---
+const FIREBASE_SERVICE_ACCOUNT_PATH = path.join(process.cwd(), "exechat-data-firebase-adminsdk-fbsvc-61e71a9487.json");
+const FIREBASE_DATABASE_URL = "https://exechat-data-default-rtdb.asia-southeast1.firebasedatabase.app/";
+
+function getFirebaseRtdb(): Database | null {
+  try {
+    if (!getApps().length) {
+      let serviceAccount: any = null;
+      if (fs.existsSync(FIREBASE_SERVICE_ACCOUNT_PATH)) {
+        const raw = fs.readFileSync(FIREBASE_SERVICE_ACCOUNT_PATH, "utf-8");
+        serviceAccount = JSON.parse(raw);
+      } else if (process.env.FIREBASE_SERVICE_ACCOUNT_JSON) {
+        serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON);
+      }
+
+      if (serviceAccount) {
+        initializeApp({
+          credential: cert(serviceAccount),
+          databaseURL: FIREBASE_DATABASE_URL
+        });
+        console.log("Firebase Admin SDK initialized with Realtime Database URL:", FIREBASE_DATABASE_URL);
+      } else {
+        console.warn("Firebase service account file not found at:", FIREBASE_SERVICE_ACCOUNT_PATH);
+      }
+    }
+
+    if (getApps().length) {
+      return getDatabase();
+    }
+  } catch (err) {
+    console.error("Firebase Admin SDK initialization error:", err);
+  }
+  return null;
+}
+
+app.get("/api/firebase/config", (req, res) => {
+  const rtdb = getFirebaseRtdb();
+  res.json({
+    databaseUrl: FIREBASE_DATABASE_URL,
+    isConfigured: !!rtdb,
+    serviceAccountFile: "exechat-data-firebase-adminsdk-fbsvc-61e71a9487.json"
+  });
+});
+
+// --- FAST IN-MEMORY DB CACHE & FIREBASE REALTIME DATABASE ENGINE ---
 const userDbCache = new Map<string, any>(); // key: uid -> full user profile & chats
 const userLangCache = new Map<string, string>(); // key: userKey/uid -> language code
 const userProjectsCache = new Map<string, any[]>(); // key: userKey -> list of projects
 
 // --- USER LANGUAGE DATABASE ENDPOINTS ---
-// Stores user language preference directly in Supabase Database (not Storage)
+// Stores user language preference directly in Firebase Realtime Database
 app.post("/api/user/language/save", async (req, res) => {
   try {
     const { uid, userEmail, language } = req.body;
@@ -91,23 +138,18 @@ app.post("/api/user/language/save", async (req, res) => {
     userLangCache.set(userKey, language);
     if (uid) userLangCache.set(uid, language);
 
-    const supabase = getSupabaseClient();
-    if (supabase) {
-      // Try saving directly to Supabase Database 'user_settings' & 'user_data' tables
+    const rtdb = getFirebaseRtdb();
+    if (rtdb) {
       try {
-        await supabase
-          .from("user_settings")
-          .upsert({ user_key: userKey, language, updated_at: new Date().toISOString() }, { onConflict: "user_key" });
+        await rtdb.ref(`user_settings/${userKey}`).update({ language, updated_at: new Date().toISOString() });
       } catch (dbErr) {}
 
       try {
-        await supabase
-          .from("user_data")
-          .upsert({ uid: userKey, language, updated_at: new Date().toISOString() }, { onConflict: "uid" });
+        await rtdb.ref(`user_data/${userKey}`).update({ language, updated_at: new Date().toISOString() });
       } catch (dbErr) {}
     }
 
-    res.json({ success: true, language, message: "Language successfully saved in database." });
+    res.json({ success: true, language, message: "Language successfully saved in Firebase Realtime Database." });
   } catch (err: any) {
     console.error("Save Language Error:", err);
     res.status(500).json({ error: err.message || "Failed to save language." });
@@ -126,37 +168,26 @@ app.post("/api/user/language/get", async (req, res) => {
       return res.json({ success: true, language: userLangCache.get(uid) });
     }
 
-    const supabase = getSupabaseClient();
-    if (!supabase) {
-      return res.json({ success: true, language: "en" });
+    const rtdb = getFirebaseRtdb();
+    if (rtdb) {
+      try {
+        const snap1 = await rtdb.ref(`user_settings/${userKey}/language`).once("value");
+        if (snap1.exists() && snap1.val()) {
+          const lang = snap1.val();
+          userLangCache.set(userKey, lang);
+          return res.json({ success: true, language: lang });
+        }
+      } catch (dbErr) {}
+
+      try {
+        const snap2 = await rtdb.ref(`user_data/${userKey}/language`).once("value");
+        if (snap2.exists() && snap2.val()) {
+          const lang = snap2.val();
+          userLangCache.set(userKey, lang);
+          return res.json({ success: true, language: lang });
+        }
+      } catch (dbErr) {}
     }
-
-    // Attempt read from Supabase Database 'user_settings' or 'user_data' table
-    try {
-      const { data } = await supabase
-        .from("user_settings")
-        .select("language")
-        .eq("user_key", userKey)
-        .maybeSingle();
-
-      if (data?.language) {
-        userLangCache.set(userKey, data.language);
-        return res.json({ success: true, language: data.language });
-      }
-    } catch (dbErr) {}
-
-    try {
-      const { data } = await supabase
-        .from("user_data")
-        .select("language")
-        .eq("uid", uid || userKey)
-        .maybeSingle();
-
-      if (data?.language) {
-        userLangCache.set(userKey, data.language);
-        return res.json({ success: true, language: data.language });
-      }
-    } catch (dbErr) {}
 
     res.json({ success: true, language: "en" });
   } catch (err: any) {
@@ -205,17 +236,12 @@ app.post("/api/projects/list", async (req, res) => {
     if (userProjectsCache.has(userKey)) {
       projects = userProjectsCache.get(userKey) || [];
     } else {
-      const supabase = getSupabaseClient();
-      if (supabase) {
+      const rtdb = getFirebaseRtdb();
+      if (rtdb) {
         try {
-          const { data } = await supabase
-            .from("user_projects")
-            .select("projects")
-            .eq("user_key", userKey)
-            .maybeSingle();
-
-          if (data && Array.isArray(data.projects)) {
-            projects = data.projects;
+          const snap = await rtdb.ref(`user_projects/${userKey}/projects`).once("value");
+          if (snap.exists() && Array.isArray(snap.val())) {
+            projects = snap.val();
           }
         } catch (e) {}
       }
@@ -237,12 +263,14 @@ app.post("/api/projects/list", async (req, res) => {
 
     userProjectsCache.set(userKey, projects);
 
-    const supabase = getSupabaseClient();
-    if (supabase) {
+    const rtdb = getFirebaseRtdb();
+    if (rtdb) {
       try {
-        await supabase
-          .from("user_projects")
-          .upsert({ user_key: userKey, projects, default_project_name: defaultProjName, updated_at: new Date().toISOString() }, { onConflict: "user_key" });
+        await rtdb.ref(`user_projects/${userKey}`).set({
+          projects,
+          default_project_name: defaultProjName,
+          updated_at: new Date().toISOString()
+        });
       } catch (e) {}
     }
 
@@ -277,17 +305,12 @@ app.post("/api/projects/create", async (req, res) => {
     let currentProjects: any[] = userProjectsCache.get(userKey) || [];
 
     if (currentProjects.length === 0) {
-      const supabase = getSupabaseClient();
-      if (supabase) {
+      const rtdb = getFirebaseRtdb();
+      if (rtdb) {
         try {
-          const { data } = await supabase
-            .from("user_projects")
-            .select("projects")
-            .eq("user_key", userKey)
-            .maybeSingle();
-
-          if (data && Array.isArray(data.projects)) {
-            currentProjects = data.projects;
+          const snap = await rtdb.ref(`user_projects/${userKey}/projects`).once("value");
+          if (snap.exists() && Array.isArray(snap.val())) {
+            currentProjects = snap.val();
           }
         } catch (err) {}
       }
@@ -331,14 +354,16 @@ app.post("/api/projects/create", async (req, res) => {
     currentProjects.push(newProj);
     userProjectsCache.set(userKey, currentProjects);
 
-    const supabase = getSupabaseClient();
-    if (supabase) {
+    const rtdb = getFirebaseRtdb();
+    if (rtdb) {
       try {
-        await supabase
-          .from("user_projects")
-          .upsert({ user_key: userKey, projects: currentProjects, default_project_name: defaultProjName, updated_at: new Date().toISOString() }, { onConflict: "user_key" });
+        await rtdb.ref(`user_projects/${userKey}`).set({
+          projects: currentProjects,
+          default_project_name: defaultProjName,
+          updated_at: new Date().toISOString()
+        });
       } catch (e) {
-        console.error("Database save error on project creation:", e);
+        console.error("Firebase RTDB save error on project creation:", e);
       }
     }
 
@@ -373,17 +398,12 @@ app.post("/api/projects/delete", async (req, res) => {
     let currentProjects: any[] = userProjectsCache.get(userKey) || [];
 
     if (currentProjects.length === 0) {
-      const supabase = getSupabaseClient();
-      if (supabase) {
+      const rtdb = getFirebaseRtdb();
+      if (rtdb) {
         try {
-          const { data } = await supabase
-            .from("user_projects")
-            .select("projects")
-            .eq("user_key", userKey)
-            .maybeSingle();
-
-          if (data && Array.isArray(data.projects)) {
-            currentProjects = data.projects;
+          const snap = await rtdb.ref(`user_projects/${userKey}/projects`).once("value");
+          if (snap.exists() && Array.isArray(snap.val())) {
+            currentProjects = snap.val();
           }
         } catch (err) {}
       }
@@ -403,12 +423,14 @@ app.post("/api/projects/delete", async (req, res) => {
 
     userProjectsCache.set(userKey, updatedProjects);
 
-    const supabase = getSupabaseClient();
-    if (supabase) {
+    const rtdb = getFirebaseRtdb();
+    if (rtdb) {
       try {
-        await supabase
-          .from("user_projects")
-          .upsert({ user_key: userKey, projects: updatedProjects, default_project_name: defaultProjName, updated_at: new Date().toISOString() }, { onConflict: "user_key" });
+        await rtdb.ref(`user_projects/${userKey}`).set({
+          projects: updatedProjects,
+          default_project_name: defaultProjName,
+          updated_at: new Date().toISOString()
+        });
       } catch (e) {}
     }
 
@@ -519,7 +541,7 @@ function getSupabaseClient() {
   return createClient(url, key);
 }
 
-// Endpoint to save complete user profile, chats, language, and username directly in Supabase Database tables
+// Endpoint to save complete user profile, chats, language, and username directly in Firebase Realtime Database
 app.post("/api/db/save-all", async (req, res) => {
   try {
     const { uid, email, userEmail, username, displayName, sessions, language } = req.body;
@@ -550,48 +572,37 @@ app.post("/api/db/save-all", async (req, res) => {
       if (userKey) userLangCache.set(userKey, language);
     }
 
-    const supabase = getSupabaseClient();
-    if (supabase) {
-      // 2. Persist directly into Supabase Database table 'user_data' & 'user_profiles' (NO Storage bucket used)
+    const rtdb = getFirebaseRtdb();
+    if (rtdb) {
       try {
-        await supabase
-          .from("user_data")
-          .upsert({
-            uid,
-            email: effEmail,
-            username,
-            display_name: displayName,
-            language,
-            sessions,
-            data: payload,
-            updated_at: new Date().toISOString()
-          }, { onConflict: "uid" });
+        await rtdb.ref(`user_data/${userKey}`).set(payload);
+        if (uid !== userKey) {
+          await rtdb.ref(`user_data/${uid}`).set(payload);
+        }
       } catch (dbErr) {
-        console.warn("Supabase Database user_data table save notice:", dbErr);
+        console.warn("Firebase RTDB user_data save notice:", dbErr);
       }
 
       try {
-        await supabase
-          .from("user_profiles")
-          .upsert({
-            uid,
-            email: effEmail,
-            username,
-            display_name: displayName,
-            language,
-            updated_at: new Date().toISOString()
-          }, { onConflict: "uid" });
+        await rtdb.ref(`user_profiles/${userKey}`).set({
+          uid,
+          email: effEmail,
+          username,
+          displayName,
+          language,
+          updatedAt: Date.now()
+        });
       } catch (dbErr) {}
     }
 
-    res.json({ success: true, message: "All user permanent data successfully saved in Supabase database tables." });
+    res.json({ success: true, message: "All user permanent data successfully saved in Firebase Realtime Database." });
   } catch (err: any) {
-    console.error("Supabase DB Save Error:", err);
-    res.status(500).json({ error: err.message || "Failed to save data to Supabase database." });
+    console.error("Firebase RTDB Save Error:", err);
+    res.status(500).json({ error: err.message || "Failed to save data to Firebase Realtime Database." });
   }
 });
 
-// Endpoint to load user profile and chats directly from Supabase Database tables
+// Endpoint to load user profile and chats directly from Firebase Realtime Database
 app.post("/api/db/load-all", async (req, res) => {
   try {
     const { uid, email, userEmail } = req.body;
@@ -613,33 +624,20 @@ app.post("/api/db/load-all", async (req, res) => {
       return res.json({ found: true, data: userDbCache.get(effEmail.toLowerCase()) });
     }
 
-    const supabase = getSupabaseClient();
-    if (!supabase) {
+    const rtdb = getFirebaseRtdb();
+    if (!rtdb) {
       return res.json({ found: false });
     }
 
-    // 2. Query Supabase Database table 'user_data' by uid OR email
+    // 2. Query Firebase Realtime Database 'user_data' by userKey or uid
     try {
-      let query = supabase.from("user_data").select("*");
-      if (uid && effEmail) {
-        query = query.or(`uid.eq.${uid},email.eq.${effEmail}`);
-      } else if (uid) {
-        query = query.eq("uid", uid);
-      } else if (effEmail) {
-        query = query.eq("email", effEmail);
+      let snap = await rtdb.ref(`user_data/${userKey}`).once("value");
+      if (!snap.exists() && uid) {
+        snap = await rtdb.ref(`user_data/${uid}`).once("value");
       }
 
-      const { data, error } = await query.maybeSingle();
-
-      if (!error && data) {
-        const parsedData = data.data || {
-          uid: data.uid,
-          email: data.email,
-          username: data.username,
-          displayName: data.display_name,
-          language: data.language,
-          sessions: data.sessions
-        };
+      if (snap.exists() && snap.val()) {
+        const parsedData = snap.val();
         if (uid) userDbCache.set(uid, parsedData);
         if (userKey) userDbCache.set(userKey, parsedData);
         if (effEmail) userDbCache.set(effEmail.toLowerCase(), parsedData);
@@ -647,58 +645,93 @@ app.post("/api/db/load-all", async (req, res) => {
       }
     } catch (err) {}
 
-    // 3. Fallback: Query 'user_profiles' table
+    // 3. Fallback: Query 'user_profiles' node
     try {
-      const { data, error } = await supabase
-        .from("user_profiles")
-        .select("*")
-        .eq("uid", uid)
-        .maybeSingle();
-
-      if (!error && data) {
-        const parsedData = {
-          uid: data.uid,
-          email: data.email,
-          username: data.username,
-          displayName: data.display_name,
-          language: data.language
-        };
+      let snap = await rtdb.ref(`user_profiles/${userKey}`).once("value");
+      if (snap.exists() && snap.val()) {
+        const parsedData = snap.val();
         if (uid) userDbCache.set(uid, parsedData);
         return res.json({ found: true, data: parsedData });
       }
     } catch (err) {}
 
+    // 4. Auto-migration Fallback: Try loading from Supabase Storage & automatically migrate to Firebase RTDB
+    try {
+      const supabase = getSupabaseClient();
+      if (supabase) {
+        const pathsToTry = [
+          `user_data/${userKey}.json`,
+          `user_data/${uid}.json`,
+          `users/${userKey}/user_data.json`,
+          `users/${uid}/user_data.json`,
+          `profiles/${userKey}.json`
+        ];
+        const bucketsToTry = ["execode", "exeai-users", "user-data"];
+
+        for (const b of bucketsToTry) {
+          for (const p of pathsToTry) {
+            try {
+              const { data: fileBlob, error: downloadErr } = await supabase.storage.from(b).download(p);
+              if (!downloadErr && fileBlob) {
+                const text = await fileBlob.text();
+                const parsedData = JSON.parse(text);
+                if (parsedData) {
+                  // Migrate automatically to Firebase RTDB!
+                  if (userKey) {
+                    await rtdb.ref(`user_data/${userKey}`).set(parsedData);
+                    userDbCache.set(userKey, parsedData);
+                  }
+                  if (uid) {
+                    await rtdb.ref(`user_data/${uid}`).set(parsedData);
+                    userDbCache.set(uid, parsedData);
+                  }
+                  console.log(`[Auto-Migration] Successfully migrated user data for ${userKey || uid} from Supabase bucket '${b}' to Firebase RTDB.`);
+                  return res.json({ found: true, data: parsedData, migrated: true });
+                }
+              }
+            } catch (innerErr) {}
+          }
+        }
+      }
+    } catch (migErr) {
+      console.warn("Auto-migration check failed:", migErr);
+    }
+
     res.json({ found: false });
   } catch (err: any) {
-    console.error("Supabase DB Load Error:", err);
-    res.status(500).json({ error: err.message || "Failed to load data from Supabase database." });
+    console.error("Firebase RTDB Load Error:", err);
+    res.status(500).json({ error: err.message || "Failed to load data from Firebase Realtime Database." });
   }
 });
 
 // Endpoint to clear user data completely from permanent database
 app.post("/api/db/clear-all", async (req, res) => {
   try {
-    const { uid } = req.body;
+    const { uid, userEmail } = req.body;
     if (!uid) {
       return res.status(400).json({ error: "Missing user uid" });
     }
 
+    const userKey = getSanitizedUserKey(uid, userEmail);
     userDbCache.delete(uid);
+    if (userKey) userDbCache.delete(userKey);
 
-    const supabase = getSupabaseClient();
-    if (supabase) {
+    const rtdb = getFirebaseRtdb();
+    if (rtdb) {
       try {
-        await supabase.from("user_data").delete().eq("uid", uid);
+        await rtdb.ref(`user_data/${userKey}`).remove();
+        await rtdb.ref(`user_data/${uid}`).remove();
       } catch (err) {}
 
       try {
-        await supabase.from("user_profiles").delete().eq("uid", uid);
+        await rtdb.ref(`user_profiles/${userKey}`).remove();
+        await rtdb.ref(`user_profiles/${uid}`).remove();
       } catch (err) {}
     }
 
-    res.json({ success: true, message: "User permanent database completely purged." });
+    res.json({ success: true, message: "User permanent database completely purged from Firebase Realtime Database." });
   } catch (err: any) {
-    console.error("Supabase DB Clear Error:", err);
+    console.error("Firebase RTDB Clear Error:", err);
     res.status(500).json({ error: err.message || "Failed to clear database." });
   }
 });
@@ -707,8 +740,8 @@ app.post("/api/db/clear-all", async (req, res) => {
 app.post("/api/db/metrics", async (req, res) => {
   try {
     const { uid } = req.body;
-    const supabase = getSupabaseClient();
-    if (!supabase) {
+    const rtdb = getFirebaseRtdb();
+    if (!rtdb) {
       return res.json({ connected: false, totalBytes: 0, limitBytes: 52428800 });
     }
 
@@ -722,7 +755,8 @@ app.post("/api/db/metrics", async (req, res) => {
       connected: true,
       totalBytes,
       limitBytes: 52428800,
-      formattedSize: (totalBytes / 1024).toFixed(2) + " KB"
+      formattedSize: (totalBytes / 1024).toFixed(2) + " KB",
+      engine: "Firebase Realtime Database"
     });
   } catch (err) {
     res.json({ connected: false, totalBytes: 0, limitBytes: 52428800 });
@@ -1807,6 +1841,13 @@ app.post("/api/chat/stream", async (req, res) => {
     const { messages, temperature, model = "gemma-4-31b", webSearchEnabled = false } = req.body;
     let systemInstruction = req.body.systemInstruction;
 
+    const languageInstruction = "\n\n[CRITICAL LANGUAGE CONSISTENCY & DETECTION DIRECTIVE]:\n" +
+      "1. ALWAYS detect and strictly match the language of the user's input/prompt before responding.\n" +
+      "2. If the user prompt is in Japanese (日本語 - containing Hiragana, Katakana, Kanji, or Japanese text/words), your response AFTER </think> MUST BE 100% IN JAPANESE. Do not switch to English!\n" +
+      "3. If the user prompt is in Indonesian (Bahasa Indonesia), your response AFTER </think> MUST BE 100% IN INDONESIAN. Do not switch to English!\n" +
+      "4. If the user prompt is in any other specific language (Spanish, French, German, Arabic, Chinese, etc.), respond strictly in that exact language.\n" +
+      "5. The reasoning inside <think>...</think> can be brief or in English/user language, but the final response AFTER </think> MUST BE strictly in the user's input language!";
+
     const linkInstruction = "\n\n[IMPORTANT RULES CONCERNING LINKS/URLS]:\n" +
       "1. NEVER truncate/cut URLs or use ellipsis characters (bad example: 'https://drive.google.com/…', 'https://www.dropbox.com/…').\n" +
       "2. Always write fully functional, complete, and valid URLs from official, reputable websites (e.g., 'https://drive.google.com', 'https://www.dropbox.com', 'https://wetransfer.com', 'https://www.pcloud.com').\n" +
@@ -1854,7 +1895,7 @@ app.post("/api/chat/stream", async (req, res) => {
       "2. STAIN & PRIVACY RULE: NEVER mention, acknowledge, or reveal any underlying third-party base models, engines, or architecture names (such as Gemma, GPT, Llama, Zai, Claude, Gemini, Groq, Cerebras, etc.).\n" +
       "3. If any user asks about your underlying model, engine, architecture, or who built your model, state strictly that you are powered by ExeChat's custom proprietary ExeAi architecture developed by Hexky and Chika Ravita.";
 
-    systemInstruction = (systemInstruction || "You are ExeAi, an advanced AI assistant that is highly intelligent, friendly, and helpful.") + thinkInstruction + linkInstruction + designInstruction + modernEventInstruction + userRequestedPersonality + imageLimitInstruction + modelPrivacyInstruction;
+    systemInstruction = (systemInstruction || "You are ExeAi, an advanced AI assistant that is highly intelligent, friendly, and helpful.") + languageInstruction + thinkInstruction + linkInstruction + designInstruction + modernEventInstruction + userRequestedPersonality + imageLimitInstruction + modelPrivacyInstruction;
 
     if (!messages || !Array.isArray(messages)) {
       res.write(`data: ${JSON.stringify({ error: "Invalid or missing messages array" })}\n\n`);

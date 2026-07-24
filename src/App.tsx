@@ -204,10 +204,10 @@ function TypewriterMessage({
     <div className="flex flex-col">
       {/* 1. THINKING PROCESS BLOCK (3-DOT ANIMATION, EXPANDABLE WHEN COMPLETE) */}
       {effectiveIsThinking ? (
-        <div className="mb-3 font-sans select-none align-baseline flex items-center gap-1.5 text-xs text-amber-500 dark:text-amber-400 font-medium bg-amber-500/10 px-3.5 py-2 rounded-xl border border-amber-500/20 w-fit">
-          <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-[bounce_1s_infinite_100ms]" />
-          <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-[bounce_1s_infinite_200ms]" />
-          <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-[bounce_1s_infinite_300ms]" />
+        <div className="mb-3 font-sans select-none align-baseline flex items-center gap-1.5 text-xs text-zinc-500 dark:text-zinc-400 font-medium bg-zinc-100 dark:bg-zinc-900/60 px-3.5 py-2 rounded-xl border border-zinc-200 dark:border-zinc-800 w-fit">
+          <span className="h-1.5 w-1.5 rounded-full bg-zinc-500 dark:bg-zinc-400 animate-[bounce_1s_infinite_100ms]" />
+          <span className="h-1.5 w-1.5 rounded-full bg-zinc-500 dark:bg-zinc-400 animate-[bounce_1s_infinite_200ms]" />
+          <span className="h-1.5 w-1.5 rounded-full bg-zinc-500 dark:bg-zinc-400 animate-[bounce_1s_infinite_300ms]" />
         </div>
       ) : effectiveThinking !== null ? (
         <div className="mb-3 font-sans select-none align-baseline flex flex-col items-start">
@@ -474,7 +474,7 @@ export default function App() {
   const [searchQuery, setSearchQuery] = useState("");
 
   const [selectedPresetId, setSelectedPresetId] = useState("default");
-  const [selectedModelId, setSelectedModelId] = useState("gemma-4-31b");
+  const [selectedModelId, setSelectedModelId] = useState("automatic");
   const [globalWebSearchEnabled, setGlobalWebSearchEnabled] = useState(false);
   const [temperature, setTemperature] = useState(0.7);
   const [showSettings, setShowSettings] = useState(false);
@@ -1343,12 +1343,12 @@ export default function App() {
       sidebarBg: "bg-black",
       sectionBg: "bg-black/60",
       border: "border-zinc-900/80",
-      bubbleUser: "bg-zinc-900 border border-zinc-850 text-zinc-100",
+      bubbleUser: "bg-zinc-900 border border-zinc-800 text-zinc-100",
       bubbleAssistant: "bg-transparent border-transparent text-zinc-200",
       textMuted: "text-zinc-500",
-      textBase: "text-zinc-350",
+      textBase: "text-zinc-300",
       textTitle: "text-zinc-100",
-      accentColor: "bg-zinc-900 hover:bg-zinc-850 text-white",
+      accentColor: "bg-zinc-900 hover:bg-zinc-800 text-white",
       scrollbarClass: "scrollbar-thin scrollbar-thumb-zinc-900",
       gradient: "from-black/40 via-transparent to-transparent",
     },
@@ -1358,13 +1358,13 @@ export default function App() {
       mainBg: "bg-white",
       sidebarBg: "bg-zinc-100",
       sectionBg: "bg-zinc-100/80",
-      border: "border-zinc-300",
-      bubbleUser: "bg-zinc-100 border border-zinc-250/80 text-zinc-800",
-      bubbleAssistant: "bg-transparent border-transparent text-zinc-800",
+      border: "border-zinc-200",
+      bubbleUser: "bg-zinc-100 border border-zinc-200 text-zinc-900",
+      bubbleAssistant: "bg-transparent border-transparent text-zinc-900",
       textMuted: "text-zinc-500",
       textBase: "text-zinc-800",
       textTitle: "text-zinc-900",
-      accentColor: "bg-zinc-900 hover:bg-zinc-850 text-white",
+      accentColor: "bg-zinc-900 hover:bg-zinc-800 text-white",
       scrollbarClass: "scrollbar-thin scrollbar-thumb-zinc-300",
       gradient: "from-zinc-100/25 via-transparent to-transparent",
     },
@@ -2212,6 +2212,7 @@ export default function App() {
     const assistantMsgId = "msg_" + Date.now() + "_assistant";
 
     activeAssistantMsgIdRef.current = assistantMsgId;
+    thinkingStartTimesRef.current[assistantMsgId] = Date.now();
 
     setIsGenerating(true);
     scrollToBottom("smooth");
@@ -3279,7 +3280,7 @@ export default function App() {
   };
 
   const renderSidebarContent = (isMobile = false) => (
-    <div className={`flex flex-col h-full w-full ${curTheme.sidebarBg} ${isDark ? "text-zinc-150" : "text-zinc-800"} select-none`}>
+    <div className={`flex flex-col h-full w-full ${curTheme.sidebarBg} ${isDark ? "text-zinc-100" : "text-zinc-900"} select-none`}>
       <div className={`p-5 border-b ${curTheme.border} flex items-center justify-between shrink-0`}>
         <div className="flex items-center gap-3">
           <ExeChatLogo className="h-5 w-5 shrink-0" size={20} />
@@ -3295,7 +3296,7 @@ export default function App() {
             <button
               onClick={() => setIsMobileSidebarOpen(false)}
               className={`p-1.5 rounded-lg border border-transparent transition-all duration-200 cursor-pointer ${
-                isDark ? "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50" : "text-zinc-650 hover:text-zinc-900 hover:bg-zinc-200/50"
+                isDark ? "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50" : "text-zinc-600 hover:text-zinc-900 hover:bg-zinc-200/50"
               }`}
               title="Close Sidebar"
             >
@@ -3305,7 +3306,7 @@ export default function App() {
             <button
               onClick={() => setIsDesktopSidebarOpen(false)}
               className={`p-1.5 rounded-lg border border-transparent transition-all duration-200 cursor-pointer ${
-                isDark ? "border-transparent text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50" : "border-transparent text-zinc-650 hover:text-zinc-900 hover:bg-zinc-200/50"
+                isDark ? "border-transparent text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50" : "border-transparent text-zinc-600 hover:text-zinc-900 hover:bg-zinc-200/50"
               }`}
               title="Close Chat History"
             >
@@ -3326,7 +3327,7 @@ export default function App() {
           }}
           className={`w-full flex items-center justify-center gap-2 rounded-xl font-semibold py-3 px-4 transition-all duration-200 text-sm tracking-wide border ${
             isDark 
-              ? "bg-zinc-900 hover:bg-zinc-850 text-zinc-100 border-zinc-800 hover:border-zinc-750 shadow-sm" 
+              ? "bg-zinc-900 hover:bg-zinc-800 text-zinc-100 border-zinc-800 hover:border-zinc-700 shadow-sm" 
               : "bg-white hover:bg-zinc-50 text-zinc-900 border-zinc-200 shadow-sm"
           }`}
         >
@@ -3345,8 +3346,8 @@ export default function App() {
             showExeCode
               ? "bg-amber-500/20 text-amber-500 border-amber-500/40"
               : isDark 
-                ? "bg-zinc-900 hover:bg-zinc-850 text-zinc-200 border-zinc-800" 
-                : "bg-white hover:bg-zinc-50 text-zinc-700 border-zinc-200"
+                ? "bg-zinc-900 hover:bg-zinc-800 text-zinc-200 border-zinc-800" 
+                : "bg-white hover:bg-zinc-50 text-zinc-800 border-zinc-200"
           }`}
         >
           <Code className="h-4 w-4 text-amber-500" />
@@ -3365,7 +3366,7 @@ export default function App() {
             className={`w-full pl-10 pr-4 py-2.5 rounded-xl text-sm transition-all duration-200 focus:outline-none border ${
               isDark 
                 ? "border-zinc-800/80 bg-black/40 text-zinc-300 placeholder-zinc-600 focus:border-zinc-700 focus:bg-black/70" 
-                : "border-zinc-200 bg-zinc-100/50 text-zinc-850 placeholder-zinc-400 focus:border-zinc-300 focus:bg-white"
+                : "border-zinc-200 bg-zinc-100/80 text-zinc-900 placeholder-zinc-500 focus:border-zinc-300 focus:bg-white"
             }`}
           />
           {searchQuery && (
@@ -3385,7 +3386,7 @@ export default function App() {
           <button
             onClick={() => setIsHistoryCollapsed(!isHistoryCollapsed)}
             className={`flex items-center gap-1 text-xs font-bold uppercase tracking-wider transition-colors hover:opacity-85 ${
-              isDark ? "text-zinc-400 hover:text-zinc-200" : "text-zinc-650 hover:text-zinc-900"
+              isDark ? "text-zinc-400 hover:text-zinc-200" : "text-zinc-600 hover:text-zinc-900"
             }`}
           >
             <span>History</span>
@@ -3463,18 +3464,18 @@ export default function App() {
                                   isActive
                                     ? isDark
                                       ? "bg-zinc-800 border-zinc-700/50 text-zinc-100 font-medium"
-                                      : "bg-zinc-100 border-zinc-200 text-zinc-900 font-medium shadow-sm"
+                                      : "bg-zinc-200/90 border-zinc-300 text-zinc-900 font-semibold shadow-sm"
                                     : isDark
-                                      ? "border-transparent text-zinc-400 hover:bg-zinc-850 hover:text-zinc-200"
-                                      : "border-transparent text-zinc-650 hover:bg-zinc-100/60 hover:text-zinc-900"
+                                      ? "border-transparent text-zinc-400 hover:bg-zinc-800/80 hover:text-zinc-200"
+                                      : "border-transparent text-zinc-700 hover:bg-zinc-200/60 hover:text-zinc-900"
                                 }`}
                               >
                                 <div className="flex items-center gap-2.5 min-w-0 flex-1">
                                   <MessageSquare
                                     className={`h-4 w-4 shrink-0 transition-colors ${
                                       isActive 
-                                        ? isDark ? "text-zinc-300" : "text-zinc-700" 
-                                        : isDark ? "text-zinc-500 group-hover:text-zinc-400" : "text-zinc-400 group-hover:text-zinc-600"
+                                        ? isDark ? "text-zinc-300" : "text-zinc-800" 
+                                        : isDark ? "text-zinc-500 group-hover:text-zinc-400" : "text-zinc-600 group-hover:text-zinc-800"
                                     }`}
                                   />
                                   {isEditing ? (
@@ -3638,7 +3639,7 @@ export default function App() {
                   }
                 }}
                 className={`p-1.5 rounded-lg transition-all duration-200 cursor-pointer ${
-                  isDark ? "text-zinc-400 hover:text-white hover:bg-zinc-800/50" : "text-zinc-650 hover:text-zinc-900 hover:bg-zinc-200/50"
+                  isDark ? "text-zinc-400 hover:text-white hover:bg-zinc-800/50" : "text-zinc-700 hover:text-zinc-900 hover:bg-zinc-200/50"
                 }`}
                 title={getTranslation("settings", userLanguage)}
               >
@@ -3650,7 +3651,11 @@ export default function App() {
           <div className="flex items-center justify-between w-full gap-2">
             <button
               onClick={handleGoogleLoginClick}
-              className="flex-1 text-center text-[10px] text-zinc-400 hover:text-zinc-200 bg-zinc-900/10 border border-dashed border-zinc-800 hover:border-zinc-700 rounded-xl py-2 transition-all font-sans"
+              className={`flex-1 text-center text-[10px] rounded-xl py-2 transition-all font-sans ${
+                isDark
+                  ? "text-zinc-400 hover:text-zinc-200 bg-zinc-900/10 border border-dashed border-zinc-800 hover:border-zinc-700"
+                  : "text-zinc-700 hover:text-zinc-900 bg-zinc-100 border border-dashed border-zinc-300 hover:border-zinc-400"
+              }`}
             >
               Sign in with Google
             </button>
@@ -3663,7 +3668,7 @@ export default function App() {
                 }
               }}
               className={`p-1.5 rounded-lg transition-all duration-200 cursor-pointer shrink-0 ${
-                isDark ? "text-zinc-400 hover:text-white hover:bg-zinc-800/50" : "text-zinc-650 hover:text-zinc-900 hover:bg-zinc-200/50"
+                isDark ? "text-zinc-400 hover:text-white hover:bg-zinc-800/50" : "text-zinc-700 hover:text-zinc-900 hover:bg-zinc-200/50"
               }`}
               title={getTranslation("settings", userLanguage)}
             >
@@ -3800,7 +3805,7 @@ export default function App() {
   }
 
   return (
-    <div style={{ height: viewportHeight }} className="flex w-full overflow-hidden bg-black font-sans text-zinc-100 antialiased selection:bg-zinc-700/80">
+    <div style={{ height: viewportHeight }} className={`flex w-full overflow-hidden ${curTheme.outerBg} font-sans ${isDark ? "text-zinc-100" : "text-zinc-900"} antialiased selection:bg-zinc-700/80`}>
       <input
         ref={fileInputRef}
         type="file"
@@ -3842,7 +3847,7 @@ export default function App() {
                 <button
                   onClick={() => setIsDesktopSidebarOpen(true)}
                   className={`p-2 rounded-xl transition-all duration-200 cursor-pointer ${
-                    isDark ? "text-zinc-400 hover:text-white hover:bg-zinc-800/50" : "text-zinc-650 hover:text-zinc-900 hover:bg-zinc-200/50"
+                    isDark ? "text-zinc-400 hover:text-white hover:bg-zinc-800/50" : "text-zinc-700 hover:text-zinc-900 hover:bg-zinc-200/50"
                   }`}
                   title="Expand Sidebar"
                 >
@@ -3857,8 +3862,8 @@ export default function App() {
                     setShowSettings(false);
                     setShowExeCode(false);
                   }}
-                  className={`p-2 rounded-xl hover:bg-zinc-550/10 transition-all duration-200 cursor-pointer ${
-                    isDark ? "text-zinc-400 hover:text-white" : "text-zinc-650 hover:text-zinc-900"
+                  className={`p-2 rounded-xl hover:bg-zinc-500/10 transition-all duration-200 cursor-pointer ${
+                    isDark ? "text-zinc-400 hover:text-white" : "text-zinc-700 hover:text-zinc-900"
                   }`}
                   title="New Chat"
                 >
@@ -3871,8 +3876,8 @@ export default function App() {
                     setShowSearchModal(true);
                     playNotifySound();
                   }}
-                  className={`p-2 rounded-xl hover:bg-zinc-550/10 transition-all duration-200 cursor-pointer ${
-                    isDark ? "text-zinc-400 hover:text-white" : "text-zinc-650 hover:text-zinc-900"
+                  className={`p-2 rounded-xl hover:bg-zinc-500/10 transition-all duration-200 cursor-pointer ${
+                    isDark ? "text-zinc-400 hover:text-white" : "text-zinc-700 hover:text-zinc-900"
                   }`}
                   title="Search Conversations"
                 >
@@ -3891,7 +3896,7 @@ export default function App() {
                   className={`hidden md:flex p-2 rounded-xl transition-all duration-200 cursor-pointer ${
                     showExeCode 
                       ? "bg-amber-500/10 text-amber-500" 
-                      : `hover:bg-zinc-500/10 ${isDark ? "text-zinc-400 hover:text-white" : "text-zinc-650 hover:text-zinc-900"}`
+                      : `hover:bg-zinc-500/10 ${isDark ? "text-zinc-400 hover:text-white" : "text-zinc-700 hover:text-zinc-900"}`
                   }`}
                   title="ExeCode Workspace"
                 >
@@ -3926,7 +3931,7 @@ export default function App() {
                   className={`p-2 rounded-xl transition-all duration-200 cursor-pointer ${
                     showSettings 
                       ? "bg-[#1a73e8]/10 text-[#1a73e8]" 
-                      : `hover:bg-zinc-500/10 ${isDark ? "text-zinc-400 hover:text-white" : "text-zinc-650 hover:text-zinc-900"}`
+                      : `hover:bg-zinc-500/10 ${isDark ? "text-zinc-400 hover:text-white" : "text-zinc-700 hover:text-zinc-900"}`
                   }`}
                   title="Settings"
                 >
@@ -4173,7 +4178,7 @@ export default function App() {
                                   className={`absolute bottom-full left-0 mb-2 w-44 rounded-xl p-1.5 shadow-xl border z-50 transition-all ${
                                     isDark 
                                       ? "bg-zinc-900/95 border-zinc-800 text-zinc-100 backdrop-blur-md" 
-                                      : "bg-white/95 border-zinc-250 text-zinc-900 backdrop-blur-md"
+                                      : "bg-white/95 border-zinc-200 text-zinc-900 backdrop-blur-md shadow-lg"
                                   }`}
                                 >
                                   <button
@@ -4184,7 +4189,7 @@ export default function App() {
                                     className={`flex items-center gap-2.5 w-full text-left px-3 py-2 text-xs md:text-sm font-semibold transition-colors rounded-lg cursor-pointer ${
                                       isDark 
                                         ? "hover:bg-zinc-800 text-zinc-300 hover:text-white" 
-                                        : "hover:bg-zinc-150 text-zinc-700 hover:text-zinc-900"
+                                        : "hover:bg-zinc-100 text-zinc-700 hover:text-zinc-900"
                                     }`}
                                   >
                                     <Paperclip className="h-4 w-4 text-amber-500 shrink-0" />
@@ -4232,7 +4237,6 @@ export default function App() {
                           >
                             <Cpu className="h-3 w-3 text-purple-500 shrink-0" />
                             <span className="truncate">{activeModel.name}</span>
-                            <ChevronDown className="h-3 w-3 text-zinc-500 shrink-0" />
                           </button>
 
                           <button
@@ -4605,27 +4609,11 @@ export default function App() {
                       const isStillThinking = latestMsg.content === "" || isThinking;
 
                       if (isStillThinking) {
-                        const elapsed = typeof latestMsg.thinkingDuration === "number" 
-                          ? latestMsg.thinkingDuration.toFixed(1) 
-                          : "0.1";
-
                         return (
-                          <div className="flex items-center gap-2 text-zinc-500 pl-0 md:pl-1 py-1.5 text-[11px] md:text-xs select-none font-sans">
-                            <span className="relative flex h-2 w-2">
-                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
-                              <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
-                            </span>
-                            <span className="font-medium animate-pulse text-amber-600 dark:text-amber-450">
-                              {(() => {
-                                if (latestMsg.routedModelId) {
-                                  const matchedModel = MODEL_OPTIONS.find(m => m.id === latestMsg.routedModelId);
-                                  const modelDisplayName = matchedModel ? matchedModel.name : latestMsg.routedModelId;
-                                  const cleanName = modelDisplayName.split(" (")[0];
-                                  return `Loading model ${cleanName} (${elapsed}s)...`;
-                                }
-                                return `Thinking (${elapsed}s)...`;
-                              })()}
-                            </span>
+                          <div className="flex items-center gap-1.5 text-zinc-400 dark:text-zinc-500 pl-0 md:pl-1 py-1.5 text-xs select-none font-sans">
+                            <span className="h-1.5 w-1.5 rounded-full bg-zinc-400 dark:bg-zinc-500 animate-[bounce_1s_infinite_100ms]" />
+                            <span className="h-1.5 w-1.5 rounded-full bg-zinc-400 dark:bg-zinc-500 animate-[bounce_1s_infinite_200ms]" />
+                            <span className="h-1.5 w-1.5 rounded-full bg-zinc-400 dark:bg-zinc-500 animate-[bounce_1s_infinite_300ms]" />
                           </div>
                         );
                       }
@@ -4719,7 +4707,7 @@ export default function App() {
                                   className={`absolute bottom-full left-0 mb-2 w-44 rounded-xl p-1.5 shadow-xl border z-50 transition-all ${
                                     isDark 
                                       ? "bg-zinc-900/95 border-zinc-800 text-zinc-100 backdrop-blur-md" 
-                                      : "bg-white/95 border-zinc-250 text-zinc-900 backdrop-blur-md"
+                                      : "bg-white/95 border-zinc-200 text-zinc-900 backdrop-blur-md shadow-lg"
                                   }`}
                                 >
                                   <button
@@ -4730,7 +4718,7 @@ export default function App() {
                                     className={`flex items-center gap-2.5 w-full text-left px-3 py-2 text-xs md:text-sm font-semibold transition-colors rounded-lg cursor-pointer ${
                                       isDark 
                                         ? "hover:bg-zinc-800 text-zinc-300 hover:text-white" 
-                                        : "hover:bg-zinc-150 text-zinc-700 hover:text-zinc-900"
+                                        : "hover:bg-zinc-100 text-zinc-700 hover:text-zinc-900"
                                     }`}
                                   >
                                     <Paperclip className="h-4 w-4 text-amber-500 shrink-0" />
@@ -4783,7 +4771,6 @@ export default function App() {
                         <span className="truncate max-w-[80px] sm:max-w-[130px] font-sans text-[10px] md:text-[11px]">
                           {activeModel.name}
                         </span>
-                        <ChevronDown className="h-3 w-3 text-purple-400 shrink-0" />
                       </button>
 
                       {isGenerating ? (

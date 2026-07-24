@@ -3012,20 +3012,16 @@ body {
                 : "0.1";
 
               return (
-                <div className="flex items-center justify-between gap-2 py-2 px-3 my-1 rounded-xl border border-amber-500/20 bg-amber-500/5 select-none font-sans">
+                <div className="flex items-center justify-between gap-2 py-2 px-3 my-1 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50 select-none font-sans">
                   <div className="flex items-center gap-2 min-w-0">
-                    <span className="relative flex h-2 w-2 shrink-0">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
-                    </span>
                     {isStillThinking ? (
-                      <div className="flex gap-1 items-center">
-                        <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-[bounce_1s_infinite_100ms]" />
-                        <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-[bounce_1s_infinite_200ms]" />
-                        <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-[bounce_1s_infinite_300ms]" />
+                      <div className="flex gap-1.5 items-center">
+                        <span className="h-1.5 w-1.5 rounded-full bg-zinc-500 dark:bg-zinc-400 animate-[bounce_1s_infinite_100ms]" />
+                        <span className="h-1.5 w-1.5 rounded-full bg-zinc-500 dark:bg-zinc-400 animate-[bounce_1s_infinite_200ms]" />
+                        <span className="h-1.5 w-1.5 rounded-full bg-zinc-500 dark:bg-zinc-400 animate-[bounce_1s_infinite_300ms]" />
                       </div>
                     ) : (
-                      <span className="text-xs text-amber-600 dark:text-amber-400 font-medium truncate">
+                      <span className="text-xs text-zinc-600 dark:text-zinc-400 font-medium truncate">
                         Applying code modifications...
                       </span>
                     )}
