@@ -243,7 +243,7 @@ function TypewriterMessage({
       {/* 2. CHAT RESPONSE OR LOADING / ERROR BLOCK */}
       {actual ? (
         <MarkdownRenderer content={actual} />
-      ) : isGenerating ? (
+      ) : isGenerating && !effectiveIsThinking ? (
         <div className="flex items-center gap-2 py-2 select-none">
           <span className="h-1.5 w-1.5 rounded-full bg-zinc-500 animate-[bounce_1s_infinite_100ms]" />
           <span className="h-1.5 w-1.5 rounded-full bg-zinc-500 animate-[bounce_1s_infinite_200ms]" />
@@ -4637,27 +4637,6 @@ export default function App() {
                         </motion.div>
                       );
                     })}
-
-                    {(() => {
-                      if (!isGenerating) return null;
-                      const latestMsg = currentSession.messages[currentSession.messages.length - 1];
-                      if (!latestMsg || latestMsg.role !== "model") return null;
-
-                      const { isThinking } = parseMessageThinking(latestMsg.content || "");
-                      const isStillThinking = latestMsg.content === "" || isThinking;
-
-                      if (isStillThinking) {
-                        return (
-                          <div className="flex items-center gap-1.5 text-zinc-400 dark:text-zinc-500 pl-0 md:pl-1 py-1.5 text-xs select-none font-sans">
-                            <span className="h-1.5 w-1.5 rounded-full bg-zinc-400 dark:bg-zinc-500 animate-[bounce_1s_infinite_100ms]" />
-                            <span className="h-1.5 w-1.5 rounded-full bg-zinc-400 dark:bg-zinc-500 animate-[bounce_1s_infinite_200ms]" />
-                            <span className="h-1.5 w-1.5 rounded-full bg-zinc-400 dark:bg-zinc-500 animate-[bounce_1s_infinite_300ms]" />
-                          </div>
-                        );
-                      }
-
-                      return null;
-                    })()}
                   </div>
                 )}
 

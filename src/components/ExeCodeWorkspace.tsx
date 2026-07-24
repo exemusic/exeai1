@@ -2693,14 +2693,6 @@ body {
             <MarkdownRenderer content={actual} />
           </div>
         )}
-
-        {isThinking && (
-          <div className="flex items-center gap-1.5 py-1 select-none">
-            <span className="h-1 w-1 rounded-full bg-zinc-500 animate-[bounce_1s_infinite_100ms]" />
-            <span className="h-1 w-1 rounded-full bg-zinc-500 animate-[bounce_1s_infinite_200ms]" />
-            <span className="h-1 w-1 rounded-full bg-zinc-500 animate-[bounce_1s_infinite_300ms]" />
-          </div>
-        )}
       </div>
     );
   };
