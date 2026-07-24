@@ -80,7 +80,7 @@ const FIREBASE_SECRET_PATHS = [
   path.join(process.cwd(), ".secrets", "firebase-service-account.json"),
   path.join(process.cwd(), "exechat-data-firebase-adminsdk-fbsvc-61e71a9487.json")
 ];
-const FIREBASE_DATABASE_URL = "https://exechat-data-default-rtdb.asia-southeast1.firebasedatabase.app/";
+const FIREBASE_DATABASE_URL = process.env.VITE_FIREBASE_DATABASE_URL || "https://exechat-data-default-rtdb.asia-southeast1.firebasedatabase.app/";
 
 function getFirebaseRtdb(): Database | null {
   try {
@@ -88,13 +88,28 @@ function getFirebaseRtdb(): Database | null {
       let serviceAccount: any = null;
       for (const secretPath of FIREBASE_SECRET_PATHS) {
         if (fs.existsSync(secretPath)) {
-          const raw = fs.readFileSync(secretPath, "utf-8");
-          serviceAccount = JSON.parse(raw);
-          break;
+          try {
+            const raw = fs.readFileSync(secretPath, "utf-8");
+            serviceAccount = JSON.parse(raw);
+            break;
+          } catch (e) {}
         }
       }
+
       if (!serviceAccount && process.env.FIREBASE_SERVICE_ACCOUNT_JSON) {
-        serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON);
+        try {
+          serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON);
+        } catch (e) {
+          console.warn("Failed to parse FIREBASE_SERVICE_ACCOUNT_JSON:", e);
+        }
+      }
+
+      if (!serviceAccount && process.env.FIREBASE_CLIENT_EMAIL && process.env.FIREBASE_PRIVATE_KEY) {
+        serviceAccount = {
+          projectId: process.env.FIREBASE_PROJECT_ID || "exechat-data",
+          clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+          privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, "\n")
+        };
       }
 
       if (serviceAccount) {
@@ -102,9 +117,9 @@ function getFirebaseRtdb(): Database | null {
           credential: cert(serviceAccount),
           databaseURL: FIREBASE_DATABASE_URL
         });
-        console.log("Firebase Admin SDK initialized with Realtime Database URL:", FIREBASE_DATABASE_URL);
+        console.log("Firebase Admin SDK initialized successfully with Realtime Database URL:", FIREBASE_DATABASE_URL);
       } else {
-        console.warn("Firebase service account credentials not found.");
+        console.warn("Firebase service account credentials not found in files or environment variables.");
       }
     }
 
