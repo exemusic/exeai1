@@ -4784,7 +4784,7 @@ export default function App() {
 
           </div>
 
-                    {/* RIGHT SETTINGS PANEL (FULL-PAGE OVERLAY) */}
+          {/* RIGHT SETTINGS PANEL (FULL-PAGE OVERLAY) */}
           <AnimatePresence>
             {showSettings && (
               <motion.div
@@ -4792,71 +4792,86 @@ export default function App() {
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.98 }}
                 transition={{ duration: 0.2 }}
-                className={`fixed inset-0 backdrop-blur-xl flex flex-col z-[100] ${isDark ? "bg-black text-zinc-100" : "bg-zinc-50/98 text-zinc-850"}`}
+                className={`fixed inset-0 backdrop-blur-xl flex flex-col z-[100] ${isDark ? "bg-[#0b141a] text-zinc-100" : "bg-zinc-100/95 text-zinc-900"}`}
               >
                 {/* 1. MOBILE VIEW (WHATSAPP-STYLE) */}
-                <div className="flex md:hidden flex-col h-full w-full overflow-hidden">
+                <div className="flex md:hidden flex-col h-full w-full overflow-hidden font-sans">
                   {mobileSettingsPage === "menu" ? (
                     <div className="flex flex-col h-full w-full">
-                      {/* WhatsApp Header */}
-                      <div className={`p-4 px-5 flex items-center gap-4 shrink-0 border-b ${curTheme.border} ${isDark ? "bg-black" : "bg-[#075e54] text-white"}`}>
+                      {/* WhatsApp Mobile Header */}
+                      <div className={`p-4 px-5 flex items-center gap-3 shrink-0 border-b ${isDark ? "bg-[#111b21] border-zinc-800 text-zinc-100" : "bg-[#008069] text-white shadow-sm"}`}>
                         <button
                           onClick={() => setShowSettings(false)}
-                          className={`p-1.5 rounded-full transition-colors ${isDark ? "hover:bg-zinc-800 text-zinc-300" : "hover:bg-teal-700 text-white"}`}
+                          className={`p-1.5 rounded-full transition-colors cursor-pointer ${isDark ? "hover:bg-zinc-800 text-zinc-200" : "hover:bg-teal-700 text-white"}`}
+                          title="Close Settings"
                         >
                           <ChevronLeft className="h-6 w-6 stroke-[2.5]" />
                         </button>
-                        <div>
-                          <h2 className="text-lg font-bold tracking-tight">Settings</h2>
-                          <p className={`text-[11px] ${isDark ? "text-zinc-550" : "text-teal-100"}`}>ExeChat Account</p>
+                        <div className="flex-1">
+                          <h2 className="text-lg font-bold tracking-tight leading-tight">
+                            {userLanguage === "id" ? "Setelan" : "Settings"}
+                          </h2>
+                          <p className={`text-[11px] font-medium ${isDark ? "text-zinc-400" : "text-teal-100"}`}>
+                            ExeChat Account & System
+                          </p>
                         </div>
                       </div>
 
-                      {/* WhatsApp Menu Content */}
-                      <div className="flex-1 overflow-y-auto py-2 divide-y divide-zinc-500/10">
-                        {/* Profile Row */}
+                      {/* WhatsApp Mobile Menu Content */}
+                      <div className="flex-1 overflow-y-auto divide-y divide-zinc-200 dark:divide-zinc-800/60 pb-6">
+                        {/* WhatsApp Top Profile Banner Card */}
                         <div 
                           onClick={() => setMobileSettingsPage("akun")}
-                          className={`p-5 flex items-center gap-4 cursor-pointer transition-colors ${isDark ? "hover:bg-zinc-900/60" : "hover:bg-zinc-100"}`}
+                          className={`p-4 px-5 flex items-center gap-4 cursor-pointer transition-colors ${
+                            isDark ? "bg-[#111b21] hover:bg-[#202c33]" : "bg-white hover:bg-zinc-50"
+                          }`}
                         >
                           {userPhoto ? (
-                            <img src={userPhoto} referrerPolicy="no-referrer" alt="Profile" className="h-14 w-14 rounded-full border border-zinc-500/20 shadow shrink-0" />
+                            <img src={userPhoto} referrerPolicy="no-referrer" alt="Profile" className="h-14 w-14 rounded-full border border-zinc-200 dark:border-zinc-700 shadow-sm shrink-0 object-cover" />
                           ) : (
-                            <div className={`h-14 w-14 rounded-full border flex items-center justify-center shrink-0 bg-gradient-to-tr from-[#59a6ff] to-[#c084fc] text-white text-lg font-bold`}>
+                            <div className="h-14 w-14 rounded-full border border-amber-500/30 flex items-center justify-center shrink-0 bg-gradient-to-tr from-amber-500 to-amber-600 text-zinc-950 text-xl font-bold shadow-sm">
                               {(userDisplayName || userName || "U").charAt(0).toUpperCase()}
                             </div>
                           )}
                           <div className="flex-1 min-w-0">
-                            <h3 className={`text-base font-bold truncate ${isDark ? "text-zinc-100" : "text-zinc-900"}`}>{userDisplayName || "Guest Profile"}</h3>
-                            <p className="text-xs text-zinc-500 truncate mt-0.5">{userEmail || "Connected as guest offline"}</p>
+                            <h3 className={`text-base font-bold truncate ${isDark ? "text-zinc-100" : "text-zinc-900"}`}>
+                              {userDisplayName || userName || "Guest Profile"}
+                            </h3>
+                            <p className="text-xs text-zinc-500 dark:text-zinc-400 truncate mt-0.5 font-medium">
+                              {userEmail || "Connected as guest offline"}
+                            </p>
                           </div>
-                          <ChevronRight className="h-5 w-5 text-zinc-500 shrink-0" />
+                          <ChevronRight className="h-5 w-5 text-zinc-400 shrink-0" />
                         </div>
 
-                        {/* Setting Items */}
-                        <div className="py-2">
+                        {/* WhatsApp Category Group */}
+                        <div className={`py-2 ${isDark ? "bg-[#0b141a]" : "bg-zinc-100"}`}>
                           {[
-                            { id: "akun", name: "Account & Profile", desc: "Change nickname, view authentication details", icon: User },
-                            { id: "model", name: "Engine & AI Personality", desc: "Select fast/powerful model or cognitive topics", icon: Cpu },
-                            { id: "tampilan", name: "Theme & Display", desc: "Dark mode preferences, alert sound customizers", icon: Sun },
-                            { id: "ingatan", name: "AI Memory", desc: "Set persistent user background context", icon: Brain },
-                            { id: "feedback", name: "Submit Feedback", desc: "Send feature requests, suggestions & attachments", icon: MessageSquare },
+                            { id: "akun", name: userLanguage === "id" ? "Akun & Profil" : "Account & Profile", desc: userLanguage === "id" ? "Ubah nama panggilan, info email, bahasa" : "Change nickname, email info, language", icon: User, color: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" },
+                            { id: "model", name: userLanguage === "id" ? "Model AI & Suhu" : "AI Engine & Temperature", desc: userLanguage === "id" ? "Pilih model AI aktif dan preset kreativitas" : "Select active model and creativity preset", icon: Cpu, color: "bg-blue-500/10 text-blue-600 dark:text-blue-400" },
+                            { id: "tampilan", name: userLanguage === "id" ? "Tema & Tampilan" : "Theme & Display", desc: userLanguage === "id" ? "Mode gelap/terang, riwayat percakapan" : "Dark/light mode, chat history toggle", icon: Sun, color: "bg-amber-500/10 text-amber-600 dark:text-amber-400" },
+                            { id: "ingatan", name: userLanguage === "id" ? "Memori & Direktif AI" : "AI Memory & Directives", desc: userLanguage === "id" ? "Simpan konteks latar belakang pengguna" : "Set persistent background memory", icon: Brain, color: "bg-purple-500/10 text-purple-600 dark:text-purple-400" },
+                            { id: "feedback", name: userLanguage === "id" ? "Kirim Masukan & Laporan" : "Submit Feedback & Support", desc: userLanguage === "id" ? "Bantuan, laporan bug & saran fitur" : "Send suggestions, report bugs, admin panel", icon: MessageSquare, color: "bg-rose-500/10 text-rose-600 dark:text-rose-400" },
                           ].map((item) => {
                             const ItemIcon = item.icon;
                             return (
                               <div
                                 key={item.id}
                                 onClick={() => setMobileSettingsPage(item.id as any)}
-                                className={`px-5 py-4 flex items-center gap-4 cursor-pointer transition-colors ${isDark ? "hover:bg-zinc-900/60" : "hover:bg-zinc-100"}`}
+                                className={`px-5 py-3.5 flex items-center gap-4 cursor-pointer transition-colors border-b last:border-b-0 ${
+                                  isDark 
+                                    ? "bg-[#111b21] hover:bg-[#202c33] border-zinc-800/60" 
+                                    : "bg-white hover:bg-zinc-50 border-zinc-200/60"
+                                }`}
                               >
-                                <div className={`p-2.5 rounded-full shrink-0 ${isDark ? "bg-zinc-900 text-amber-400" : "bg-zinc-100 text-[#075e54]"}`}>
+                                <div className={`p-2.5 rounded-2xl shrink-0 flex items-center justify-center ${item.color}`}>
                                   <ItemIcon className="h-5 w-5" />
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                  <h4 className={`text-sm font-semibold ${isDark ? "text-zinc-200" : "text-zinc-800"}`}>{item.name}</h4>
-                                  <p className="text-xs text-zinc-500 truncate mt-0.5">{item.desc}</p>
+                                  <h4 className={`text-[15px] font-semibold ${isDark ? "text-zinc-100" : "text-zinc-900"}`}>{item.name}</h4>
+                                  <p className="text-xs text-zinc-500 dark:text-zinc-400 truncate mt-0.5">{item.desc}</p>
                                 </div>
-                                <ChevronRight className="h-4 w-4 text-zinc-500 shrink-0" />
+                                <ChevronRight className="h-4 w-4 text-zinc-400 shrink-0" />
                               </div>
                             );
                           })}
@@ -4865,78 +4880,119 @@ export default function App() {
                     </div>
                   ) : (
                     <div className="flex flex-col h-full w-full">
-                      {/* WhatsApp Subpage Header */}
-                      <div className={`p-4 px-5 flex items-center gap-4 shrink-0 border-b ${curTheme.border} ${isDark ? "bg-black" : "bg-[#075e54] text-white"}`}>
+                      {/* WhatsApp Mobile Subpage Header */}
+                      <div className={`p-4 px-5 flex items-center gap-3 shrink-0 border-b ${isDark ? "bg-[#111b21] border-zinc-800 text-zinc-100" : "bg-[#008069] text-white shadow-sm"}`}>
                         <button
                           onClick={() => setMobileSettingsPage("menu")}
-                          className={`p-1.5 rounded-full transition-colors ${isDark ? "hover:bg-zinc-800 text-zinc-300" : "hover:bg-teal-700 text-white"}`}
+                          className={`p-1.5 rounded-full transition-colors cursor-pointer ${isDark ? "hover:bg-zinc-800 text-zinc-200" : "hover:bg-teal-700 text-white"}`}
+                          title="Back to settings menu"
                         >
                           <ChevronLeft className="h-6 w-6 stroke-[2.5]" />
                         </button>
-                        <div>
-                          <h2 className="text-base font-bold capitalize">
-                            {mobileSettingsPage === "akun" ? "Account & Profile" :
-                             mobileSettingsPage === "model" ? "AI Engine & Topics" :
-                             mobileSettingsPage === "tampilan" ? "Theme & Display" :
-                             mobileSettingsPage === "ingatan" ? "AI Memory" : "Submit Feedback"}
+                        <div className="flex-1">
+                          <h2 className="text-base font-bold capitalize leading-tight">
+                            {mobileSettingsPage === "akun" ? (userLanguage === "id" ? "Akun & Profil" : "Account & Profile") :
+                             mobileSettingsPage === "model" ? (userLanguage === "id" ? "Model AI & Suhu" : "AI Engine & Temperature") :
+                             mobileSettingsPage === "tampilan" ? (userLanguage === "id" ? "Tema & Tampilan" : "Theme & Display") :
+                             mobileSettingsPage === "ingatan" ? (userLanguage === "id" ? "Memori AI" : "AI Memory") : 
+                             (userLanguage === "id" ? "Kirim Masukan" : "Submit Feedback")}
                           </h2>
-                          <p className={`text-[10px] ${isDark ? "text-zinc-500" : "text-teal-100"}`}>Configuring ExeChat preferences</p>
+                          <p className={`text-[10px] font-medium ${isDark ? "text-zinc-400" : "text-teal-100"}`}>
+                            {userLanguage === "id" ? "Pengaturan Konfigurasi ExeChat" : "ExeChat Configuration Panel"}
+                          </p>
                         </div>
                       </div>
 
-                      {/* WhatsApp Subpage Content */}
-                      <div className="flex-1 overflow-y-auto p-5 space-y-6">
+                      {/* WhatsApp Mobile Subpage Content */}
+                      <div className={`flex-1 overflow-y-auto p-4 space-y-4 ${isDark ? "bg-[#0b141a]" : "bg-zinc-100"}`}>
                         {/* SUBPAGE: AKUN */}
                         {mobileSettingsPage === "akun" && (
-                          <div className="space-y-6 animate-fadeIn">
-                            <div className={`rounded-2xl p-5 border ${isDark ? "bg-zinc-900/10 border-transparent shadow-none" : "bg-white border-zinc-200"}`}>
-                              <h3 className="text-xs md:text-sm font-bold uppercase tracking-wider text-zinc-500 mb-3">Membership status</h3>
+                          <div className="space-y-4 animate-fadeIn">
+                            <div className={`rounded-2xl p-4 border ${isDark ? "bg-[#111b21] border-zinc-800" : "bg-white border-zinc-200 shadow-xs"}`}>
+                              <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-500 mb-3">
+                                {userLanguage === "id" ? "Status Keanggotaan" : "Membership Status"}
+                              </h3>
                               <div className="flex items-center gap-3">
                                 {userPhoto ? (
-                                  <img src={userPhoto} referrerPolicy="no-referrer" alt="Profile" className="h-12 w-12 rounded-full border border-zinc-500/20" />
+                                  <img src={userPhoto} referrerPolicy="no-referrer" alt="Profile" className="h-12 w-12 rounded-full border border-zinc-200 dark:border-zinc-700 object-cover" />
                                 ) : (
-                                  <div className="h-12 w-12 rounded-full border flex items-center justify-center bg-zinc-900 text-zinc-400">
-                                    <User className="h-6 w-6" />
+                                  <div className="h-12 w-12 rounded-full border border-amber-500/30 flex items-center justify-center bg-amber-500 text-zinc-950 font-bold text-lg">
+                                    {(userDisplayName || userName || "U").charAt(0).toUpperCase()}
                                   </div>
                                 )}
                                 <div className="flex-1 min-w-0">
                                   <div className="flex items-center gap-1.5">
                                     <span className="h-2 w-2 rounded-full bg-emerald-500" />
-                                    <span className="text-sm font-bold text-zinc-800 dark:text-zinc-200">Connected via Google</span>
+                                    <span className="text-sm font-bold text-zinc-900 dark:text-zinc-100">
+                                      {userEmail ? "Connected via Google" : "Guest Mode"}
+                                    </span>
                                   </div>
-                                  <p className="text-xs md:text-sm text-zinc-500 truncate mt-0.5">{userEmail || "Offline mode"}</p>
+                                  <p className="text-xs text-zinc-500 truncate mt-0.5">{userEmail || "Offline session"}</p>
                                 </div>
                                 <button
                                   onClick={handleLogout}
-                                  className="text-xs md:text-sm font-bold py-1.5 px-3 rounded-lg border border-red-900/20 text-red-500 bg-red-500/5 hover:bg-red-500/10"
+                                  className="text-xs font-bold py-1.5 px-3 rounded-lg border border-red-500/20 text-red-500 bg-red-500/10 hover:bg-red-500/20 transition-colors cursor-pointer"
                                 >
                                   Logout
                                 </button>
                               </div>
                             </div>
 
-                            <div className={`rounded-2xl p-5 border ${isDark ? "bg-zinc-900/10 border-transparent shadow-none" : "bg-white border-zinc-200"}`}>
-                              <h3 className="text-xs md:text-sm font-bold uppercase tracking-wider text-zinc-500 mb-1">Nickname settings</h3>
-                              <p className="text-xs md:text-sm text-zinc-500 leading-relaxed mb-4">Set your nickname that the AI assistant will use to greet you.</p>
+                            <div className={`rounded-2xl p-4 border ${isDark ? "bg-[#111b21] border-zinc-800" : "bg-white border-zinc-200 shadow-xs"}`}>
+                              <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-500 mb-1">
+                                {userLanguage === "id" ? "Nama Panggilan (Nickname)" : "Nickname Settings"}
+                              </h3>
+                              <p className="text-xs text-zinc-500 leading-relaxed mb-3">
+                                {userLanguage === "id" ? "Atur nama panggilan yang digunakan asisten AI untuk menyapa Anda." : "Set your preferred nickname used by the AI assistant to address you."}
+                              </p>
                               
                               <div className="space-y-3">
                                 <input
                                   value={userName}
                                   onChange={(e) => setUserName(e.target.value)}
                                   placeholder="Enter nickname..."
-                                  className={`w-full rounded-xl px-4 py-3 text-sm md:text-base focus:outline-none border ${
-                                    isDark ? "bg-black border-zinc-900 text-zinc-100" : "bg-zinc-50 border-zinc-200"
+                                  className={`w-full rounded-xl px-3.5 py-2.5 text-sm focus:outline-none border ${
+                                    isDark ? "bg-[#202c33] border-zinc-700 text-zinc-100" : "bg-zinc-50 border-zinc-300 text-zinc-900"
                                   }`}
                                 />
                                 <button
                                   onClick={handleSaveUsername}
-                                  className="w-full py-3.5 rounded-xl text-sm font-bold bg-amber-500 text-zinc-950"
+                                  className="w-full py-3 rounded-xl text-xs font-bold bg-amber-500 text-zinc-950 hover:bg-amber-400 transition-all cursor-pointer"
                                 >
-                                  Save Nickname
+                                  {userLanguage === "id" ? "Simpan Nickname" : "Save Nickname"}
                                 </button>
                                 {redeemFeedback && (
-                                  <p className="text-xs text-emerald-500 mt-1">✓ {redeemFeedback}</p>
+                                  <p className="text-xs text-emerald-500 font-semibold">✓ {redeemFeedback}</p>
                                 )}
+                              </div>
+                            </div>
+
+                            <div className={`rounded-2xl p-4 border ${isDark ? "bg-[#111b21] border-zinc-800" : "bg-white border-zinc-200 shadow-xs"}`}>
+                              <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-500 mb-3 flex items-center gap-2">
+                                <Globe className="h-4 w-4 text-amber-500" />
+                                {userLanguage === "id" ? "Bahasa Antarmuka" : "Interface Language"}
+                              </h3>
+                              <div className="grid grid-cols-2 gap-2">
+                                {LANGUAGES.map((lang) => {
+                                  const isSelected = userLanguage === lang.code;
+                                  return (
+                                    <button
+                                      key={lang.code}
+                                      type="button"
+                                      onClick={() => handleSelectLanguage(lang.code)}
+                                      className={`p-2.5 rounded-xl border flex items-center gap-2 text-left transition-all cursor-pointer ${
+                                        isSelected
+                                          ? "bg-amber-500/10 border-amber-500 text-amber-500 font-bold"
+                                          : isDark
+                                            ? "bg-[#202c33] border-zinc-700 text-zinc-300"
+                                            : "bg-zinc-50 border-zinc-200 text-zinc-700"
+                                      }`}
+                                    >
+                                      <span className="text-base">{lang.flag}</span>
+                                      <span className="text-xs font-semibold truncate">{lang.name}</span>
+                                    </button>
+                                  );
+                                })}
                               </div>
                             </div>
                           </div>
@@ -4944,10 +5000,12 @@ export default function App() {
 
                         {/* SUBPAGE: MODEL */}
                         {mobileSettingsPage === "model" && (
-                          <div className="space-y-6 animate-fadeIn">
-                            <div className="space-y-3">
-                              <h3 className="text-xs md:text-sm font-bold uppercase tracking-wider text-zinc-500">AI Engines</h3>
-                              <div className="space-y-2.5">
+                          <div className="space-y-4 animate-fadeIn">
+                            <div className="space-y-2">
+                              <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-500">
+                                {userLanguage === "id" ? "Pilihan Engine AI" : "AI Models"}
+                              </h3>
+                              <div className="space-y-2">
                                 {MODEL_OPTIONS.map((m) => {
                                   const isSelected = currentSession ? currentSession.model === m.id : selectedModelId === m.id;
                                   return (
@@ -4961,17 +5019,17 @@ export default function App() {
                                         }
                                         playNotifySound();
                                       }}
-                                      className={`p-4 rounded-xl border cursor-pointer transition-colors ${
+                                      className={`p-3.5 rounded-xl border cursor-pointer transition-colors ${
                                         isSelected 
-                                          ? isDark ? "bg-zinc-900 border-amber-500/40 text-zinc-100" : "bg-blue-50/70 border-blue-500 text-zinc-900"
-                                          : isDark ? "border-transparent bg-zinc-900/10 text-zinc-400" : "border-zinc-200 bg-white text-zinc-600"
+                                          ? isDark ? "bg-[#202c33] border-amber-500 text-zinc-100" : "bg-amber-50 border-amber-500 text-zinc-900"
+                                          : isDark ? "border-zinc-800 bg-[#111b21] text-zinc-400" : "border-zinc-200 bg-white text-zinc-600"
                                       }`}
                                     >
                                       <div className="flex items-center justify-between mb-1">
                                         <span className="text-sm font-bold">{m.name}</span>
-                                        {isSelected && <span className="text-[10px] px-2 py-0.5 rounded-full font-mono font-bold bg-amber-500/10 text-amber-400 border border-amber-500/25">Active</span>}
+                                        {isSelected && <span className="text-[10px] px-2 py-0.5 rounded-full font-mono font-bold bg-amber-500/20 text-amber-500">Active</span>}
                                       </div>
-                                      <p className="text-xs md:text-sm leading-relaxed text-zinc-500">{m.description}</p>
+                                      <p className="text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed">{m.description}</p>
                                     </div>
                                   );
                                 })}
@@ -4980,129 +5038,79 @@ export default function App() {
 
                             {/* TEMPERATURE SETTINGS FOR GEMMA-4 MOBILE */}
                             {((currentSession ? currentSession.model : selectedModelId) === "gemma-4-31b") && (
-                              <div className={`p-4 rounded-xl border space-y-4 ${isDark ? "bg-zinc-900/40 border-zinc-800" : "bg-white border-zinc-200 shadow-sm"}`}>
+                              <div className={`p-4 rounded-xl border space-y-3 ${isDark ? "bg-[#111b21] border-zinc-800" : "bg-white border-zinc-200 shadow-xs"}`}>
                                 <div className="flex items-center justify-between gap-2">
                                   <div className="flex items-center gap-2">
                                     <Sliders className="h-4 w-4 text-amber-500" />
-                                    <h4 className="text-xs font-bold uppercase tracking-wider text-zinc-500">Preset Temperature</h4>
+                                    <h4 className="text-xs font-bold uppercase tracking-wider text-zinc-500">
+                                      {userLanguage === "id" ? "Suhu Kreativitas" : "Temperature Preset"}
+                                    </h4>
                                   </div>
-                                  <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-black border border-zinc-800 text-amber-400">
+                                  <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-zinc-900 text-amber-400 border border-zinc-800">
                                     {activeTemp.toFixed(2)}
                                   </span>
                                 </div>
 
-                                <div className="space-y-1">
-                                  <input 
-                                    type="range" 
-                                    min="0.10" 
-                                    max="1.00" 
-                                    step="0.05"
-                                    value={activeTemp}
-                                    onChange={(e) => {
-                                      const val = parseFloat(e.target.value);
-                                      if (currentSession) {
-                                        setSessions((prev) => prev.map((s) => s.id === currentSessionId ? { ...s, temperature: val } : s));
-                                      } else {
-                                        setTemperature(val);
-                                      }
-                                    }}
-                                    className="w-full h-1.5 bg-zinc-850 dark:bg-black rounded-lg appearance-none cursor-pointer accent-amber-500"
-                                  />
-                                  <div className="flex justify-between text-[8px] text-zinc-550 font-mono">
-                                    <span>Konsisten (0.10)</span>
-                                    <span>Kreatif (1.00)</span>
-                                  </div>
-                                </div>
+                                <input 
+                                  type="range" 
+                                  min="0.10" 
+                                  max="1.00" 
+                                  step="0.05"
+                                  value={activeTemp}
+                                  onChange={(e) => {
+                                    const val = parseFloat(e.target.value);
+                                    if (currentSession) {
+                                      setSessions((prev) => prev.map((s) => s.id === currentSessionId ? { ...s, temperature: val } : s));
+                                    } else {
+                                      setTemperature(val);
+                                    }
+                                  }}
+                                  className="w-full h-1.5 bg-zinc-300 dark:bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-amber-500"
+                                />
 
-                                <div className="space-y-2">
-                                  <h5 className="text-[10px] font-bold text-zinc-550 uppercase font-mono tracking-wider">Optimized Presets (gemma-4)</h5>
-                                  <div className="space-y-2 max-h-[180px] overflow-y-auto pr-1">
-                                    {GEMMA_TEMP_PRESETS.map((p) => {
-                                      const [minStr, maxStr] = p.range.split("–");
-                                      const minVal = parseFloat(minStr);
-                                      const maxVal = parseFloat(maxStr);
-                                      const isMatched = activeTemp >= minVal && activeTemp <= maxVal;
-                                      
-                                      return (
-                                        <div
-                                          key={p.id}
-                                          onClick={() => {
-                                            if (currentSession) {
-                                              setSessions((prev) => prev.map((s) => s.id === currentSessionId ? { ...s, temperature: p.defaultValue } : s));
-                                            } else {
-                                              setTemperature(p.defaultValue);
-                                            }
-                                            playNotifySound();
-                                          }}
-                                          className={`p-3 rounded-xl border cursor-pointer transition-colors text-left ${
-                                            isMatched
-                                              ? isDark
-                                                ? "bg-amber-500/10 border-amber-500/40 text-zinc-150"
-                                                : "bg-blue-50/70 border-blue-500 text-zinc-900"
-                                              : isDark
-                                                ? "border-transparent bg-zinc-900/10 text-zinc-400 hover:bg-zinc-900/20"
-                                                : "border-zinc-200 bg-white text-zinc-650 hover:border-zinc-300"
-                                          }`}
-                                        >
-                                          <div className="flex items-center justify-between gap-1 mb-1">
-                                            <span className="text-xs font-bold leading-tight">{p.name}</span>
-                                            <span className={`text-[9px] font-mono font-bold px-1 py-0.5 rounded ${
-                                              isMatched ? "bg-amber-500/25 text-amber-400" : "bg-zinc-500/10 text-zinc-500"
-                                            }`}>
-                                              {p.range}
-                                            </span>
-                                          </div>
-                                          <p className="text-[10px] text-zinc-500 leading-normal">{p.description}</p>
+                                <div className="space-y-1.5 pt-1">
+                                  {GEMMA_TEMP_PRESETS.map((p) => {
+                                    const [minStr, maxStr] = p.range.split("–");
+                                    const minVal = parseFloat(minStr);
+                                    const maxVal = parseFloat(maxStr);
+                                    const isMatched = activeTemp >= minVal && activeTemp <= maxVal;
+                                    return (
+                                      <div
+                                        key={p.id}
+                                        onClick={() => {
+                                          if (currentSession) {
+                                            setSessions((prev) => prev.map((s) => s.id === currentSessionId ? { ...s, temperature: p.defaultValue } : s));
+                                          } else {
+                                            setTemperature(p.defaultValue);
+                                          }
+                                          playNotifySound();
+                                        }}
+                                        className={`p-2.5 rounded-lg border text-left cursor-pointer transition-colors ${
+                                          isMatched
+                                            ? "bg-amber-500/10 border-amber-500 text-amber-500 font-semibold"
+                                            : isDark ? "border-zinc-800 bg-[#202c33] text-zinc-400" : "border-zinc-200 bg-zinc-50 text-zinc-600"
+                                        }`}
+                                      >
+                                        <div className="flex items-center justify-between text-xs font-bold">
+                                          <span>{p.name}</span>
+                                          <span className="text-[9px] font-mono">{p.range}</span>
                                         </div>
-                                      );
-                                    })}
-                                  </div>
+                                      </div>
+                                    );
+                                  })}
                                 </div>
                               </div>
                             )}
-
-                            <div className="space-y-3">
-                              <h3 className="text-xs md:text-sm font-bold uppercase tracking-wider text-zinc-500">Cognitive Topics</h3>
-                              <div className="space-y-2.5">
-                                {SYSTEM_PRESETS.map((preset) => {
-                                  const isSelected = currentSession ? currentSession.systemInstructionId === preset.id : selectedPresetId === preset.id;
-                                  return (
-                                    <div
-                                      key={preset.id}
-                                      onClick={() => {
-                                        if (currentSession) {
-                                          setSessions((prev) => prev.map((s) => s.id === currentSessionId ? { ...s, systemInstructionId: preset.id } : s));
-                                        } else {
-                                          setSelectedPresetId(preset.id);
-                                        }
-                                        playNotifySound();
-                                      }}
-                                      className={`p-4 rounded-xl border cursor-pointer transition-colors ${
-                                        isSelected 
-                                          ? isDark ? "bg-zinc-900 border-amber-500/40" : "bg-blue-50/70 border-blue-500"
-                                          : isDark ? "border-transparent bg-zinc-900/10" : "border-zinc-200 bg-white"
-                                      }`}
-                                    >
-                                      <div className="flex items-center gap-2 mb-1.5">
-                                        <div className={`p-1.5 rounded-lg border ${isSelected ? "text-amber-500 border-amber-500/25" : "text-zinc-500 border-zinc-800"}`}>
-                                          {getPresetIcon(preset.icon, "h-4 w-4")}
-                                        </div>
-                                        <span className="text-xs font-bold text-zinc-800 dark:text-zinc-200">{preset.name}</span>
-                                      </div>
-                                      <p className="text-[11px] leading-relaxed text-zinc-550">{preset.description}</p>
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            </div>
                           </div>
                         )}
 
                         {/* SUBPAGE: TAMPILAN */}
                         {mobileSettingsPage === "tampilan" && (
-                          <div className="space-y-6 animate-fadeIn">
-                            <div className="space-y-3">
-                              <h3 className="text-xs md:text-sm font-bold uppercase tracking-wider text-zinc-500">Theme</h3>
+                          <div className="space-y-4 animate-fadeIn">
+                            <div className={`rounded-2xl p-4 border ${isDark ? "bg-[#111b21] border-zinc-800" : "bg-white border-zinc-200 shadow-xs"}`}>
+                              <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-500 mb-3">
+                                {userLanguage === "id" ? "Mode Tema" : "Theme Mode"}
+                              </h3>
                               <div className="space-y-2">
                                 {[
                                   { id: "system", name: "System Preset", icon: Laptop },
@@ -5118,15 +5126,15 @@ export default function App() {
                                         setThemeMode(t.id as any);
                                         playNotifySound();
                                       }}
-                                      className={`p-4 rounded-xl border flex items-center justify-between cursor-pointer ${
+                                      className={`p-3.5 rounded-xl border flex items-center justify-between cursor-pointer ${
                                         isSelected 
-                                          ? isDark ? "bg-zinc-900 border-amber-500/40 text-zinc-100" : "bg-blue-50/75 border-blue-500 text-zinc-900"
-                                          : isDark ? "border-transparent bg-zinc-900/10 text-zinc-300" : "border-zinc-200 bg-white text-zinc-650"
+                                          ? "bg-amber-500/10 border-amber-500 text-amber-500 font-bold"
+                                          : isDark ? "border-zinc-800 bg-[#202c33] text-zinc-300" : "border-zinc-200 bg-zinc-50 text-zinc-700"
                                       }`}
                                     >
                                       <div className="flex items-center gap-2.5">
-                                        <IconComp className="h-4 w-4 text-zinc-500" />
-                                        <span className="text-sm font-semibold">{t.name}</span>
+                                        <IconComp className="h-4 w-4" />
+                                        <span className="text-xs font-semibold">{t.name}</span>
                                       </div>
                                       {isSelected && <span className="h-2 w-2 rounded-full bg-amber-500" />}
                                     </div>
@@ -5135,13 +5143,12 @@ export default function App() {
                               </div>
                             </div>
 
-                            <div className={`rounded-2xl p-5 border ${isDark ? "bg-zinc-900/10 border-transparent shadow-none" : "bg-white border-zinc-200"}`}>
-                              <h3 className="text-xs md:text-sm font-bold uppercase tracking-wider text-zinc-500 mb-2.5">Chat History</h3>
+                            <div className={`rounded-2xl p-4 border ${isDark ? "bg-[#111b21] border-zinc-800" : "bg-white border-zinc-200 shadow-xs"}`}>
+                              <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-500 mb-2">
+                                {userLanguage === "id" ? "Riwayat Percakapan" : "Chat History"}
+                              </h3>
                               <div className="flex items-center justify-between">
-                                <div>
-                                  <h4 className="text-sm font-semibold">Yesterday & Older</h4>
-                                  <p className="text-xs text-zinc-500 mt-1">Show older chat sessions in your history sidebar.</p>
-                                </div>
+                                <p className="text-xs text-zinc-500">Tampilkan riwayat kemarin & lebih lama di sidebar.</p>
                                 <button
                                   onClick={() => {
                                     const newVal = !showYesterdayHistory;
@@ -5149,45 +5156,44 @@ export default function App() {
                                     localStorage.setItem("showYesterdayHistory", JSON.stringify(newVal));
                                     playNotifySound();
                                   }}
-                                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none cursor-pointer ${
+                                  className={`relative inline-flex h-5 w-10 items-center rounded-full transition-colors cursor-pointer ${
                                     showYesterdayHistory ? "bg-amber-500" : "bg-zinc-700"
                                   }`}
                                 >
                                   <span
-                                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                                      showYesterdayHistory ? "translate-x-6" : "translate-x-1"
+                                    className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${
+                                      showYesterdayHistory ? "translate-x-5" : "translate-x-1"
                                     }`}
                                   />
                                 </button>
                               </div>
-                            </div>
-
-                            <div className={`rounded-2xl p-5 border ${isDark ? "bg-zinc-900/10 border-transparent shadow-none" : "bg-white border-zinc-200"}`}>
-                              <h3 className="text-xs md:text-sm font-bold uppercase tracking-wider text-zinc-500 mb-2.5">Sound feedback</h3>
-                              <p className="text-xs md:text-sm leading-relaxed text-zinc-500">ExeChat plays a subtle sound when generating responses is complete.</p>
                             </div>
                           </div>
                         )}
 
                         {/* SUBPAGE: INGATAN */}
                         {mobileSettingsPage === "ingatan" && (
-                          <div className="space-y-6 animate-fadeIn">
-                            <div className={`rounded-2xl p-5 border ${isDark ? "bg-zinc-900/10 border-transparent shadow-none" : "bg-white border-zinc-200"}`}>
+                          <div className="space-y-4 animate-fadeIn">
+                            <div className={`rounded-2xl p-4 border ${isDark ? "bg-[#111b21] border-zinc-800" : "bg-white border-zinc-200 shadow-xs"}`}>
                               <div className="flex items-center gap-2 mb-2">
-                                <Brain className="h-5 w-5 text-amber-500" />
-                                <h3 className="text-xs md:text-sm font-bold uppercase tracking-wider text-zinc-500">AI Memory Limits (Max 5)</h3>
+                                <Brain className="h-4 w-4 text-amber-500" />
+                                <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-500">
+                                  {userLanguage === "id" ? "Memori AI (Maksimal 5)" : "AI Memory (Max 5)"}
+                                </h3>
                               </div>
-                              <p className="text-xs md:text-sm text-zinc-500 leading-relaxed mb-4">Saved background information gets added contextually to help customize the responses.</p>
-                              
+                              <p className="text-xs text-zinc-500 mb-3 leading-relaxed">
+                                Konteks personal yang disimpan agar respon AI lebih relevan dan sesuai gaya Anda.
+                              </p>
+
                               <div className="flex gap-2">
                                 <input
                                   type="text"
                                   value={memoryInput}
                                   onChange={(e) => setMemoryInput(e.target.value)}
-                                  placeholder={memories.length >= 5 ? "Limit reached" : "Enter personal preference..."}
+                                  placeholder={memories.length >= 5 ? "Batas maksimal tercapai" : "Tambah preferensi..."}
                                   disabled={memories.length >= 5}
-                                  className={`flex-1 rounded-xl px-4 py-3 text-sm md:text-base focus:outline-none border ${
-                                    isDark ? "bg-black border-zinc-900 text-zinc-150" : "bg-white border-zinc-200 text-zinc-900"
+                                  className={`flex-1 rounded-xl px-3 py-2 text-xs focus:outline-none border ${
+                                    isDark ? "bg-[#202c33] border-zinc-700 text-zinc-100" : "bg-zinc-50 border-zinc-300 text-zinc-900"
                                   }`}
                                 />
                                 <button
@@ -5199,27 +5205,27 @@ export default function App() {
                                     }
                                   }}
                                   disabled={!memoryInput.trim() || memories.length >= 5}
-                                  className="px-5 py-3 rounded-xl text-sm font-bold bg-amber-500 text-zinc-950 disabled:opacity-40"
+                                  className="px-4 py-2 rounded-xl text-xs font-bold bg-amber-500 text-zinc-950 disabled:opacity-40 cursor-pointer"
                                 >
-                                  Add
+                                  Tambah
                                 </button>
                               </div>
 
-                              <div className="space-y-2 mt-4 pt-4 border-t border-zinc-500/10">
+                              <div className="space-y-2 mt-3 pt-3 border-t border-zinc-200 dark:border-zinc-800">
                                 {memories.length === 0 ? (
-                                  <div className="text-center py-5 text-sm text-zinc-500 italic">No saved memories yet.</div>
+                                  <p className="text-center py-4 text-xs text-zinc-500 italic">Belum ada memori tersimpan.</p>
                                 ) : (
                                   memories.map((mem, idx) => (
-                                    <div key={idx} className="flex items-center justify-between gap-3 p-3 rounded-xl bg-zinc-500/5 border border-zinc-500/10 text-sm">
-                                      <span className="truncate flex-1 font-medium text-zinc-800 dark:text-zinc-300">{mem}</span>
+                                    <div key={idx} className="flex items-center justify-between gap-2 p-2.5 rounded-lg bg-zinc-500/5 border border-zinc-500/10 text-xs">
+                                      <span className="truncate font-medium text-zinc-800 dark:text-zinc-200">{mem}</span>
                                       <button
                                         onClick={() => {
                                           setMemories((prev) => prev.filter((_, i) => i !== idx));
                                           playNotifySound();
                                         }}
-                                        className="p-1 text-zinc-500 hover:text-red-500"
+                                        className="p-1 text-zinc-400 hover:text-red-500 cursor-pointer"
                                       >
-                                        <Trash2 className="h-4 w-4" />
+                                        <Trash2 className="h-3.5 w-3.5" />
                                       </button>
                                     </div>
                                   ))
@@ -5239,511 +5245,605 @@ export default function App() {
                   )}
                 </div>
 
-                {/* 2. DESKTOP VIEW (PREMIUM DUAL COLUMN PANELS WITH SPACIOUS TYPOGRAPHY) */}
-                <div className="hidden md:flex flex-row h-full w-full overflow-hidden">
-                  {/* Left categories sidebar panel */}
-                  <div className={`w-80 shrink-0 ${isDark ? "border-transparent bg-black" : `border-r ${curTheme.border} bg-zinc-100/50`} flex flex-col justify-between p-6`}>
-                    <div className="space-y-8">
-                      {/* Navigation categories */}
-                      <nav className="space-y-2">
-                        {[
-                          { id: "akun", name: getTranslation("tabAccountName", userLanguage), desc: getTranslation("tabAccountDesc", userLanguage), icon: User },
-                          { id: "model", name: getTranslation("tabModelName", userLanguage), desc: getTranslation("tabModelDesc", userLanguage), icon: Cpu },
-                          { id: "tampilan", name: getTranslation("tabTampilanName", userLanguage), desc: getTranslation("tabTampilanDesc", userLanguage), icon: Sun },
-                          { id: "ingatan", name: getTranslation("tabIngatanName", userLanguage), desc: getTranslation("tabIngatanDesc", userLanguage), icon: Brain },
-                          { id: "feedback", name: getTranslation("tabFeedbackName", userLanguage), desc: getTranslation("tabFeedbackDesc", userLanguage), icon: MessageSquare },
-                        ].map((item) => {
-                          const IconComp = item.icon;
-                          const isActive = settingsTab === item.id;
-                          return (
+                {/* 2. DESKTOP VIEW (GITHUB-STYLE MODERN CONTROL PANEL) */}
+                <div className="hidden md:flex flex-row items-center justify-center h-full w-full p-6 lg:p-10 font-sans">
+                  <div className="max-w-6xl w-full h-[88vh] rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#0d1117] shadow-2xl flex overflow-hidden">
+                    {/* Left GitHub Sidebar */}
+                    <div className="w-72 shrink-0 border-r border-zinc-200 dark:border-zinc-800 bg-zinc-50/80 dark:bg-[#161b22] p-5 flex flex-col justify-between select-none">
+                      <div className="space-y-6">
+                        {/* Sidebar Header */}
+                        <div className="flex items-center gap-3 px-2 py-1">
+                          <div className="h-9 w-9 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-500 flex items-center justify-center shrink-0 shadow-xs">
+                            <Settings className="h-5 w-5" />
+                          </div>
+                          <div>
+                            <h2 className="text-base font-bold text-zinc-900 dark:text-zinc-100 tracking-tight leading-none">Settings</h2>
+                            <p className="text-[11px] text-zinc-500 dark:text-zinc-400 font-medium mt-1">ExeChat Control Center</p>
+                          </div>
+                        </div>
+
+                        {/* Navigation Categories */}
+                        <nav className="space-y-4">
+                          <div>
+                            <span className="text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider px-2 block mb-1.5">
+                              User Preferences
+                            </span>
                             <button
-                              key={item.id}
-                              onClick={() => setSettingsTab(item.id as any)}
-                              className={`w-full flex items-center gap-4 p-4 rounded-2xl border text-left transition-all duration-300 cursor-pointer ${
-                                isActive
-                                  ? isDark
-                                    ? "bg-zinc-900 border-transparent text-white shadow-xl ring-1 ring-amber-500/10"
-                                    : "bg-white border-zinc-250 text-zinc-900 shadow-md ring-1 ring-blue-500/10"
-                                  : isDark
-                                    ? "border-transparent text-zinc-400 hover:bg-black/40 hover:text-zinc-200"
-                                    : "border-transparent text-zinc-600 hover:bg-zinc-150/50 hover:text-zinc-900"
+                              onClick={() => setSettingsTab("akun")}
+                              className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-left transition-all text-xs font-semibold relative cursor-pointer ${
+                                settingsTab === "akun"
+                                  ? "bg-white dark:bg-[#0d1117] text-zinc-900 dark:text-white border border-zinc-200 dark:border-zinc-700 shadow-xs"
+                                  : "text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200/60 dark:hover:bg-zinc-800/60 hover:text-zinc-900 dark:hover:text-zinc-200"
                               }`}
                             >
-                              <div className={`p-2.5 rounded-xl border transition-colors ${
-                                isActive 
-                                  ? isDark ? "bg-black border-transparent text-amber-400" : "bg-zinc-100 border-blue-250 text-[#1a73e8]" 
-                                  : isDark ? "bg-zinc-900 border-transparent text-zinc-500" : "bg-white border-zinc-200 text-zinc-500"
-                              }`}>
-                                <IconComp className="h-5 w-5" />
-                              </div>
+                              {settingsTab === "akun" && <div className="absolute left-0 top-2 bottom-2 w-1 bg-amber-500 dark:bg-amber-400 rounded-r-md" />}
+                              <User className="h-4 w-4 shrink-0 text-zinc-500 dark:text-zinc-400" />
                               <div className="flex-1 min-w-0">
-                                <h4 className="text-sm font-bold tracking-tight">{item.name}</h4>
-                                <p className="text-xs text-zinc-500 truncate mt-0.5 font-medium">{item.desc}</p>
+                                <div className="truncate">{getTranslation("tabAccountName", userLanguage)}</div>
                               </div>
                             </button>
-                          );
-                        })}
-                      </nav>
-                    </div>
-
-                    {/* Exit button at bottom of sidebar */}
-                    <button
-                      onClick={() => setShowSettings(false)}
-                      className="w-full flex items-center justify-center gap-2 p-3.5 rounded-2xl font-bold text-sm border transition-all duration-300 hover:scale-[1.02] cursor-pointer bg-zinc-900 hover:bg-zinc-850 text-white border-transparent dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 dark:border-transparent"
-                    >
-                      <X className="h-4 w-4 stroke-[2.5]" />
-                      <span>{getTranslation("close", userLanguage)}</span>
-                    </button>
-                  </div>
-
-                  {/* Right configuration values content panel */}
-                  <div className="flex-1 overflow-y-auto p-8 md:p-12">
-                    <div className="w-full space-y-8 animate-fadeIn">
-                      {/* TAB: AKUN */}
-                      {settingsTab === "akun" && (
-                        <div className="space-y-8">
-                          <div>
-                            <h3 className="text-xl font-display font-bold text-zinc-900 dark:text-zinc-100 tracking-tight">{getTranslation("accountHeader", userLanguage)}</h3>
-                            <p className="text-sm text-zinc-500 mt-1 font-medium">{getTranslation("accountSubheader", userLanguage)}</p>
                           </div>
 
-                          <div className={`rounded-3xl p-6 md:p-8 border ${isDark ? "bg-zinc-900/10 border-transparent shadow-none" : "bg-white border-zinc-200/80 shadow-md"}`}>
-                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6">
-                              <div className="flex items-center gap-4">
-                                {userPhoto ? (
-                                  <img src={userPhoto} referrerPolicy="no-referrer" alt="Profile" className="h-16 w-16 rounded-full border border-zinc-500/20 shadow-md" />
-                                ) : (
-                                  <div className="h-16 w-16 rounded-full border flex items-center justify-center bg-zinc-900 border-transparent text-zinc-400 shadow-md">
-                                    <User className="h-8 w-8" />
-                                  </div>
-                                )}
-                                <div>
-                                  <div className="flex items-center gap-2">
-                                    <span className="h-2.5 w-2.5 rounded-full bg-emerald-500 animate-pulse" />
-                                    <span className="text-base font-bold text-zinc-800 dark:text-zinc-200">{getTranslation("activeConnection", userLanguage)}</span>
-                                  </div>
-                                  <p className="text-sm text-zinc-500 mt-1 font-mono">{userEmail || getTranslation("offlineMode", userLanguage)}</p>
-                                </div>
-                              </div>
+                          <div>
+                            <span className="text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider px-2 block mb-1.5">
+                              AI Engine & Logic
+                            </span>
+                            <div className="space-y-1">
                               <button
-                                onClick={handleLogout}
-                                className="px-6 py-3 text-sm font-bold rounded-2xl border border-red-950/20 text-red-500 bg-red-500/5 hover:bg-red-500/10 transition-colors"
+                                onClick={() => setSettingsTab("model")}
+                                className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-left transition-all text-xs font-semibold relative cursor-pointer ${
+                                  settingsTab === "model"
+                                    ? "bg-white dark:bg-[#0d1117] text-zinc-900 dark:text-white border border-zinc-200 dark:border-zinc-700 shadow-xs"
+                                    : "text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200/60 dark:hover:bg-zinc-800/60 hover:text-zinc-900 dark:hover:text-zinc-200"
+                                }`}
                               >
-                                {getTranslation("signOut", userLanguage)}
+                                {settingsTab === "model" && <div className="absolute left-0 top-2 bottom-2 w-1 bg-amber-500 dark:bg-amber-400 rounded-r-md" />}
+                                <Cpu className="h-4 w-4 shrink-0 text-zinc-500 dark:text-zinc-400" />
+                                <div className="flex-1 min-w-0">
+                                  <div className="truncate">{getTranslation("tabModelName", userLanguage)}</div>
+                                </div>
+                              </button>
+
+                              <button
+                                onClick={() => setSettingsTab("ingatan")}
+                                className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-left transition-all text-xs font-semibold relative cursor-pointer ${
+                                  settingsTab === "ingatan"
+                                    ? "bg-white dark:bg-[#0d1117] text-zinc-900 dark:text-white border border-zinc-200 dark:border-zinc-700 shadow-xs"
+                                    : "text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200/60 dark:hover:bg-zinc-800/60 hover:text-zinc-900 dark:hover:text-zinc-200"
+                                }`}
+                              >
+                                {settingsTab === "ingatan" && <div className="absolute left-0 top-2 bottom-2 w-1 bg-amber-500 dark:bg-amber-400 rounded-r-md" />}
+                                <Brain className="h-4 w-4 shrink-0 text-zinc-500 dark:text-zinc-400" />
+                                <div className="flex-1 min-w-0">
+                                  <div className="truncate">{getTranslation("tabIngatanName", userLanguage)}</div>
+                                </div>
                               </button>
                             </div>
                           </div>
 
-                          <div className={`rounded-3xl p-6 md:p-8 border space-y-6 ${isDark ? "bg-zinc-900/10 border-transparent shadow-none" : "bg-white border-zinc-200/80 shadow-md"}`}>
-                            <div>
-                              <h4 className="text-base font-bold text-zinc-800 dark:text-zinc-200">{getTranslation("nicknameHeader", userLanguage)}</h4>
-                              <p className="text-xs text-zinc-500 mt-1 font-medium">{getTranslation("nicknameSubheader", userLanguage)}</p>
-                            </div>
-
-                            <div className="space-y-4">
-                              <div className="flex gap-3">
-                                <input
-                                  value={userName}
-                                  onChange={(e) => setUserName(e.target.value)}
-                                  placeholder={getTranslation("enterCustomName", userLanguage)}
-                                  className={`flex-1 rounded-2xl px-4 py-3.5 text-sm focus:outline-none border ${
-                                    isDark ? "bg-black border-zinc-900 text-zinc-100" : "bg-zinc-50 border-zinc-200"
-                                  }`}
-                                />
-                                <button
-                                  onClick={handleSaveUsername}
-                                  className="px-6 py-3.5 rounded-2xl text-sm font-bold bg-amber-500 text-zinc-950 transition-transform hover:scale-[1.01]"
-                                >
-                                  {getTranslation("saveNickname", userLanguage)}
-                                </button>
+                          <div>
+                            <span className="text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider px-2 block mb-1.5">
+                              System Interface
+                            </span>
+                            <button
+                              onClick={() => setSettingsTab("tampilan")}
+                              className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-left transition-all text-xs font-semibold relative cursor-pointer ${
+                                settingsTab === "tampilan"
+                                  ? "bg-white dark:bg-[#0d1117] text-zinc-900 dark:text-white border border-zinc-200 dark:border-zinc-700 shadow-xs"
+                                  : "text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200/60 dark:hover:bg-zinc-800/60 hover:text-zinc-900 dark:hover:text-zinc-200"
+                              }`}
+                            >
+                              {settingsTab === "tampilan" && <div className="absolute left-0 top-2 bottom-2 w-1 bg-amber-500 dark:bg-amber-400 rounded-r-md" />}
+                              <Sun className="h-4 w-4 shrink-0 text-zinc-500 dark:text-zinc-400" />
+                              <div className="flex-1 min-w-0">
+                                <div className="truncate">{getTranslation("tabTampilanName", userLanguage)}</div>
                               </div>
-                              {redeemFeedback && (
-                                <p className="text-sm text-emerald-500 font-semibold flex items-center gap-1.5">
-                                  <span>✓</span> <span>{redeemFeedback}</span>
-                                </p>
-                              )}
-                            </div>
+                            </button>
                           </div>
 
-                          <div className={`rounded-3xl p-6 md:p-8 border space-y-6 ${isDark ? "bg-zinc-900/10 border-transparent shadow-none" : "bg-white border-zinc-200/80 shadow-md"}`}>
-                            <div>
-                              <h4 className="text-base font-bold text-zinc-800 dark:text-zinc-200 flex items-center gap-2">
-                                <Globe className="h-5 w-5 text-amber-500" />
-                                {getTranslation("prefLangHeader", userLanguage)}
-                              </h4>
-                              <p className="text-xs text-zinc-500 mt-1 font-medium">{getTranslation("prefLangSubheader", userLanguage)}</p>
-                            </div>
+                          <div>
+                            <span className="text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider px-2 block mb-1.5">
+                              Help & Feedback
+                            </span>
+                            <button
+                              onClick={() => setSettingsTab("feedback")}
+                              className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-left transition-all text-xs font-semibold relative cursor-pointer ${
+                                settingsTab === "feedback"
+                                  ? "bg-white dark:bg-[#0d1117] text-zinc-900 dark:text-white border border-zinc-200 dark:border-zinc-700 shadow-xs"
+                                  : "text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200/60 dark:hover:bg-zinc-800/60 hover:text-zinc-900 dark:hover:text-zinc-200"
+                              }`}
+                            >
+                              {settingsTab === "feedback" && <div className="absolute left-0 top-2 bottom-2 w-1 bg-amber-500 dark:bg-amber-400 rounded-r-md" />}
+                              <MessageSquare className="h-4 w-4 shrink-0 text-zinc-500 dark:text-zinc-400" />
+                              <div className="flex-1 min-w-0">
+                                <div className="truncate">{getTranslation("tabFeedbackName", userLanguage)}</div>
+                              </div>
+                            </button>
+                          </div>
+                        </nav>
+                      </div>
 
-                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                              {LANGUAGES.map((lang) => {
-                                const isSelected = userLanguage === lang.code;
-                                return (
-                                  <button
-                                    key={lang.code}
-                                    type="button"
-                                    onClick={() => handleSelectLanguage(lang.code)}
-                                    className={`p-3 rounded-2xl border flex items-center gap-3 text-left transition-all duration-300 cursor-pointer ${
-                                      isSelected
-                                        ? "bg-amber-500/10 border-amber-500 text-amber-500 font-bold shadow-sm scale-[1.02]"
-                                        : isDark
-                                          ? "bg-black border-zinc-900 text-zinc-400 hover:border-zinc-850 hover:text-zinc-200"
-                                          : "bg-zinc-50 border-zinc-200 text-zinc-600 hover:border-zinc-300 hover:text-zinc-800"
-                                    }`}
-                                  >
-                                    <span className="text-xl shrink-0">{lang.flag}</span>
-                                    <div className="min-w-0">
-                                      <p className="text-xs font-bold truncate">{lang.name}</p>
-                                      <p className="text-[10px] text-zinc-500 truncate font-medium">{lang.nativeName}</p>
-                                    </div>
-                                  </button>
-                                );
-                              })}
+                      {/* Sidebar Footer */}
+                      <div className="space-y-3 pt-4 border-t border-zinc-200 dark:border-zinc-800">
+                        <div className="flex items-center gap-2.5 px-2">
+                          {userPhoto ? (
+                            <img src={userPhoto} referrerPolicy="no-referrer" alt="User Avatar" className="h-8 w-8 rounded-full border border-zinc-300 dark:border-zinc-700 object-cover" />
+                          ) : (
+                            <div className="h-8 w-8 rounded-full bg-amber-500 text-zinc-950 font-bold flex items-center justify-center text-xs">
+                              {(userName || "U").charAt(0).toUpperCase()}
                             </div>
+                          )}
+                          <div className="min-w-0 flex-1">
+                            <p className="text-xs font-bold text-zinc-900 dark:text-zinc-100 truncate leading-tight">{userName || "Guest User"}</p>
+                            <p className="text-[10px] text-zinc-500 truncate">{userEmail || "Local Session"}</p>
                           </div>
                         </div>
-                      )}
 
-                      {/* TAB: MODEL */}
-                      {settingsTab === "model" && (
-                        <div className="space-y-8">
-                          <div>
-                            <h3 className="text-xl font-display font-bold text-zinc-900 dark:text-zinc-100 tracking-tight">{getTranslation("modelHeader", userLanguage)}</h3>
-                            <p className="text-sm text-zinc-500 mt-1 font-medium">{getTranslation("modelSubheader", userLanguage)}</p>
-                          </div>
+                        <button
+                          onClick={() => setShowSettings(false)}
+                          className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-xs font-bold border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#161b22] hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-800 dark:text-zinc-200 transition-all cursor-pointer shadow-xs"
+                        >
+                          <X className="h-3.5 w-3.5" />
+                          <span>Close Settings</span>
+                        </button>
+                      </div>
+                    </div>
 
-                          <div className="space-y-4">
-                            <h4 className="text-sm font-bold text-zinc-550 uppercase font-mono tracking-wider">{getTranslation("availEngines", userLanguage)}</h4>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                              {MODEL_OPTIONS.map((m) => {
-                                const isSelected = currentSession ? currentSession.model === m.id : selectedModelId === m.id;
-                                return (
-                                  <div
-                                    key={m.id}
-                                    onClick={() => {
-                                      if (currentSession) {
-                                        setSessions((prev) => prev.map((s) => s.id === currentSessionId ? { ...s, model: m.id } : s));
-                                      } else {
-                                        setSelectedModelId(m.id);
-                                      }
-                                      playNotifySound();
-                                    }}
-                                    className={`p-6 rounded-3xl border cursor-pointer transition-all duration-300 flex flex-col justify-between ${
-                                      isSelected
-                                        ? isDark
-                                          ? "bg-zinc-900 border-transparent shadow-xl ring-2 ring-amber-500/10 text-zinc-100"
-                                          : "bg-blue-50/75 border-[#1a73e8] shadow-md ring-2 ring-blue-500/10 text-zinc-900"
-                                        : isDark
-                                          ? "border-transparent bg-zinc-900/10 text-zinc-400 hover:border-zinc-700 hover:bg-zinc-900/30"
-                                          : "border-zinc-200 bg-white text-zinc-650 hover:border-zinc-350 hover:bg-zinc-50/50"
-                                    }`}
-                                  >
-                                    <div>
-                                      <div className="flex items-center justify-between mb-3">
-                                        <span className="text-sm font-bold">{m.name}</span>
-                                        {isSelected ? (
-                                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/25 uppercase font-mono">{getTranslation("selected", userLanguage)}</span>
-                                        ) : (
-                                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-zinc-500/5 text-zinc-500 border border-zinc-500/10 uppercase font-mono">{getTranslation("compatible", userLanguage)}</span>
-                                        )}
-                                      </div>
-                                      <p className="text-xs leading-relaxed text-zinc-500">{m.description}</p>
+                    {/* Right GitHub Content Panel */}
+                    <div className="flex-1 flex flex-col h-full bg-white dark:bg-[#0d1117] min-w-0 overflow-hidden">
+                      {/* Top Bar Header */}
+                      <div className="px-8 py-5 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between shrink-0 bg-white dark:bg-[#0d1117]">
+                        <div>
+                          <h2 className="text-xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100">
+                            {settingsTab === "akun" && getTranslation("accountHeader", userLanguage)}
+                            {settingsTab === "model" && getTranslation("modelHeader", userLanguage)}
+                            {settingsTab === "tampilan" && getTranslation("displayHeader", userLanguage)}
+                            {settingsTab === "ingatan" && getTranslation("memoryHeader", userLanguage)}
+                            {settingsTab === "feedback" && getTranslation("feedbackHeader", userLanguage)}
+                          </h2>
+                          <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
+                            {settingsTab === "akun" && getTranslation("accountSubheader", userLanguage)}
+                            {settingsTab === "model" && getTranslation("modelSubheader", userLanguage)}
+                            {settingsTab === "tampilan" && getTranslation("displaySubheader", userLanguage)}
+                            {settingsTab === "ingatan" && getTranslation("memorySubheader", userLanguage)}
+                            {settingsTab === "feedback" && getTranslation("feedbackSubheader", userLanguage)}
+                          </p>
+                        </div>
+
+                        <button
+                          onClick={() => setShowSettings(false)}
+                          className="p-2 rounded-xl hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-zinc-800 dark:hover:text-white transition-colors cursor-pointer"
+                          title="Close (Esc)"
+                        >
+                          <X className="h-5 w-5" />
+                        </button>
+                      </div>
+
+                      {/* Main Scrollable Content */}
+                      <div className="flex-1 overflow-y-auto p-8 space-y-6">
+                        {/* TAB: AKUN */}
+                        {settingsTab === "akun" && (
+                          <div className="space-y-6 animate-fadeIn">
+                            {/* Box 1: Account Status */}
+                            <div className="border border-zinc-200 dark:border-zinc-800 rounded-xl overflow-hidden bg-white dark:bg-[#161b22] shadow-xs">
+                              <div className="bg-zinc-50/80 dark:bg-[#1c2128] px-5 py-3 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between">
+                                <h4 className="text-xs font-bold uppercase tracking-wider text-zinc-700 dark:text-zinc-300 flex items-center gap-2">
+                                  <User className="h-4 w-4 text-amber-500" />
+                                  <span>{getTranslation("activeConnection", userLanguage)}</span>
+                                </h4>
+                                <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                              </div>
+                              <div className="p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                                <div className="flex items-center gap-3.5">
+                                  {userPhoto ? (
+                                    <img src={userPhoto} referrerPolicy="no-referrer" alt="Profile" className="h-12 w-12 rounded-full border border-zinc-200 dark:border-zinc-700 object-cover" />
+                                  ) : (
+                                    <div className="h-12 w-12 rounded-full bg-amber-500 text-zinc-950 font-bold flex items-center justify-center text-lg">
+                                      {(userDisplayName || userName || "U").charAt(0).toUpperCase()}
                                     </div>
+                                  )}
+                                  <div>
+                                    <h5 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">{userDisplayName || userName || "Guest User"}</h5>
+                                    <p className="text-xs text-zinc-500 dark:text-zinc-400 font-mono mt-0.5">{userEmail || "Offline mode"}</p>
                                   </div>
-                                );
-                              })}
+                                </div>
+                                <button
+                                  onClick={handleLogout}
+                                  className="px-4 py-2 text-xs font-bold rounded-xl border border-red-500/30 text-red-500 bg-red-500/5 hover:bg-red-500/10 transition-colors cursor-pointer"
+                                >
+                                  {getTranslation("signOut", userLanguage)}
+                                </button>
+                              </div>
+                            </div>
+
+                            {/* Box 2: Nickname */}
+                            <div className="border border-zinc-200 dark:border-zinc-800 rounded-xl overflow-hidden bg-white dark:bg-[#161b22] shadow-xs">
+                              <div className="bg-zinc-50/80 dark:bg-[#1c2128] px-5 py-3 border-b border-zinc-200 dark:border-zinc-800">
+                                <h4 className="text-xs font-bold uppercase tracking-wider text-zinc-700 dark:text-zinc-300">
+                                  {getTranslation("nicknameHeader", userLanguage)}
+                                </h4>
+                              </div>
+                              <div className="p-5 space-y-3">
+                                <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                                  {getTranslation("nicknameSubheader", userLanguage)}
+                                </p>
+                                <div className="flex gap-3 max-w-lg">
+                                  <input
+                                    value={userName}
+                                    onChange={(e) => setUserName(e.target.value)}
+                                    placeholder={getTranslation("enterCustomName", userLanguage)}
+                                    className={`flex-1 rounded-xl px-3.5 py-2 text-xs focus:outline-none border ${
+                                      isDark ? "bg-[#0d1117] border-zinc-700 text-zinc-100" : "bg-zinc-50 border-zinc-300 text-zinc-900"
+                                    }`}
+                                  />
+                                  <button
+                                    onClick={handleSaveUsername}
+                                    className="px-4 py-2 rounded-xl text-xs font-bold bg-amber-500 hover:bg-amber-400 text-zinc-950 transition-all cursor-pointer"
+                                  >
+                                    {getTranslation("saveNickname", userLanguage)}
+                                  </button>
+                                </div>
+                                {redeemFeedback && (
+                                  <p className="text-xs text-emerald-500 font-semibold flex items-center gap-1.5">
+                                    <span>✓</span> <span>{redeemFeedback}</span>
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Box 3: Preferred Language */}
+                            <div className="border border-zinc-200 dark:border-zinc-800 rounded-xl overflow-hidden bg-white dark:bg-[#161b22] shadow-xs">
+                              <div className="bg-zinc-50/80 dark:bg-[#1c2128] px-5 py-3 border-b border-zinc-200 dark:border-zinc-800 flex items-center gap-2">
+                                <Globe className="h-4 w-4 text-amber-500" />
+                                <h4 className="text-xs font-bold uppercase tracking-wider text-zinc-700 dark:text-zinc-300">
+                                  {getTranslation("prefLangHeader", userLanguage)}
+                                </h4>
+                              </div>
+                              <div className="p-5">
+                                <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-4">
+                                  {getTranslation("prefLangSubheader", userLanguage)}
+                                </p>
+                                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                                  {LANGUAGES.map((lang) => {
+                                    const isSelected = userLanguage === lang.code;
+                                    return (
+                                      <button
+                                        key={lang.code}
+                                        type="button"
+                                        onClick={() => handleSelectLanguage(lang.code)}
+                                        className={`p-3 rounded-xl border flex items-center gap-3 text-left transition-all cursor-pointer ${
+                                          isSelected
+                                            ? "bg-amber-500/10 border-amber-500 text-amber-500 font-bold"
+                                            : isDark
+                                              ? "bg-[#0d1117] border-zinc-800 text-zinc-400 hover:border-zinc-700 hover:text-zinc-200"
+                                              : "bg-zinc-50 border-zinc-200 text-zinc-600 hover:border-zinc-300"
+                                        }`}
+                                      >
+                                        <span className="text-lg shrink-0">{lang.flag}</span>
+                                        <div className="min-w-0">
+                                          <p className="text-xs font-bold truncate">{lang.name}</p>
+                                          <p className="text-[10px] text-zinc-500 truncate font-mono">{lang.nativeName}</p>
+                                        </div>
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                              </div>
                             </div>
                           </div>
+                        )}
 
-                          {/* TEMPERATURE PRESETS FOR GEMMA-4 */}
-                          {((currentSession ? currentSession.model : selectedModelId) === "gemma-4-31b") && (
-                            <div className={`p-6 md:p-8 rounded-3xl border space-y-6 ${isDark ? "bg-zinc-900/40 border-zinc-800" : "bg-white border-zinc-200 shadow-sm"}`}>
-                              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                                <div>
-                                  <h4 className="text-base font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
-                                    <Sliders className="h-5 w-5 text-amber-500" />
-                                    Preset Temperature (Suhu Kreativitas)
-                                  </h4>
-                                  <p className="text-xs text-zinc-550 mt-1 font-medium">Suhu mempengaruhi tingkat kreativitas dan konsistensi jawaban model Gemma-4.</p>
-                                </div>
-                                <div className="flex items-center gap-3 self-start sm:self-center">
-                                  <span className="text-xs font-mono font-bold px-3 py-1.5 rounded-xl bg-black border border-zinc-800 text-amber-400 shadow-inner">
-                                    Active Temp: {activeTemp.toFixed(2)}
-                                  </span>
-                                </div>
+                        {/* TAB: MODEL */}
+                        {settingsTab === "model" && (
+                          <div className="space-y-6 animate-fadeIn">
+                            {/* Models Grid Box */}
+                            <div className="border border-zinc-200 dark:border-zinc-800 rounded-xl overflow-hidden bg-white dark:bg-[#161b22] shadow-xs">
+                              <div className="bg-zinc-50/80 dark:bg-[#1c2128] px-5 py-3 border-b border-zinc-200 dark:border-zinc-800 flex items-center gap-2">
+                                <Cpu className="h-4 w-4 text-amber-500" />
+                                <h4 className="text-xs font-bold uppercase tracking-wider text-zinc-700 dark:text-zinc-300">
+                                  {getTranslation("availEngines", userLanguage)}
+                                </h4>
                               </div>
-
-                              <div className="space-y-2">
-                                <input 
-                                  type="range" 
-                                  min="0.10" 
-                                  max="1.00" 
-                                  step="0.05"
-                                  value={activeTemp}
-                                  onChange={(e) => {
-                                    const val = parseFloat(e.target.value);
-                                    if (currentSession) {
-                                      setSessions((prev) => prev.map((s) => s.id === currentSessionId ? { ...s, temperature: val } : s));
-                                    } else {
-                                      setTemperature(val);
-                                    }
-                                  }}
-                                  className="w-full h-2 bg-zinc-850 dark:bg-black rounded-lg appearance-none cursor-pointer accent-amber-500"
-                                />
-                                <div className="flex justify-between text-[10px] text-zinc-550 font-mono font-bold px-1">
-                                  <span>Konsisten (0.10)</span>
-                                  <span>Kreatif (1.00)</span>
-                                </div>
-                              </div>
-
-                              <div className="space-y-3">
-                                <h5 className="text-xs font-bold text-zinc-550 uppercase font-mono tracking-wider">Optimized Presets untuk exeai-e5:5:9</h5>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                  {GEMMA_TEMP_PRESETS.map((p) => {
-                                    const [minStr, maxStr] = p.range.split("–");
-                                    const minVal = parseFloat(minStr);
-                                    const maxVal = parseFloat(maxStr);
-                                    const isMatched = activeTemp >= minVal && activeTemp <= maxVal;
-                                    
+                              <div className="p-5">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                  {MODEL_OPTIONS.map((m) => {
+                                    const isSelected = currentSession ? currentSession.model === m.id : selectedModelId === m.id;
                                     return (
                                       <div
-                                        key={p.id}
+                                        key={m.id}
                                         onClick={() => {
                                           if (currentSession) {
-                                            setSessions((prev) => prev.map((s) => s.id === currentSessionId ? { ...s, temperature: p.defaultValue } : s));
+                                            setSessions((prev) => prev.map((s) => s.id === currentSessionId ? { ...s, model: m.id } : s));
                                           } else {
-                                            setTemperature(p.defaultValue);
+                                            setSelectedModelId(m.id);
                                           }
                                           playNotifySound();
                                         }}
-                                        className={`p-4 rounded-2xl border cursor-pointer transition-all duration-300 flex flex-col justify-between text-left ${
-                                          isMatched
-                                            ? isDark
-                                              ? "bg-amber-500/10 border-amber-500/50 shadow-md shadow-amber-500/5 text-zinc-100"
-                                              : "bg-blue-50/80 border-blue-500/80 shadow-sm text-zinc-900"
+                                        className={`p-4 rounded-xl border cursor-pointer transition-all ${
+                                          isSelected
+                                            ? "bg-amber-500/10 border-amber-500 text-zinc-900 dark:text-zinc-100"
                                             : isDark
-                                              ? "border-transparent bg-zinc-900/20 text-zinc-400 hover:bg-zinc-900/40 hover:border-zinc-800"
-                                              : "border-zinc-200 bg-zinc-50/50 text-zinc-650 hover:bg-zinc-50 hover:border-zinc-300"
+                                              ? "border-zinc-800 bg-[#0d1117] text-zinc-400 hover:border-zinc-700"
+                                              : "border-zinc-200 bg-zinc-50 text-zinc-600 hover:border-zinc-300"
                                         }`}
                                       >
-                                        <div>
-                                          <div className="flex items-center justify-between mb-1.5 gap-2">
-                                            <span className="text-xs font-bold leading-tight">{p.name}</span>
-                                            <span className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded ${
-                                              isMatched 
-                                                ? "bg-amber-500/20 text-amber-400" 
-                                                : "bg-zinc-500/10 text-zinc-500"
-                                            }`}>
-                                              {p.range}
+                                        <div className="flex items-center justify-between mb-1.5">
+                                          <span className="text-xs font-bold">{m.name}</span>
+                                          {isSelected && (
+                                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-500 uppercase font-mono">
+                                              {getTranslation("selected", userLanguage)}
                                             </span>
-                                          </div>
-                                          <p className="text-[11px] leading-relaxed text-zinc-500">{p.description}</p>
+                                          )}
                                         </div>
+                                        <p className="text-xs text-zinc-500 leading-relaxed">{m.description}</p>
                                       </div>
                                     );
                                   })}
                                 </div>
                               </div>
                             </div>
-                          )}
 
-                          <div className="space-y-4">
-                            <h4 className="text-sm font-bold text-zinc-550 uppercase font-mono tracking-wider">Specialized Cognitive Presets</h4>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                              {SYSTEM_PRESETS.map((preset) => {
-                                const isSelected = currentSession ? currentSession.systemInstructionId === preset.id : selectedPresetId === preset.id;
-                                return (
-                                  <div
-                                    key={preset.id}
-                                    onClick={() => {
+                            {/* Temperature Box for Gemma-4 */}
+                            {((currentSession ? currentSession.model : selectedModelId) === "gemma-4-31b") && (
+                              <div className="border border-zinc-200 dark:border-zinc-800 rounded-xl overflow-hidden bg-white dark:bg-[#161b22] shadow-xs">
+                                <div className="bg-zinc-50/80 dark:bg-[#1c2128] px-5 py-3 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between">
+                                  <h4 className="text-xs font-bold uppercase tracking-wider text-zinc-700 dark:text-zinc-300 flex items-center gap-2">
+                                    <Sliders className="h-4 w-4 text-amber-500" />
+                                    <span>Gemma-4 Temperature Presets</span>
+                                  </h4>
+                                  <span className="text-xs font-mono font-bold px-2 py-0.5 rounded bg-zinc-900 text-amber-400 border border-zinc-800">
+                                    {activeTemp.toFixed(2)}
+                                  </span>
+                                </div>
+                                <div className="p-5 space-y-4">
+                                  <input 
+                                    type="range" 
+                                    min="0.10" 
+                                    max="1.00" 
+                                    step="0.05"
+                                    value={activeTemp}
+                                    onChange={(e) => {
+                                      const val = parseFloat(e.target.value);
                                       if (currentSession) {
-                                        setSessions((prev) => prev.map((s) => s.id === currentSessionId ? { ...s, systemInstructionId: preset.id } : s));
+                                        setSessions((prev) => prev.map((s) => s.id === currentSessionId ? { ...s, temperature: val } : s));
                                       } else {
-                                        setSelectedPresetId(preset.id);
+                                        setTemperature(val);
                                       }
-                                      playNotifySound();
                                     }}
-                                    className={`p-6 rounded-3xl border cursor-pointer transition-all duration-300 ${
-                                      isSelected
-                                        ? isDark
-                                          ? "bg-zinc-900 border-transparent shadow-xl ring-2 ring-amber-500/10"
-                                          : "bg-blue-50/75 border-[#1a73e8] shadow-md ring-2 ring-blue-500/10"
-                                        : isDark
-                                          ? "border-transparent bg-zinc-900/10 hover:border-zinc-700 hover:bg-zinc-900/30"
-                                          : "border-zinc-200 bg-white hover:border-zinc-350 hover:bg-zinc-50/50"
-                                    }`}
-                                  >
-                                    <div className="flex items-center gap-3.5 mb-3">
-                                      <div className={`p-2 rounded-xl border ${isSelected ? "text-amber-500 border-amber-500/25 bg-black" : "text-zinc-500 border-zinc-200 bg-zinc-50"}`}>
-                                        {getPresetIcon(preset.icon, "h-5 w-5")}
-                                      </div>
-                                      <span className="text-sm font-bold text-zinc-800 dark:text-zinc-200">{preset.name}</span>
-                                      {preset.badge && (
-                                        <span className="ml-auto text-[9px] font-bold px-2 py-0.5 rounded bg-amber-500/10 text-amber-500 uppercase font-mono tracking-wider">{preset.badge}</span>
-                                      )}
-                                    </div>
-                                    <p className="text-xs leading-relaxed text-zinc-500">{preset.description}</p>
+                                    className="w-full h-1.5 bg-zinc-300 dark:bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-amber-500"
+                                  />
+
+                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                    {GEMMA_TEMP_PRESETS.map((p) => {
+                                      const [minStr, maxStr] = p.range.split("–");
+                                      const minVal = parseFloat(minStr);
+                                      const maxVal = parseFloat(maxStr);
+                                      const isMatched = activeTemp >= minVal && activeTemp <= maxVal;
+                                      return (
+                                        <div
+                                          key={p.id}
+                                          onClick={() => {
+                                            if (currentSession) {
+                                              setSessions((prev) => prev.map((s) => s.id === currentSessionId ? { ...s, temperature: p.defaultValue } : s));
+                                            } else {
+                                              setTemperature(p.defaultValue);
+                                            }
+                                            playNotifySound();
+                                          }}
+                                          className={`p-3 rounded-xl border text-left cursor-pointer transition-colors ${
+                                            isMatched
+                                              ? "bg-amber-500/10 border-amber-500 text-amber-500 font-semibold"
+                                              : isDark ? "border-zinc-800 bg-[#0d1117] text-zinc-400" : "border-zinc-200 bg-zinc-50 text-zinc-600"
+                                          }`}
+                                        >
+                                          <div className="flex items-center justify-between text-xs font-bold mb-1">
+                                            <span>{p.name}</span>
+                                            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-zinc-500/10">{p.range}</span>
+                                          </div>
+                                          <p className="text-[11px] text-zinc-500 leading-normal">{p.description}</p>
+                                        </div>
+                                      );
+                                    })}
                                   </div>
-                                );
-                              })}
-                            </div>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* TAB: TAMPILAN */}
-                      {settingsTab === "tampilan" && (
-                        <div className="space-y-8">
-                          <div>
-                            <h3 className="text-xl font-display font-bold text-zinc-900 dark:text-zinc-100 tracking-tight">{getTranslation("displayHeader", userLanguage)}</h3>
-                            <p className="text-sm text-zinc-500 mt-1 font-medium">{getTranslation("displaySubheader", userLanguage)}</p>
-                          </div>
-
-                           <div className={`rounded-3xl p-6 md:p-8 border space-y-6 ${isDark ? "bg-zinc-900/10 border-transparent shadow-none" : "bg-white border-zinc-200/80 shadow-md"}`}>
-                             <h4 className="text-sm font-bold text-zinc-550 uppercase font-mono tracking-wider">{getTranslation("selectStyleTheme", userLanguage)}</h4>
-                             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                               {[
-                                 { id: "system", name: getTranslation("systemSync", userLanguage), desc: "Follow OS configurations", icon: Laptop },
-                                 { id: "dark", name: getTranslation("slateDark", userLanguage), desc: "Eye-saving deep slate", icon: Moon },
-                                 { id: "light", name: getTranslation("pureLight", userLanguage), desc: "High contrast paper white", icon: Sun },
-                               ].map((t) => {
-                                 const isSelected = themeMode === t.id;
-                                 const IconComp = t.icon;
-                                 return (
-                                   <div
-                                     key={t.id}
-                                     onClick={() => {
-                                       setThemeMode(t.id as any);
-                                       playNotifySound();
-                                     }}
-                                     className={`p-5 rounded-2xl border cursor-pointer transition-all duration-300 flex flex-col justify-between items-start text-left ${
-                                       isSelected
-                                         ? isDark
-                                           ? "bg-zinc-900 border-amber-500/40 shadow-md text-white"
-                                           : "bg-blue-50/75 border-[#1a73e8] shadow shadow-blue-500/5 text-zinc-900"
-                                         : isDark
-                                           ? "border-transparent bg-zinc-900/10 text-zinc-400 hover:border-zinc-700 hover:bg-zinc-900/30"
-                                           : "border-zinc-200 bg-white text-zinc-650 hover:border-zinc-350 hover:bg-zinc-50"
-                                     }`}
-                                   >
-                                    <div className="flex items-center gap-3 mb-3">
-                                      <div className={`p-2 rounded-lg border ${isSelected ? "text-amber-400 border-amber-500/25" : "text-zinc-500 border-zinc-800"}`}>
-                                        <IconComp className="h-4.5 w-4.5" />
-                                      </div>
-                                      <span className="text-xs font-bold">{t.name}</span>
-                                    </div>
-                                    <p className="text-[11px] leading-relaxed text-zinc-500">{t.desc}</p>
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          </div>
-
-                          <div className={`rounded-3xl p-6 md:p-8 border space-y-4 ${isDark ? "bg-zinc-900/10 border-transparent shadow-none" : "bg-white border-zinc-200/80 shadow-md"}`}>
-                            <h4 className="text-base font-bold text-zinc-800 dark:text-zinc-200">{getTranslation("chatHistorySettings", userLanguage)}</h4>
-                            <div className="flex items-center justify-between">
-                              <div>
-                                <p className="text-xs md:text-sm text-zinc-500 font-medium">{getTranslation("toggleYesterdayDesc", userLanguage)}</p>
+                                </div>
                               </div>
-                              <button
-                                onClick={() => {
-                                  const newVal = !showYesterdayHistory;
-                                  setShowYesterdayHistory(newVal);
-                                  localStorage.setItem("showYesterdayHistory", JSON.stringify(newVal));
-                                  playNotifySound();
-                                }}
-                                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none cursor-pointer ${
-                                  showYesterdayHistory ? "bg-amber-500" : "bg-zinc-700"
-                                }`}
-                              >
-                                <span
-                                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                                    showYesterdayHistory ? "translate-x-6" : "translate-x-1"
-                                  }`}
-                                />
-                              </button>
+                            )}
+
+                            {/* Cognitive Presets Box */}
+                            <div className="border border-zinc-200 dark:border-zinc-800 rounded-xl overflow-hidden bg-white dark:bg-[#161b22] shadow-xs">
+                              <div className="bg-zinc-50/80 dark:bg-[#1c2128] px-5 py-3 border-b border-zinc-200 dark:border-zinc-800">
+                                <h4 className="text-xs font-bold uppercase tracking-wider text-zinc-700 dark:text-zinc-300">
+                                  Cognitive & Persona Presets
+                                </h4>
+                              </div>
+                              <div className="p-5">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                  {SYSTEM_PRESETS.map((preset) => {
+                                    const isSelected = currentSession ? currentSession.systemInstructionId === preset.id : selectedPresetId === preset.id;
+                                    return (
+                                      <div
+                                        key={preset.id}
+                                        onClick={() => {
+                                          if (currentSession) {
+                                            setSessions((prev) => prev.map((s) => s.id === currentSessionId ? { ...s, systemInstructionId: preset.id } : s));
+                                          } else {
+                                            setSelectedPresetId(preset.id);
+                                          }
+                                          playNotifySound();
+                                        }}
+                                        className={`p-4 rounded-xl border cursor-pointer transition-all ${
+                                          isSelected
+                                            ? "bg-amber-500/10 border-amber-500"
+                                            : isDark ? "border-zinc-800 bg-[#0d1117]" : "border-zinc-200 bg-zinc-50"
+                                        }`}
+                                      >
+                                        <div className="flex items-center gap-2.5 mb-1.5">
+                                          <div className={`p-1.5 rounded-lg border ${isSelected ? "text-amber-500 border-amber-500/30 bg-amber-500/10" : "text-zinc-500 border-zinc-700"}`}>
+                                            {getPresetIcon(preset.icon, "h-4 w-4")}
+                                          </div>
+                                          <span className="text-xs font-bold text-zinc-900 dark:text-zinc-100">{preset.name}</span>
+                                        </div>
+                                        <p className="text-xs text-zinc-500 leading-relaxed">{preset.description}</p>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </div>
                             </div>
                           </div>
+                        )}
 
-                          <div className={`rounded-3xl p-6 md:p-8 border space-y-4 ${isDark ? "bg-zinc-900/10 border-transparent shadow-none" : "bg-white border-zinc-200/80 shadow-md"}`}>
-                            <h4 className="text-base font-bold text-zinc-800 dark:text-zinc-200">{getTranslation("acousticAudioHeader", userLanguage)}</h4>
-                            <p className="text-xs md:text-sm text-zinc-500 leading-relaxed font-medium">{getTranslation("acousticAudioDesc", userLanguage)}</p>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* TAB: INGATAN */}
-                      {settingsTab === "ingatan" && (
-                        <div className="space-y-8">
-                          <div>
-                            <h3 className="text-xl font-display font-bold text-zinc-900 dark:text-zinc-100 tracking-tight">{getTranslation("memoryHeader", userLanguage)}</h3>
-                            <p className="text-sm text-zinc-500 mt-1 font-medium">{getTranslation("memorySubheader", userLanguage)}</p>
-                          </div>
-
-                          <div className={`rounded-3xl p-6 md:p-8 border space-y-6 ${isDark ? "bg-zinc-900/10 border-transparent shadow-none" : "bg-white border-zinc-200/80 shadow-md"}`}>
-                            <div className="flex items-center gap-3">
-                              <Brain className="h-6 w-6 text-amber-500 animate-pulse" />
-                              <h4 className="text-base font-bold text-zinc-800 dark:text-zinc-200">{getTranslation("injectMemory", userLanguage)}</h4>
+                        {/* TAB: TAMPILAN */}
+                        {settingsTab === "tampilan" && (
+                          <div className="space-y-6 animate-fadeIn">
+                            <div className="border border-zinc-200 dark:border-zinc-800 rounded-xl overflow-hidden bg-white dark:bg-[#161b22] shadow-xs">
+                              <div className="bg-zinc-50/80 dark:bg-[#1c2128] px-5 py-3 border-b border-zinc-200 dark:border-zinc-800">
+                                <h4 className="text-xs font-bold uppercase tracking-wider text-zinc-700 dark:text-zinc-300">
+                                  {getTranslation("selectStyleTheme", userLanguage)}
+                                </h4>
+                              </div>
+                              <div className="p-5">
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                  {[
+                                    { id: "system", name: getTranslation("systemSync", userLanguage), desc: "Follow OS settings", icon: Laptop },
+                                    { id: "dark", name: getTranslation("slateDark", userLanguage), desc: "Eye-saving deep theme", icon: Moon },
+                                    { id: "light", name: getTranslation("pureLight", userLanguage), desc: "Clean paper white theme", icon: Sun },
+                                  ].map((t) => {
+                                    const isSelected = themeMode === t.id;
+                                    const IconComp = t.icon;
+                                    return (
+                                      <div
+                                        key={t.id}
+                                        onClick={() => {
+                                          setThemeMode(t.id as any);
+                                          playNotifySound();
+                                        }}
+                                        className={`p-4 rounded-xl border cursor-pointer transition-all ${
+                                          isSelected
+                                            ? "bg-amber-500/10 border-amber-500 text-amber-500 font-bold"
+                                            : isDark ? "border-zinc-800 bg-[#0d1117] text-zinc-400" : "border-zinc-200 bg-zinc-50 text-zinc-600"
+                                        }`}
+                                      >
+                                        <div className="flex items-center gap-2.5 mb-2">
+                                          <IconComp className="h-4 w-4" />
+                                          <span className="text-xs font-bold">{t.name}</span>
+                                        </div>
+                                        <p className="text-xs text-zinc-500">{t.desc}</p>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </div>
                             </div>
 
-                            <div className="flex gap-3">
-                              <input
-                                type="text"
-                                value={memoryInput}
-                                onChange={(e) => setMemoryInput(e.target.value)}
-                                placeholder={memories.length >= 5 ? "Maximum limit reached" : "Example: React TSX style..."}
-                                disabled={memories.length >= 5}
-                                className={`flex-1 rounded-2xl px-4 py-3.5 text-sm focus:outline-none border ${
-                                  isDark ? "bg-black border-zinc-900 text-zinc-100" : "bg-zinc-50 border-zinc-200"
-                                }`}
-                              />
-                              <button
-                                onClick={() => {
-                                  if (memoryInput.trim() && memories.length < 5) {
-                                    setMemories((prev) => [...prev, memoryInput.trim()]);
-                                    setMemoryInput("");
+                            <div className="border border-zinc-200 dark:border-zinc-800 rounded-xl overflow-hidden bg-white dark:bg-[#161b22] shadow-xs">
+                              <div className="bg-zinc-50/80 dark:bg-[#1c2128] px-5 py-3 border-b border-zinc-200 dark:border-zinc-800">
+                                <h4 className="text-xs font-bold uppercase tracking-wider text-zinc-700 dark:text-zinc-300">
+                                  {getTranslation("chatHistorySettings", userLanguage)}
+                                </h4>
+                              </div>
+                              <div className="p-5 flex items-center justify-between">
+                                <p className="text-xs text-zinc-500">
+                                  {getTranslation("toggleYesterdayDesc", userLanguage)}
+                                </p>
+                                <button
+                                  onClick={() => {
+                                    const newVal = !showYesterdayHistory;
+                                    setShowYesterdayHistory(newVal);
+                                    localStorage.setItem("showYesterdayHistory", JSON.stringify(newVal));
                                     playNotifySound();
-                                  }
-                                }}
-                                disabled={!memoryInput.trim() || memories.length >= 5}
-                                className="px-6 py-3.5 rounded-2xl text-sm font-bold bg-amber-500 text-zinc-950 disabled:opacity-40"
-                              >
-                                {getTranslation("saveMemory", userLanguage)}
-                              </button>
-                            </div>
-
-                            <div className="space-y-3 pt-4 border-t border-zinc-500/10">
-                              {memories.length === 0 ? (
-                                <div className="text-center py-8 text-sm text-zinc-500 italic border border-dashed rounded-2xl border-dashed rounded-2xl border-zinc-500/20">{getTranslation("noMemories", userLanguage)}</div>
-                              ) : (
-                                memories.map((mem, idx) => (
-                                  <div key={idx} className="flex items-center justify-between gap-4 p-4.5 rounded-2xl bg-zinc-500/5 border border-zinc-500/10 text-sm">
-                                    <div className="flex items-center gap-3 min-w-0">
-                                      <span className="h-2 w-2 rounded-full bg-amber-500 shrink-0" />
-                                      <span className="font-medium truncate text-zinc-800 dark:text-zinc-300">{mem}</span>
-                                    </div>
-                                    <button
-                                      onClick={() => {
-                                        setMemories((prev) => prev.filter((_, i) => i !== idx));
-                                        playNotifySound();
-                                      }}
-                                      className="p-1.5 rounded-xl border border-zinc-500/10 hover:bg-red-500/10 text-zinc-400 hover:text-red-500"
-                                    >
-                                      <Trash2 className="h-4 w-4" />
-                                    </button>
-                                  </div>
-                                ))
-                              )}
+                                  }}
+                                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors cursor-pointer ${
+                                    showYesterdayHistory ? "bg-amber-500" : "bg-zinc-700"
+                                  }`}
+                                >
+                                  <span
+                                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                                      showYesterdayHistory ? "translate-x-6" : "translate-x-1"
+                                    }`}
+                                  />
+                                </button>
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      )}
+                        )}
 
-                      {/* TAB: FEEDBACK */}
-                      {settingsTab === "feedback" && (
-                        <div className="animate-fadeIn">
-                          {renderFeedbackForm()}
-                        </div>
-                      )}
+                        {/* TAB: INGATAN */}
+                        {settingsTab === "ingatan" && (
+                          <div className="space-y-6 animate-fadeIn">
+                            <div className="border border-zinc-200 dark:border-zinc-800 rounded-xl overflow-hidden bg-white dark:bg-[#161b22] shadow-xs">
+                              <div className="bg-zinc-50/80 dark:bg-[#1c2128] px-5 py-3 border-b border-zinc-200 dark:border-zinc-800 flex items-center gap-2">
+                                <Brain className="h-4 w-4 text-amber-500" />
+                                <h4 className="text-xs font-bold uppercase tracking-wider text-zinc-700 dark:text-zinc-300">
+                                  {getTranslation("injectMemory", userLanguage)}
+                                </h4>
+                              </div>
+                              <div className="p-5 space-y-4">
+                                <p className="text-xs text-zinc-500">
+                                  Informasi latar belakang personal disimpan agar AI menyesuaikan jawaban.
+                                </p>
+
+                                <div className="flex gap-3 max-w-lg">
+                                  <input
+                                    type="text"
+                                    value={memoryInput}
+                                    onChange={(e) => setMemoryInput(e.target.value)}
+                                    placeholder={memories.length >= 5 ? "Limit reached" : "Example: Prefer TSX code examples..."}
+                                    disabled={memories.length >= 5}
+                                    className={`flex-1 rounded-xl px-3.5 py-2 text-xs focus:outline-none border ${
+                                      isDark ? "bg-[#0d1117] border-zinc-700 text-zinc-100" : "bg-zinc-50 border-zinc-300 text-zinc-900"
+                                    }`}
+                                  />
+                                  <button
+                                    onClick={() => {
+                                      if (memoryInput.trim() && memories.length < 5) {
+                                        setMemories((prev) => [...prev, memoryInput.trim()]);
+                                        setMemoryInput("");
+                                        playNotifySound();
+                                      }
+                                    }}
+                                    disabled={!memoryInput.trim() || memories.length >= 5}
+                                    className="px-4 py-2 rounded-xl text-xs font-bold bg-amber-500 text-zinc-950 disabled:opacity-40 cursor-pointer"
+                                  >
+                                    {getTranslation("saveMemory", userLanguage)}
+                                  </button>
+                                </div>
+
+                                <div className="space-y-2 pt-3 border-t border-zinc-200 dark:border-zinc-800">
+                                  {memories.length === 0 ? (
+                                    <p className="text-center py-6 text-xs text-zinc-500 italic">{getTranslation("noMemories", userLanguage)}</p>
+                                  ) : (
+                                    memories.map((mem, idx) => (
+                                      <div key={idx} className="flex items-center justify-between gap-3 p-3 rounded-lg bg-zinc-500/5 border border-zinc-500/10 text-xs">
+                                        <div className="flex items-center gap-2.5 min-w-0">
+                                          <span className="h-1.5 w-1.5 rounded-full bg-amber-500 shrink-0" />
+                                          <span className="font-medium truncate text-zinc-800 dark:text-zinc-200">{mem}</span>
+                                        </div>
+                                        <button
+                                          onClick={() => {
+                                            setMemories((prev) => prev.filter((_, i) => i !== idx));
+                                            playNotifySound();
+                                          }}
+                                          className="p-1 text-zinc-400 hover:text-red-500 cursor-pointer"
+                                        >
+                                          <Trash2 className="h-3.5 w-3.5" />
+                                        </button>
+                                      </div>
+                                    ))
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* TAB: FEEDBACK */}
+                        {settingsTab === "feedback" && (
+                          <div className="animate-fadeIn">
+                            {renderFeedbackForm()}
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
