@@ -194,18 +194,21 @@ function TypewriterMessage({
     }
   }, [content, isLatest]);
 
+  const fullParsed = parseMessageThinking(content);
   const { thinking, actual, isThinking } = parseMessageThinking(displayedContent);
+  const effectiveIsThinking = isThinking || (fullParsed.isThinking && !actual);
+  const effectiveThinking = thinking || fullParsed.thinking;
   const duration = thinkingDuration || 2;
 
   return (
     <div className="flex flex-col">
       {/* 1. THINKING PROCESS BLOCK (LIGHTBULB ICON, AMBER THEME, EXPANDABLE) */}
-      {isThinking ? (
+      {effectiveIsThinking ? (
         <div className="mb-3 font-sans select-none align-baseline flex items-center gap-2 text-xs text-amber-600 dark:text-amber-400 font-medium bg-amber-500/10 px-3 py-1.5 rounded-xl border border-amber-500/20 w-fit">
           <Lightbulb className="h-3.5 w-3.5 text-amber-500 animate-pulse shrink-0" />
           <span>Thinking...</span>
         </div>
-      ) : thinking !== null ? (
+      ) : effectiveThinking !== null ? (
         <div className="mb-3 font-sans select-none align-baseline flex flex-col items-start">
           <button
             onClick={() => setExpandedThoughts(prev => ({ ...prev, [msgId]: !prev[msgId] }))}
@@ -228,7 +231,7 @@ function TypewriterMessage({
                 className="overflow-hidden w-full"
               >
                 <div className="mt-2 ml-3.5 pl-3.5 border-l-2 border-zinc-200 dark:border-zinc-800 text-xs text-zinc-500 dark:text-zinc-400 font-mono leading-relaxed whitespace-pre-wrap py-1">
-                  {thinking || "Processing reasoning..."}
+                  {effectiveThinking || "Processing reasoning..."}
                 </div>
               </motion.div>
             )}
@@ -236,17 +239,17 @@ function TypewriterMessage({
         </div>
       ) : null}
 
-      {/* 2. CHAT RESPONSE OR ERROR / WARNING BLOCK */}
+      {/* 2. CHAT RESPONSE OR LOADING / ERROR BLOCK */}
       {actual ? (
         <MarkdownRenderer content={actual} />
-      ) : isGenerating && isLatest && displayedContent === "" ? (
-        <div className="flex items-center gap-2 py-2">
+      ) : isGenerating ? (
+        <div className="flex items-center gap-2 py-2 select-none">
           <span className="h-1.5 w-1.5 rounded-full bg-zinc-500 animate-[bounce_1s_infinite_100ms]" />
           <span className="h-1.5 w-1.5 rounded-full bg-zinc-500 animate-[bounce_1s_infinite_200ms]" />
           <span className="h-1.5 w-1.5 rounded-full bg-zinc-500 animate-[bounce_1s_infinite_300ms]" />
         </div>
-      ) : !isGenerating && !actual ? (
-        /* CHAT ERROR / EMPTY RESPONSE WARNING - RED/ROSE ERROR STYLE WITH ALERT ICON */
+      ) : !actual && effectiveThinking === null && !effectiveIsThinking ? (
+        /* CHAT ERROR / EMPTY RESPONSE WARNING - ONLY SHOWN IF GENERATION FINISHED AND NO TEXT/THINKING IS PRESENT */
         <div className="text-rose-600 dark:text-rose-400 text-xs mt-1 select-none font-sans flex items-center gap-2 bg-rose-500/10 border border-rose-500/20 px-3.5 py-2 rounded-xl w-fit">
           <AlertCircle className="h-4 w-4 text-rose-500 shrink-0" />
           <span>No text response was generated. Please try resending or rephrasing your message!</span>
@@ -376,10 +379,12 @@ export default function App() {
       return { thinking: sanitizeAndShortenThought(thinking), actual, isThinking: true };
     }
 
-    // Check if the content ends with a partial <think tag to prevent temporary flickering of partial tag
-    const partialThinkRegex = /<t(h(i(n(k)?)?)?)?$/i;
-    if (partialThinkRegex.test(content)) {
-      return { thinking: "", actual: content.replace(partialThinkRegex, "").trim(), isThinking: true };
+    // Check if the content starts or ends with a partial <think> tag (e.g. "<", "<t", "<th", etc.)
+    const partialThinkRegex = /<(t(h(i(n(k)?)?)?)?)?$/i;
+    if (partialThinkRegex.test(content) || /^<(t(h(i(n(k)?)?)?)?)?/i.test(content.trim())) {
+      if (!content.includes("</think>")) {
+        return { thinking: "", actual: "", isThinking: true };
+      }
     }
 
     // Just in case there is any stray/orphaned </think> or <think> in the text, clean them up
