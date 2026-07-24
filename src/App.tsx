@@ -4196,7 +4196,7 @@ export default function App() {
                           placeholder={userLanguage === "id" ? "Tanyakan apa saja pada ExeChat..." : "Ask ExeChat anything..."}
                           disabled={isGenerating}
                           className={`flex-1 bg-transparent resize-none border-none outline-none focus:ring-0 text-[15px] sm:text-base md:text-base min-h-[44px] md:min-h-[50px] max-h-40 font-sans py-2.5 ${
-                            isDark ? "text-zinc-250 placeholder-zinc-500" : "text-zinc-850 placeholder-zinc-400"
+                            isDark ? "text-zinc-100 placeholder:text-zinc-500" : "text-zinc-900 placeholder:text-zinc-500"
                           }`}
                           style={{ height: "auto" }}
                         />
@@ -4284,10 +4284,10 @@ export default function App() {
                         >
                           {/* Message bubble */}
                           <div
-                            className={`max-w-[88%] md:max-w-[82%] transition-all duration-300 ${
+                            className={`max-w-[88%] md:max-w-[82%] min-w-0 break-words [overflow-wrap:anywhere] transition-all duration-300 ${
                               isUser
                                 ? `${curTheme.bubbleUser} rounded-[20px] rounded-tr-sm p-3 px-4 shadow-sm border`
-                                : "bg-transparent border-transparent p-0"
+                                : "bg-transparent border-transparent p-0 w-full"
                             }`}
                           >
 
@@ -4330,7 +4330,7 @@ export default function App() {
                                    </div>
                                  </div>
                                ) : (
-                                 <div className="whitespace-pre-wrap leading-relaxed font-sans text-sm sm:text-[15px] md:text-base select-text flex flex-col gap-2.5 relative group/msg">
+                                 <div className="whitespace-pre-wrap break-words [overflow-wrap:anywhere] leading-relaxed font-sans text-sm sm:text-[15px] md:text-base select-text flex flex-col gap-2.5 relative group/msg">
                                    {msg.attachment && (
                                      <div className={`flex items-center gap-3 p-3 rounded-xl border max-w-sm transition-all duration-300 ${
                                        isDark 
@@ -4378,7 +4378,7 @@ export default function App() {
                                    )}
                                    <div className="flex items-start justify-between gap-4">
                                      <div 
-                                       className="flex-1 cursor-pointer hover:opacity-90 active:scale-[0.99] transition-all"
+                                       className="flex-1 min-w-0 break-words [overflow-wrap:anywhere] cursor-pointer hover:opacity-90 active:scale-[0.99] transition-all"
                                        title="Double-click to edit message"
                                        onDoubleClick={() => {
                                          if (!isGenerating) {
@@ -4435,7 +4435,7 @@ export default function App() {
                                   </span>
                                 </div>
                               ) : (
-                                <div className="text-zinc-800 dark:text-zinc-100 font-sans text-[15px] sm:text-[16px] md:text-[18px] leading-relaxed select-text">
+                                <div className="text-zinc-800 dark:text-zinc-100 font-sans text-[15px] sm:text-[16px] md:text-[18px] leading-relaxed select-text min-w-0 max-w-full break-words [overflow-wrap:anywhere]">
                                   <TypewriterMessage
                                     content={msg.content}
                                     isLatest={index === currentSession.messages.length - 1}
@@ -4680,7 +4680,7 @@ export default function App() {
                     )}
 
                     <div className="flex items-center w-full gap-1.5 md:gap-2">
-                      {/* Upload button + Model chip inside prompt box */}
+                      {/* Upload button inside prompt box */}
                       <div className="flex items-center gap-1.5 shrink-0">
                         <div className="relative">
                           <button
@@ -4727,24 +4727,6 @@ export default function App() {
                             )}
                           </AnimatePresence>
                         </div>
-
-                        {/* Inline Model Picker Chip */}
-                        <button
-                          type="button"
-                          onClick={() => setShowModelModal(true)}
-                          className={`flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold rounded-full border transition-all cursor-pointer ${
-                            isDark
-                              ? "bg-zinc-800/80 hover:bg-zinc-800 text-purple-300 border-zinc-700/80"
-                              : "bg-purple-50 hover:bg-purple-100 text-purple-700 border-purple-200"
-                          }`}
-                          title={userLanguage === "id" ? "Ganti Model AI" : "Switch AI Model"}
-                        >
-                          <Cpu className="h-3 w-3 text-purple-500 shrink-0" />
-                          <span className="truncate max-w-[85px] sm:max-w-[130px] font-mono text-[10px] md:text-[11px]">
-                            ^ {activeModel.name}
-                          </span>
-                          <ChevronDown className="h-3 w-3 text-purple-400 shrink-0" />
-                        </button>
                       </div>
 
                      <textarea
@@ -4766,13 +4748,30 @@ export default function App() {
                        }
                        disabled={isGenerating}
                        className={`flex-1 max-h-40 min-h-[36px] md:min-h-[40px] bg-transparent resize-none py-1.5 md:py-2 px-2 border-none outline-none focus:ring-0 text-[15px] sm:text-base md:text-base ${
-                         isDark ? "text-zinc-200 placeholder-zinc-550" : "text-zinc-850 placeholder-zinc-400"
+                         isDark ? "text-zinc-100 placeholder:text-zinc-500" : "text-zinc-900 placeholder:text-zinc-500"
                        }`}
                        style={{ height: "auto" }}
                      />
 
-                    {/* Abort button / Submit button */}
-                    <div className="flex items-center shrink-0">
+                    {/* Inline Model Picker Chip + Abort/Submit button on the right */}
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => setShowModelModal(true)}
+                        className={`flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold rounded-full border transition-all cursor-pointer ${
+                          isDark
+                            ? "bg-zinc-800/80 hover:bg-zinc-800 text-purple-300 border-zinc-700/80"
+                            : "bg-purple-50 hover:bg-purple-100 text-purple-700 border-purple-200"
+                        }`}
+                        title={userLanguage === "id" ? "Ganti Model AI" : "Switch AI Model"}
+                      >
+                        <Cpu className="h-3 w-3 text-purple-500 shrink-0" />
+                        <span className="truncate max-w-[80px] sm:max-w-[130px] font-sans text-[10px] md:text-[11px]">
+                          {activeModel.name}
+                        </span>
+                        <ChevronDown className="h-3 w-3 text-purple-400 shrink-0" />
+                      </button>
+
                       {isGenerating ? (
                         <button
                           onClick={handleStopGeneration}

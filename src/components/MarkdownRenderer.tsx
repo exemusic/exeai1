@@ -180,7 +180,7 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps) {
   const parts = preprocessedContent.split(/(```[\s\S]*?```)/g);
 
   return (
-    <div className="space-y-4 text-zinc-800 dark:text-zinc-100 font-sans leading-relaxed text-base md:text-[17px]">
+    <div className="space-y-4 text-zinc-800 dark:text-zinc-100 font-sans leading-relaxed text-base md:text-[17px] min-w-0 max-w-full break-words [overflow-wrap:anywhere]">
       {parts.map((part, index) => {
 
         if (part.startsWith("```")) {
@@ -249,7 +249,7 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps) {
               return [
                 <code
                   key={subIdx}
-                  className="rounded bg-zinc-100 dark:bg-zinc-900/90 border border-zinc-200 dark:border-zinc-800 px-1.5 py-0.5 font-mono text-[13px] md:text-sm text-amber-600 dark:text-amber-400/90"
+                  className="rounded bg-zinc-100 dark:bg-zinc-900/90 border border-zinc-200 dark:border-zinc-800 px-1.5 py-0.5 font-mono text-[13px] md:text-sm text-amber-600 dark:text-amber-400/90 break-words [overflow-wrap:anywhere]"
                 >
                   {inlinePart.slice(1, -1)}
                 </code>
@@ -396,7 +396,7 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps) {
 
           flushListBuffer(lineIdx);
           renderedElements.push(
-            <p key={lineIdx} className="text-zinc-700 dark:text-zinc-300 leading-relaxed mb-3 last:mb-0">
+            <p key={lineIdx} className="text-zinc-700 dark:text-zinc-300 leading-relaxed mb-3 last:mb-0 break-words [overflow-wrap:anywhere]">
               {renderInlineStyles(line)}
             </p>
           );
