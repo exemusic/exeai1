@@ -1751,15 +1751,16 @@ body {
     };
 
     const assistantMsgId = "ai-" + Date.now();
+    thinkingStartTimesRef.current[assistantMsgId] = Date.now();
     activeAssistantMsgIdRef.current = assistantMsgId;
 
     const tempAssistantMsg: ChatMessage = {
       id: assistantMsgId,
       role: "assistant",
-      content: "<think>Reviewing project context and prompt... (1s)",
+      content: "<think>Reviewing project context and prompt...",
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       modelId: selectedModel,
-      thinkingDuration: 1,
+      thinkingDuration: 0.1,
     };
 
     setChatHistory(prev => [...prev, userMsg, tempAssistantMsg]);
@@ -1824,18 +1825,19 @@ body {
         `=========================================\n` +
         `SYSTEM & RESPONSE FORMAT INSTRUCTIONS:\n` +
         `=========================================\n` +
-        `1. MANDATORY LANGUAGE MATCHING: Respond strictly in the SAME language as the User Instruction (e.g. English if prompt is in English, Indonesian if prompt is in Indonesian).\n` +
-        `2. CRITICAL FOR CODE MODIFICATIONS & ERROR FIXES: When the user asks to modify, update, fix, create, or change code, OR provides an error log/syntax error/console error, you MUST fix the bug in the code and generate the complete updated workspace files inside a single \`\`\`json block at the end of your message.\n` +
-        `3. CHEERFUL, DETAILED & COMPREHENSIVE RESPONSES: Be warm, cheerful, enthusiastic, and helpful. NEVER write brief or generic 1-sentence responses like 'I have processed your request' or 'Done'. ALWAYS write 2 to 4 detailed, friendly, and helpful paragraphs explaining what changes were made, why, how the interface was updated, and how to test them.\n` +
-        `4. Follow user instructions precisely. DO NOT add unrequested extra features, buttons, or unasked visual components.\n` +
-        `5. SOLUTION-FIRST DIRECTIVE: NEVER claim inability or fake completion without providing the code changes. You MUST ALWAYS provide a direct, functional, working code solution and include the complete updated files in the \`\`\`json block.\n` +
-        `6. JSON output structure example:\n` +
+        `1. MANDATORY THINKING PROCESS: You MUST ALWAYS start your response with a thinking/reasoning process enclosed strictly within <think> and </think> tags in English (e.g. <think>Analyzing workspace files...\nEvaluating prompt and code updates...\nFormulating solution strategy...</think>).\n` +
+        `2. MANDATORY LANGUAGE MATCHING: Respond strictly in the SAME language as the User Instruction (e.g. English if prompt is in English, Indonesian if prompt is in Indonesian).\n` +
+        `3. CRITICAL FOR CODE MODIFICATIONS & ERROR FIXES: When the user asks to modify, update, fix, create, or change code, OR provides an error log/syntax error/console error, you MUST fix the bug in the code and generate the complete updated workspace files inside a single \`\`\`json block at the end of your message.\n` +
+        `4. CHEERFUL, DETAILED & COMPREHENSIVE RESPONSES: Be warm, cheerful, enthusiastic, and helpful. NEVER write brief or generic 1-sentence responses like 'I have processed your request' or 'Done'. ALWAYS write 2 to 4 detailed, friendly, and helpful paragraphs explaining what changes were made, why, how the interface was updated, and how to test them.\n` +
+        `5. Follow user instructions precisely. DO NOT add unrequested extra features, buttons, or unasked visual components.\n` +
+        `6. SOLUTION-FIRST DIRECTIVE: NEVER claim inability or fake completion without providing the code changes. You MUST ALWAYS provide a direct, functional, working code solution and include the complete updated files in the \`\`\`json block.\n` +
+        `7. JSON output structure example:\n` +
         `\`\`\`json\n` +
         `[\n` +
         `  { "path": "index.html", "content": "...complete updated html..." }\n` +
         `]\n` +
         `\`\`\`\n` +
-        `7. Provide complete, production-ready code in the "content" field. NEVER use placeholders or ellipsis like "// rest of code".`
+        `8. Provide complete, production-ready code in the "content" field. NEVER use placeholders or ellipsis like "// rest of code".`
     };
 
     const payloadMessages = [...previousContext, currentPromptTurn];
@@ -2230,7 +2232,7 @@ body {
   const sanitizeAndShortenThought = (thinking: string): string => {
     if (!thinking) return "";
 
-    // Keywords to completely filter out (privacy, internal directives, system guidelines, secrets, APIs)
+    // Keywords to completely filter out (privacy, internal system guidelines, secrets, APIs)
     const forbiddenKeywords = [
       "chika",
       "ravita",
@@ -2238,27 +2240,13 @@ body {
       "hengki",
       "system memory",
       "vercel",
-      "developer",
       "private",
       "confidential",
-      "instruction",
-      "directive",
-      "preset",
       "designinstruction",
       "thinkinstruction",
       "linkinstruction",
       "moderneventinstruction",
       "userrequestedpersonality",
-      "important rule",
-      "formatting rule",
-      "file list",
-      "workspace file",
-      "index.html",
-      "src/",
-      "\"path\":",
-      "\"content\":",
-      "{\"path\"",
-      "{\"content\"",
       "api_key",
       "apikey",
       "secret",
@@ -2327,8 +2315,13 @@ body {
     return slicedLines.map(step => `• ${step}`).join("\n");
   };
 
-  const parseMessageThinking = (content: string) => {
-    if (!content) return { thinking: null, actual: "", isThinking: false };
+  const parseMessageThinking = (content: string, isStreaming: boolean = false) => {
+    if (!content) {
+      if (isStreaming) {
+        return { thinking: "Reviewing project context and prompt...", actual: "", isThinking: true };
+      }
+      return { thinking: null, actual: "", isThinking: false };
+    }
 
     // Case-insensitive regex to find <think>...</think>
     const thinkRegex = /<think>([\s\S]*?)<\/think>/gi;
@@ -2353,7 +2346,12 @@ body {
     const partialThinkRegex = /<t(h(i(n(k)?)?)?)?$/i;
     if (partialThinkRegex.test(content)) {
       const actual = cleanDisplayContent(content);
-      return { thinking: "", actual, isThinking: true };
+      return { thinking: "Reviewing project context and prompt...", actual, isThinking: true };
+    }
+
+    if (isStreaming) {
+      const actual = cleanDisplayContent(content);
+      return { thinking: "Analyzing codebase and prompt...", actual, isThinking: true };
     }
 
     const actual = cleanDisplayContent(content);
@@ -2411,7 +2409,8 @@ body {
   };
 
   const renderMessageContent = (content: string, msgId: string) => {
-    const { thinking, actual, isThinking } = parseMessageThinking(content);
+    const isMsgStreaming = isAIEditing && msgId === activeAssistantMsgIdRef.current;
+    const { thinking, actual, isThinking } = parseMessageThinking(content, isMsgStreaming);
     
     const msg = chatHistory.find(m => m.id === msgId);
     const msgDuration = msg?.thinkingDuration || 2;

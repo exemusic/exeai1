@@ -54,7 +54,13 @@ import {
   Upload,
   Loader2,
   Bug,
-  Lightbulb
+  Lightbulb,
+  CheckCircle2,
+  Filter,
+  ArrowLeft,
+  ExternalLink,
+  Film,
+  Image as ImageIcon
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { Message, ChatSession, SystemPreset, ModelOption } from "./types";
@@ -605,6 +611,9 @@ export default function App() {
   const [adminLoading, setAdminLoading] = useState(false);
   const [adminError, setAdminError] = useState<string | null>(null);
   const [adminSearch, setAdminSearch] = useState("");
+  const [selectedAdminFeedback, setSelectedAdminFeedback] = useState<any | null>(null);
+  const [adminCategoryFilter, setAdminCategoryFilter] = useState<string>("All");
+  const [adminStatusFilter, setAdminStatusFilter] = useState<string>("All");
 
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [editingMessageText, setEditingMessageText] = useState<string>("");
@@ -1714,7 +1723,7 @@ export default function App() {
         };
       }
 
-      const formattedMessage = `[Category: ${feedbackCategory}] ${feedbackMessage}`;
+      const activeMessages = currentSession?.messages || [];
       const res = await fetch("/api/feedback/submit", {
         method: "POST",
         headers: {
@@ -1722,8 +1731,22 @@ export default function App() {
         },
         body: JSON.stringify({
           email: userEmail || "anonymous@gmail.com",
-          message: formattedMessage,
-          attachment: attachmentPayload
+          message: feedbackMessage.trim(),
+          category: feedbackCategory,
+          attachment: attachmentPayload,
+          chatHistory: activeMessages.length > 0 ? activeMessages.slice(-20).map(m => ({
+            id: m.id,
+            role: m.role,
+            content: m.content,
+            timestamp: m.timestamp,
+            modelId: (m as any).modelId || m.routedModelId || selectedModelId
+          })) : null,
+          modelInfo: selectedModelId,
+          clientMeta: {
+            userAgent: typeof navigator !== "undefined" ? navigator.userAgent : "",
+            language: userLanguage,
+            screenResolution: typeof window !== "undefined" ? `${window.innerWidth}x${window.innerHeight}` : ""
+          }
         })
       });
 
@@ -1747,15 +1770,30 @@ export default function App() {
     if (!dislikeReason.trim() || dislikeSubmitting || !dislikeFeedbackToast) return;
     setDislikeSubmitting(true);
     try {
-      const formattedMessage = `[Dislike Feedback - Msg ID: ${dislikeFeedbackToast.msgId}] ${dislikeReason.trim()}${
-        dislikeFeedbackToast.msgContent ? ` (Excerpt: "${dislikeFeedbackToast.msgContent.substring(0, 150)}...")` : ""
+      const formattedMessage = `[Dislike / Chat Error - Msg ID: ${dislikeFeedbackToast.msgId}] ${dislikeReason.trim()}${
+        dislikeFeedbackToast.msgContent ? `\n\nTarget Message Excerpt:\n"${dislikeFeedbackToast.msgContent}"` : ""
       }`;
+      const activeMessages = currentSession?.messages || [];
       const res = await fetch("/api/feedback/submit", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           email: userEmail || "anonymous@gmail.com",
           message: formattedMessage,
+          category: "Dislike / Chat Error",
+          chatHistory: activeMessages.length > 0 ? activeMessages.slice(-20).map(m => ({
+            id: m.id,
+            role: m.role,
+            content: m.content,
+            timestamp: m.timestamp,
+            modelId: (m as any).modelId || m.routedModelId || selectedModelId
+          })) : null,
+          modelInfo: selectedModelId,
+          clientMeta: {
+            userAgent: typeof navigator !== "undefined" ? navigator.userAgent : "",
+            language: userLanguage,
+            screenResolution: typeof window !== "undefined" ? `${window.innerWidth}x${window.innerHeight}` : ""
+          }
         }),
       });
       if (res.ok) {
@@ -1835,9 +1873,40 @@ export default function App() {
       if (!res.ok) {
         throw new Error(data.error || "Failed to delete feedback.");
       }
+      if (selectedAdminFeedback && selectedAdminFeedback.id === feedbackId) {
+        setSelectedAdminFeedback(null);
+      }
       loadAdminFeedbacks();
     } catch (err: any) {
       alert(err.message || "Failed to delete feedback.");
+    }
+  };
+
+  const handleUpdateFeedbackStatus = async (feedbackId: string, status: string) => {
+    try {
+      const res = await fetch("/api/feedback/update-status", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          email: userEmail || "nairicintia@gmail.com",
+          feedbackId,
+          status
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to update feedback status.");
+      }
+      setAdminFeedbacks((prev) =>
+        prev.map((f) => (f.id === feedbackId ? { ...f, status } : f))
+      );
+      if (selectedAdminFeedback && selectedAdminFeedback.id === feedbackId) {
+        setSelectedAdminFeedback((prev: any) => ({ ...prev, status }));
+      }
+    } catch (err: any) {
+      alert(err.message || "Failed to update status.");
     }
   };
 
@@ -2953,7 +3022,7 @@ export default function App() {
     ];
 
     return (
-      <div className="space-y-6 md:space-y-8 max-h-[75vh] overflow-y-auto pr-1">
+      <div className="w-full space-y-6 md:space-y-8">
         <div>
           <h3 className="text-xl font-display font-bold text-zinc-900 dark:text-zinc-100 tracking-tight flex items-center gap-2">
             <MessageSquare className="h-5 w-5 text-amber-500" />
@@ -2964,7 +3033,32 @@ export default function App() {
           </p>
         </div>
 
-        <div className={`rounded-3xl p-6 md:p-8 border space-y-6 ${isDark ? "bg-zinc-900/10 border-transparent shadow-none" : "bg-white border-zinc-200/80 shadow-md"}`}>
+        {(userEmail?.toLowerCase() === "nairicintia@gmail.com" || userEmail?.toLowerCase() === "opengsukadiaa@gmail.com") && (
+          <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex flex-wrap items-center justify-between gap-4 shadow-sm">
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-xl bg-amber-500/20 text-amber-500 flex items-center justify-center shrink-0">
+                <ShieldCheck className="h-5 w-5" />
+              </div>
+              <div>
+                <h4 className="text-sm font-bold text-amber-500">Hexky Admin Diagnostic Portal</h4>
+                <p className="text-xs text-zinc-400">View complete user feedbacks, attachments, and user chat transcripts.</p>
+              </div>
+            </div>
+            <button
+              onClick={() => {
+                setShowAdminPopup(true);
+                loadAdminFeedbacks();
+                playNotifySound();
+              }}
+              className="px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-zinc-950 font-bold text-xs flex items-center gap-2 cursor-pointer shadow-md transition-all duration-200 hover:scale-[1.02]"
+            >
+              <Eye className="h-4 w-4" />
+              Open Admin Feedback Dashboard
+            </button>
+          </div>
+        )}
+
+        <div className={`w-full rounded-3xl p-6 md:p-8 border space-y-6 ${isDark ? "bg-zinc-900/10 border-transparent shadow-none" : "bg-white border-zinc-200/80 shadow-md"}`}>
           {feedbackSuccess && (
             <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 text-sm font-medium flex items-start gap-3">
               <span>{feedbackSuccess}</span>
@@ -6322,15 +6416,15 @@ export default function App() {
 
           {/* ADMIN FEEDBACK PANEL POPUP */}
           <AnimatePresence>
-            {showAdminPopup && userEmail?.toLowerCase() === "nairicintia@gmail.com" && (
-              <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
+            {showAdminPopup && (userEmail?.toLowerCase() === "nairicintia@gmail.com" || userEmail?.toLowerCase() === "opengsukadiaa@gmail.com") && (
+              <div className="fixed inset-0 z-[110] flex items-center justify-center p-2 sm:p-4 md:p-6">
                 {/* Backdrop overlay */}
                 <motion.div
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
                   onClick={() => setShowAdminPopup(false)}
-                  className="absolute inset-0 bg-black/75 backdrop-blur-sm"
+                  className="absolute inset-0 bg-black/85 backdrop-blur-md"
                 />
 
                 {/* Modal Container */}
@@ -6339,20 +6433,25 @@ export default function App() {
                   animate={{ opacity: 1, scale: 1, y: 0 }}
                   exit={{ opacity: 0, scale: 0.98, y: 15 }}
                   transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
-                  className={`relative w-full max-w-4xl h-[85vh] rounded-3xl border shadow-2xl flex flex-col overflow-hidden z-10 transition-all ${
-                    isDark ? "bg-[#1e1f20] border-zinc-800 text-zinc-100" : "bg-white border-zinc-200 text-zinc-900"
+                  className={`relative w-full max-w-6xl h-[92vh] rounded-3xl border shadow-2xl flex flex-col overflow-hidden z-10 transition-all ${
+                    isDark ? "bg-[#161718] border-zinc-800 text-zinc-100" : "bg-white border-zinc-200 text-zinc-900"
                   }`}
                 >
-                  {/* Header */}
-                  <div className="flex items-center justify-between px-6 py-5 border-b border-zinc-500/10">
+                  {/* Header Bar */}
+                  <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-500/10 shrink-0 bg-zinc-500/5">
                     <div className="flex items-center gap-3">
-                      <div className="h-10 w-10 rounded-xl flex items-center justify-center border bg-amber-500/10 border-amber-500/20 text-amber-500">
-                        <ShieldCheck className="h-5.5 w-5.5 stroke-[2]" />
+                      <div className="h-10 w-10 rounded-2xl flex items-center justify-center border bg-amber-500/10 border-amber-500/20 text-amber-500 shadow-sm">
+                        <ShieldCheck className="h-6 w-6" />
                       </div>
                       <div>
-                        <h3 className="font-display font-bold text-lg leading-tight">Admin Control Center</h3>
+                        <div className="flex items-center gap-2">
+                          <h3 className="font-display font-bold text-base md:text-lg leading-tight">Hexky Admin Diagnostic Portal</h3>
+                          <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-500 font-bold border border-amber-500/20">
+                            nairicintia@gmail.com
+                          </span>
+                        </div>
                         <p className={`text-xs mt-0.5 ${isDark ? "text-zinc-400" : "text-zinc-500"}`}>
-                          Hexky diagnostics, user feedbacks, and attachments
+                          Manage user feedbacks, inspect bug attachments, and review chat transcripts
                         </p>
                       </div>
                     </div>
@@ -6361,157 +6460,437 @@ export default function App() {
                       <button
                         onClick={loadAdminFeedbacks}
                         disabled={adminLoading}
-                        className={`p-2 rounded-xl border border-zinc-500/10 hover:bg-zinc-500/5 transition-all flex items-center gap-1.5 text-xs font-semibold cursor-pointer disabled:opacity-50`}
+                        className={`px-3 py-2 rounded-xl border border-zinc-500/15 hover:bg-zinc-500/10 transition-all flex items-center gap-1.5 text-xs font-bold cursor-pointer disabled:opacity-50`}
                       >
                         <RefreshCw className={`h-3.5 w-3.5 ${adminLoading ? "animate-spin" : ""}`} />
                         Refresh
                       </button>
 
                       <button
-                        onClick={() => setShowAdminPopup(false)}
+                        onClick={() => {
+                          setShowAdminPopup(false);
+                          setSelectedAdminFeedback(null);
+                        }}
                         className={`p-2 rounded-xl transition-colors cursor-pointer ${
-                          isDark ? "hover:bg-zinc-850 text-zinc-400 hover:text-zinc-200" : "hover:bg-zinc-100 text-zinc-500 hover:text-zinc-850"
+                          isDark ? "hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200" : "hover:bg-zinc-100 text-zinc-500 hover:text-zinc-900"
                         }`}
                       >
-                        <X className="h-4.5 w-4.5" />
+                        <X className="h-5 w-5" />
                       </button>
                     </div>
                   </div>
 
-                  {/* Tabs bar */}
-                  <div className="flex border-b border-zinc-500/10 px-6 bg-zinc-500/5 select-none shrink-0">
-                    <button className="px-4 py-3 text-xs font-bold border-b-2 border-amber-500 text-amber-500 flex items-center gap-2">
-                      <MessageSquare className="h-3.5 w-3.5" />
-                      View Feedback ({adminFeedbacks.length})
-                    </button>
-                  </div>
-
-                  {/* Search and filter bar */}
-                  <div className="px-6 py-3 border-b border-zinc-500/10 flex items-center gap-3 shrink-0">
-                    <div className="relative flex-1">
-                      <Search className="absolute left-3 top-2.5 h-4 w-4 text-zinc-400" />
-                      <input
-                        type="text"
-                        value={adminSearch}
-                        onChange={(e) => setAdminSearch(e.target.value)}
-                        placeholder="Search feedback message or email..."
-                        className={`w-full pl-9 pr-4 py-2 text-xs rounded-xl transition-all duration-200 focus:outline-none border ${
-                          isDark 
-                            ? "border-zinc-800 bg-black/40 text-zinc-200 placeholder-zinc-650 focus:border-zinc-700" 
-                            : "border-zinc-200 bg-zinc-50 text-zinc-800 placeholder-zinc-400 focus:border-zinc-300"
-                        }`}
-                      />
-                    </div>
-                  </div>
-
-                  {/* Content Panel Area */}
-                  <div className="flex-1 overflow-y-auto p-6 scrollbar-thin">
-                    {adminLoading ? (
-                      <div className="h-full flex flex-col items-center justify-center gap-3">
-                        <Loader2 className="h-8 w-8 text-amber-500 animate-spin" />
-                        <span className="text-sm text-zinc-500 font-medium">Fetching feedback database...</span>
-                      </div>
-                    ) : adminError ? (
-                      <div className="h-full flex flex-col items-center justify-center text-center p-6 gap-3">
-                        <div className="h-12 w-12 rounded-full bg-red-500/10 border border-red-500/20 text-red-500 flex items-center justify-center">
-                          <AlertCircle className="h-6 w-6" />
+                  {/* Main Container Area */}
+                  {selectedAdminFeedback ? (
+                    /* FULL DETAIL INSPECTOR VIEW */
+                    <div className="flex-1 flex flex-col overflow-hidden bg-zinc-900/10">
+                      {/* Top Action Bar */}
+                      <div className="px-6 py-3.5 border-b border-zinc-500/10 flex flex-wrap items-center justify-between gap-3 shrink-0 bg-zinc-500/5">
+                        <div className="flex items-center gap-3">
+                          <button
+                            onClick={() => setSelectedAdminFeedback(null)}
+                            className="px-3 py-1.5 rounded-xl border border-zinc-500/15 hover:bg-zinc-500/10 text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer text-amber-500"
+                          >
+                            <ArrowLeft className="h-4 w-4" />
+                            Back to Feedbacks List
+                          </button>
+                          <span className="text-zinc-500">|</span>
+                          <span className={`text-xs font-mono font-semibold ${isDark ? "text-zinc-300" : "text-zinc-700"}`}>
+                            ID: {selectedAdminFeedback.id?.substring(0, 12)}...
+                          </span>
                         </div>
-                        <h4 className="text-base font-bold text-zinc-850 dark:text-zinc-250">Retrieval Failed</h4>
-                        <p className="text-xs text-zinc-500 max-w-sm">{adminError}</p>
-                        <button
-                          onClick={loadAdminFeedbacks}
-                          className="mt-2 px-4 py-2 bg-amber-500 text-zinc-950 text-xs font-bold rounded-xl hover:bg-amber-400 cursor-pointer"
-                        >
-                          Retry Connection
-                        </button>
-                      </div>
-                    ) : (() => {
-                      const filtered = adminFeedbacks.filter(
-                        (f) =>
-                          f.email?.toLowerCase().includes(adminSearch.toLowerCase()) ||
-                          f.message?.toLowerCase().includes(adminSearch.toLowerCase())
-                      );
 
-                      if (filtered.length === 0) {
-                        return (
-                          <div className="h-full flex flex-col items-center justify-center text-center py-12">
-                            <MessageSquare className="h-12 w-12 text-zinc-400 dark:text-zinc-600 mb-3" />
-                            <h4 className="text-base font-bold text-zinc-850 dark:text-zinc-250">No Feedback Received</h4>
-                            <p className="text-xs text-zinc-500 max-w-sm mt-1">
-                              {adminSearch ? `No matches found for "${adminSearch}".` : "User feedback list is currently empty."}
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-bold text-zinc-500">Status:</span>
+                          <select
+                            value={selectedAdminFeedback.status || "new"}
+                            onChange={(e) => handleUpdateFeedbackStatus(selectedAdminFeedback.id, e.target.value)}
+                            className={`px-3 py-1.5 rounded-xl text-xs font-bold border focus:outline-none cursor-pointer ${
+                              selectedAdminFeedback.status === "resolved"
+                                ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-500"
+                                : selectedAdminFeedback.status === "reviewed"
+                                  ? "bg-blue-500/10 border-blue-500/30 text-blue-500"
+                                  : "bg-amber-500/10 border-amber-500/30 text-amber-500"
+                            }`}
+                          >
+                            <option value="new" className="bg-zinc-900 text-white">🟢 NEW</option>
+                            <option value="reviewed" className="bg-zinc-900 text-white">🔵 REVIEWED</option>
+                            <option value="resolved" className="bg-zinc-900 text-white">✅ RESOLVED</option>
+                          </select>
+
+                          <a
+                            href={`mailto:${selectedAdminFeedback.email}?subject=Regarding your ExeChat Feedback`}
+                            className="px-3.5 py-1.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-500 border border-amber-500/20 text-xs font-bold flex items-center gap-1.5 transition-all"
+                          >
+                            <Send className="h-3.5 w-3.5" />
+                            Email User
+                          </a>
+
+                          <button
+                            onClick={() => handleFeedbackDelete(selectedAdminFeedback.id)}
+                            className="px-3 py-1.5 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-500 border border-red-500/20 text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                            Delete
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Detail Body (2 Columns on Desktop) */}
+                      <div className="flex-1 overflow-y-auto p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 scrollbar-thin">
+                        {/* Left Column: Feedback Info & Attachments */}
+                        <div className="lg:col-span-5 space-y-5">
+                          {/* User & Category Badge */}
+                          <div className={`p-5 rounded-2xl border space-y-3 ${isDark ? "bg-zinc-900/40 border-zinc-800" : "bg-white border-zinc-200"}`}>
+                            <div className="flex items-center justify-between gap-2">
+                              <span className={`px-3 py-1 rounded-full text-xs font-bold border uppercase tracking-wider ${
+                                selectedAdminFeedback.category === "Bug Report"
+                                  ? "bg-red-500/10 border-red-500/30 text-red-500"
+                                  : selectedAdminFeedback.category === "Dislike / Chat Error"
+                                    ? "bg-rose-500/10 border-rose-500/30 text-rose-500"
+                                    : selectedAdminFeedback.category === "Question"
+                                      ? "bg-blue-500/10 border-blue-500/30 text-blue-500"
+                                      : "bg-amber-500/10 border-amber-500/30 text-amber-500"
+                              }`}>
+                                {selectedAdminFeedback.category || "General Feedback"}
+                              </span>
+                              <span className="text-xs font-mono text-zinc-500 font-medium">
+                                {new Date(selectedAdminFeedback.timestamp).toLocaleString()}
+                              </span>
+                            </div>
+
+                            <div className="pt-2 flex items-center gap-3">
+                              <div className="h-10 w-10 rounded-full bg-gradient-to-tr from-amber-500 to-amber-600 text-zinc-950 font-bold flex items-center justify-center text-sm shadow">
+                                {(selectedAdminFeedback.email || "U").charAt(0).toUpperCase()}
+                              </div>
+                              <div className="min-w-0">
+                                <p className="text-xs text-zinc-500 font-bold uppercase tracking-wider">User Email</p>
+                                <p className="text-sm font-bold text-amber-500 truncate">{selectedAdminFeedback.email}</p>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Message Content */}
+                          <div className={`p-5 rounded-2xl border space-y-3 ${isDark ? "bg-zinc-900/40 border-zinc-800" : "bg-white border-zinc-200"}`}>
+                            <div className="flex items-center justify-between">
+                              <h4 className="text-xs font-bold uppercase tracking-wider text-zinc-400">Feedback Message</h4>
+                              <button
+                                onClick={() => {
+                                  navigator.clipboard.writeText(selectedAdminFeedback.message || "");
+                                }}
+                                className="text-[11px] font-bold text-amber-500 hover:underline flex items-center gap-1 cursor-pointer"
+                              >
+                                <Copy className="h-3 w-3" /> Copy
+                              </button>
+                            </div>
+                            <p className="text-sm text-zinc-200 dark:text-zinc-200 leading-relaxed whitespace-pre-wrap select-text font-sans">
+                              {selectedAdminFeedback.message}
                             </p>
                           </div>
-                        );
-                      }
 
-                      return (
-                        <div className="space-y-4">
-                          {filtered.map((feed) => (
-                            <div
-                              key={feed.id}
-                              className={`p-5 rounded-2xl border transition-all ${
-                                isDark ? "bg-zinc-900/40 border-zinc-850 hover:bg-zinc-900/60" : "bg-white border-zinc-200/80 shadow-sm hover:shadow-md"
-                              }`}
-                            >
-                              <div className="flex flex-wrap items-center justify-between gap-2 mb-3 pb-2 border-b border-zinc-500/10">
-                                <div className="flex items-center gap-2">
-                                  <div className="h-6 w-6 rounded-full bg-gradient-to-tr from-amber-500 to-amber-600 flex items-center justify-center text-[10px] font-bold text-zinc-950 shadow-sm uppercase">
-                                    {(feed.email || "G").charAt(0)}
-                                  </div>
-                                  <span className="text-xs font-bold text-zinc-850 dark:text-zinc-250">{feed.email}</span>
-                                </div>
-                                <div className="flex items-center gap-3">
-                                  <span className="text-[10px] font-mono text-zinc-500 font-semibold flex items-center gap-1">
-                                    <Clock className="h-3 w-3 text-zinc-400" />
-                                    {new Date(feed.timestamp).toLocaleString()}
-                                  </span>
-                                  <button
-                                    onClick={() => handleFeedbackDelete(feed.id)}
-                                    className="p-1 rounded-md text-zinc-400 hover:text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer"
-                                    title="Delete Feedback"
-                                  >
-                                    <Trash2 className="h-3.5 w-3.5" />
-                                  </button>
-                                </div>
+                          {/* Attachment Preview Section */}
+                          {selectedAdminFeedback.attachmentUrl && (
+                            <div className={`p-5 rounded-2xl border space-y-3 ${isDark ? "bg-zinc-900/40 border-zinc-800" : "bg-white border-zinc-200"}`}>
+                              <div className="flex items-center justify-between">
+                                <h4 className="text-xs font-bold uppercase tracking-wider text-zinc-400 flex items-center gap-1.5">
+                                  <Paperclip className="h-4 w-4 text-amber-500" />
+                                  Attached Screenshot / Video / File
+                                </h4>
+                                <a
+                                  href={selectedAdminFeedback.attachmentUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-[11px] font-bold text-amber-500 hover:underline flex items-center gap-1"
+                                >
+                                  <Download className="h-3.5 w-3.5" /> Download
+                                </a>
                               </div>
 
-                              <p className="text-sm text-zinc-700 dark:text-zinc-300 whitespace-pre-wrap leading-relaxed select-text pr-2">
-                                {feed.message}
-                              </p>
-
-                              {feed.attachmentUrl && (
-                                <div className="mt-4 pt-3.5 border-t border-zinc-500/10 flex items-center justify-between">
-                                  <div className="flex items-center gap-2 min-w-0">
-                                    <Paperclip className="h-4 w-4 text-amber-500 shrink-0" />
-                                    <span className="text-xs font-bold text-zinc-700 dark:text-zinc-300 truncate max-w-md">
-                                      {feed.attachmentName || "Attachment File"}
-                                    </span>
-                                  </div>
-                                  <a
-                                    href={feed.attachmentUrl}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="px-3.5 py-1.5 rounded-xl text-xs font-bold bg-zinc-500/10 hover:bg-zinc-500/20 text-amber-500 border border-zinc-500/10 flex items-center gap-1.5 transition-all"
+                              {/* Media Player or Image Box */}
+                              {selectedAdminFeedback.attachmentType?.startsWith("video/") || selectedAdminFeedback.attachmentName?.match(/\.(mp4|webm|mov)$/i) ? (
+                                <div className="space-y-2">
+                                  <video
+                                    src={selectedAdminFeedback.attachmentUrl}
+                                    controls
+                                    className="w-full rounded-2xl max-h-[300px] bg-black border border-zinc-800"
+                                  />
+                                  <p className="text-[11px] text-zinc-500 text-center font-mono">
+                                    {selectedAdminFeedback.attachmentName || "Screen Recording Video"}
+                                  </p>
+                                </div>
+                              ) : (
+                                <div className="space-y-2">
+                                  <div
+                                    onClick={() => setExpandedImage(selectedAdminFeedback.attachmentUrl)}
+                                    className="relative group rounded-2xl overflow-hidden border border-zinc-800 bg-black cursor-zoom-in max-h-[320px] flex items-center justify-center"
                                   >
-                                    <Download className="h-3.5 w-3.5" />
-                                    Download File
-                                  </a>
+                                    <img
+                                      src={selectedAdminFeedback.attachmentUrl}
+                                      alt="Attachment"
+                                      className="max-h-[320px] w-auto object-contain transition-transform duration-300 group-hover:scale-105"
+                                    />
+                                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white font-bold text-xs gap-1.5">
+                                      <Maximize2 className="h-4 w-4" /> Click to Zoom Full Resolution
+                                    </div>
+                                  </div>
+                                  <p className="text-[11px] text-zinc-500 text-center font-mono">
+                                    {selectedAdminFeedback.attachmentName || "Attached Screenshot Image"}
+                                  </p>
                                 </div>
                               )}
                             </div>
+                          )}
+
+                          {/* Client Device Metadata */}
+                          {selectedAdminFeedback.clientMeta && (
+                            <div className={`p-5 rounded-2xl border space-y-2 text-xs font-mono ${isDark ? "bg-zinc-900/40 border-zinc-800 text-zinc-400" : "bg-white border-zinc-200 text-zinc-600"}`}>
+                              <h4 className="font-sans font-bold uppercase tracking-wider text-[11px] text-zinc-500 mb-1">
+                                Client Device Metadata
+                              </h4>
+                              <div className="flex justify-between py-1 border-b border-zinc-500/10">
+                                <span>Model:</span>
+                                <span className="text-amber-500 font-bold">{selectedAdminFeedback.modelInfo || "Default"}</span>
+                              </div>
+                              <div className="flex justify-between py-1 border-b border-zinc-500/10">
+                                <span>Language:</span>
+                                <span>{selectedAdminFeedback.clientMeta.language || "N/A"}</span>
+                              </div>
+                              <div className="flex justify-between py-1 border-b border-zinc-500/10">
+                                <span>Screen:</span>
+                                <span>{selectedAdminFeedback.clientMeta.screenResolution || "N/A"}</span>
+                              </div>
+                              <div className="py-1">
+                                <span className="block text-zinc-500 mb-0.5">User Agent:</span>
+                                <span className="text-[10px] break-all text-zinc-400">{selectedAdminFeedback.clientMeta.userAgent || "N/A"}</span>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Right Column: Chat Transcript & Diagnostic Context */}
+                        <div className="lg:col-span-7">
+                          <div className={`p-5 rounded-2xl border h-full flex flex-col space-y-4 ${isDark ? "bg-zinc-900/40 border-zinc-800" : "bg-white border-zinc-200"}`}>
+                            <div className="flex items-center justify-between pb-3 border-b border-zinc-500/10">
+                              <div className="flex items-center gap-2">
+                                <MessageSquare className="h-5 w-5 text-amber-500" />
+                                <div>
+                                  <h4 className="font-bold text-sm text-zinc-100">User Chat Transcript</h4>
+                                  <p className="text-[11px] text-zinc-400">Recorded messages & AI response context</p>
+                                </div>
+                              </div>
+                              <span className="text-[10px] font-mono px-2.5 py-1 rounded-lg bg-zinc-500/10 text-zinc-400 border border-zinc-500/10">
+                                {selectedAdminFeedback.chatHistory ? `${selectedAdminFeedback.chatHistory.length} Messages` : "No direct logs"}
+                              </span>
+                            </div>
+
+                            {/* Chat Transcript Container */}
+                            <div className="flex-1 overflow-y-auto space-y-3.5 pr-2 min-h-[350px] max-h-[550px] scrollbar-thin">
+                              {selectedAdminFeedback.chatHistory && Array.isArray(selectedAdminFeedback.chatHistory) && selectedAdminFeedback.chatHistory.length > 0 ? (
+                                selectedAdminFeedback.chatHistory.map((msg: any, idx: number) => {
+                                  const isUser = msg.role === "user";
+                                  return (
+                                    <div key={msg.id || idx} className={`flex flex-col ${isUser ? "items-end" : "items-start"}`}>
+                                      <div className="flex items-center gap-1.5 mb-1 px-1">
+                                        <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">
+                                          {isUser ? selectedAdminFeedback.email?.split("@")[0] || "User" : `ExeChat AI (${msg.modelId || "Model"})`}
+                                        </span>
+                                        <span className="text-[9px] font-mono text-zinc-600">
+                                          {msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString() : ""}
+                                        </span>
+                                      </div>
+                                      <div className={`p-3.5 rounded-2xl max-w-[90%] text-xs leading-relaxed ${
+                                        isUser
+                                          ? "bg-amber-500 text-zinc-950 font-medium rounded-tr-none shadow-sm"
+                                          : isDark
+                                            ? "bg-zinc-800/90 text-zinc-100 border border-zinc-700/60 rounded-tl-none"
+                                            : "bg-zinc-100 text-zinc-900 border border-zinc-200 rounded-tl-none"
+                                      }`}>
+                                        <p className="whitespace-pre-wrap select-text font-sans">{msg.content}</p>
+                                      </div>
+                                    </div>
+                                  );
+                                })
+                              ) : (
+                                <div className="h-full flex flex-col items-center justify-center text-center py-12 text-zinc-500 space-y-2">
+                                  <MessageSquare className="h-10 w-10 text-zinc-600" />
+                                  <p className="text-xs font-bold text-zinc-400">No Attached Chat Log Array</p>
+                                  <p className="text-[11px] max-w-sm text-zinc-500">
+                                    The feedback message above contains the full user complaint text. If this was submitted from a chat dislike button, the prompt excerpt is embedded inside the message box.
+                                  </p>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    /* FEEDBACK LIST VIEW */
+                    <div className="flex-1 flex flex-col overflow-hidden">
+                      {/* Search & Category Filter Bar */}
+                      <div className="px-6 py-3 border-b border-zinc-500/10 flex flex-wrap items-center justify-between gap-3 shrink-0 bg-zinc-500/5">
+                        <div className="relative flex-1 min-w-[220px]">
+                          <Search className="absolute left-3 top-2.5 h-4 w-4 text-zinc-400" />
+                          <input
+                            type="text"
+                            value={adminSearch}
+                            onChange={(e) => setAdminSearch(e.target.value)}
+                            placeholder="Search feedback text, email, or ID..."
+                            className={`w-full pl-9 pr-4 py-2 text-xs rounded-xl transition-all duration-200 focus:outline-none border ${
+                              isDark 
+                                ? "border-zinc-800 bg-black/40 text-zinc-200 placeholder-zinc-650 focus:border-zinc-700" 
+                                : "border-zinc-200 bg-zinc-50 text-zinc-800 placeholder-zinc-400 focus:border-zinc-300"
+                            }`}
+                          />
+                        </div>
+
+                        {/* Filter Tabs */}
+                        <div className="flex items-center gap-1.5 overflow-x-auto py-1">
+                          {["All", "Suggestion", "Bug Report", "Dislike / Chat Error", "Question"].map((cat) => (
+                            <button
+                              key={cat}
+                              onClick={() => setAdminCategoryFilter(cat)}
+                              className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer whitespace-nowrap ${
+                                adminCategoryFilter === cat
+                                  ? "bg-amber-500 text-zinc-950 border-amber-500 shadow-sm"
+                                  : isDark
+                                    ? "bg-zinc-900/60 border-zinc-800 text-zinc-400 hover:text-zinc-200"
+                                    : "bg-zinc-100 border-zinc-200 text-zinc-600 hover:text-zinc-900"
+                              }`}
+                            >
+                              {cat}
+                            </button>
                           ))}
                         </div>
-                      );
-                    })()}
-                  </div>
+                      </div>
+
+                      {/* Content Panel Area */}
+                      <div className="flex-1 overflow-y-auto p-6 scrollbar-thin">
+                        {adminLoading ? (
+                          <div className="h-full flex flex-col items-center justify-center gap-3 py-16">
+                            <Loader2 className="h-8 w-8 text-amber-500 animate-spin" />
+                            <span className="text-sm text-zinc-500 font-medium">Fetching feedback database...</span>
+                          </div>
+                        ) : adminError ? (
+                          <div className="h-full flex flex-col items-center justify-center text-center p-6 gap-3 py-16">
+                            <div className="h-12 w-12 rounded-full bg-red-500/10 border border-red-500/20 text-red-500 flex items-center justify-center">
+                              <AlertCircle className="h-6 w-6" />
+                            </div>
+                            <h4 className="text-base font-bold text-zinc-200">Retrieval Failed</h4>
+                            <p className="text-xs text-zinc-500 max-w-sm">{adminError}</p>
+                            <button
+                              onClick={loadAdminFeedbacks}
+                              className="mt-2 px-4 py-2 bg-amber-500 text-zinc-950 text-xs font-bold rounded-xl hover:bg-amber-400 cursor-pointer"
+                            >
+                              Retry Connection
+                            </button>
+                          </div>
+                        ) : (() => {
+                          const filtered = adminFeedbacks.filter((f) => {
+                            const matchSearch =
+                              f.email?.toLowerCase().includes(adminSearch.toLowerCase()) ||
+                              f.message?.toLowerCase().includes(adminSearch.toLowerCase());
+                            const matchCat =
+                              adminCategoryFilter === "All" ||
+                              (f.category || "").toLowerCase() === adminCategoryFilter.toLowerCase() ||
+                              (adminCategoryFilter === "Dislike / Chat Error" && f.message?.includes("Dislike"));
+                            return matchSearch && matchCat;
+                          });
+
+                          if (filtered.length === 0) {
+                            return (
+                              <div className="h-full flex flex-col items-center justify-center text-center py-16">
+                                <MessageSquare className="h-12 w-12 text-zinc-600 mb-3" />
+                                <h4 className="text-base font-bold text-zinc-200">No Feedback Received</h4>
+                                <p className="text-xs text-zinc-500 max-w-sm mt-1">
+                                  {adminSearch || adminCategoryFilter !== "All"
+                                    ? `No matches found for active filters.`
+                                    : "User feedback database is currently empty."}
+                                </p>
+                              </div>
+                            );
+                          }
+
+                          return (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              {filtered.map((feed) => (
+                                <div
+                                  key={feed.id}
+                                  onClick={() => setSelectedAdminFeedback(feed)}
+                                  className={`p-5 rounded-2xl border transition-all cursor-pointer flex flex-col justify-between space-y-3 group ${
+                                    isDark
+                                      ? "bg-zinc-900/40 border-zinc-800 hover:border-amber-500/40 hover:bg-zinc-900/80 shadow-sm hover:shadow-lg"
+                                      : "bg-white border-zinc-200/80 hover:border-amber-500/50 hover:shadow-md"
+                                  }`}
+                                >
+                                  <div>
+                                    <div className="flex items-center justify-between gap-2 mb-2 pb-2 border-b border-zinc-500/10">
+                                      <div className="flex items-center gap-2 min-w-0">
+                                        <div className="h-7 w-7 rounded-full bg-gradient-to-tr from-amber-500 to-amber-600 flex items-center justify-center text-xs font-bold text-zinc-950 shadow uppercase shrink-0">
+                                          {(feed.email || "G").charAt(0)}
+                                        </div>
+                                        <span className="text-xs font-bold text-zinc-200 truncate">{feed.email}</span>
+                                      </div>
+
+                                      <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border uppercase tracking-wider ${
+                                        feed.category === "Bug Report"
+                                          ? "bg-red-500/10 border-red-500/30 text-red-500"
+                                          : feed.category === "Dislike / Chat Error"
+                                            ? "bg-rose-500/10 border-rose-500/30 text-rose-500"
+                                            : feed.category === "Question"
+                                              ? "bg-blue-500/10 border-blue-500/30 text-blue-500"
+                                              : "bg-amber-500/10 border-amber-500/30 text-amber-500"
+                                      }`}>
+                                        {feed.category || "Feedback"}
+                                      </span>
+                                    </div>
+
+                                    <p className="text-xs text-zinc-300 dark:text-zinc-300 line-clamp-3 leading-relaxed">
+                                      {feed.message}
+                                    </p>
+                                  </div>
+
+                                  <div className="pt-2 border-t border-zinc-500/10 flex items-center justify-between text-[11px] text-zinc-500 font-mono">
+                                    <span className="flex items-center gap-1">
+                                      <Clock className="h-3 w-3 text-zinc-500" />
+                                      {new Date(feed.timestamp).toLocaleDateString()}
+                                    </span>
+
+                                    <div className="flex items-center gap-2">
+                                      {feed.attachmentUrl && (
+                                        <span className="text-amber-500 font-bold flex items-center gap-1 text-[10px] bg-amber-500/10 px-2 py-0.5 rounded-md">
+                                          <Paperclip className="h-3 w-3" /> File
+                                        </span>
+                                      )}
+                                      {feed.chatHistory && (
+                                        <span className="text-blue-400 font-bold flex items-center gap-1 text-[10px] bg-blue-500/10 px-2 py-0.5 rounded-md">
+                                          <MessageSquare className="h-3 w-3" /> Chat Log
+                                        </span>
+                                      )}
+                                      <span className="text-amber-500 font-bold group-hover:translate-x-0.5 transition-transform flex items-center gap-1">
+                                        Inspect →
+                                      </span>
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    </div>
+                  )}
 
                   {/* Summary Footer */}
-                  <div className={`px-6 py-4 border-t text-xs select-none shrink-0 flex items-center justify-between ${
-                    isDark ? "bg-zinc-900/40 border-zinc-800/80 text-zinc-500" : "bg-zinc-50 border-zinc-150 text-zinc-450"
+                  <div className={`px-6 py-3 border-t text-xs select-none shrink-0 flex items-center justify-between ${
+                    isDark ? "bg-zinc-900/60 border-zinc-800/80 text-zinc-500" : "bg-zinc-50 border-zinc-200 text-zinc-500"
                   }`}>
-                    <span>Secure diagnostics session activated</span>
-                    <span className="font-bold uppercase tracking-wider text-[9px] font-mono px-2 py-0.5 rounded bg-amber-500/10 text-amber-500 border border-amber-500/20">
-                      Hexky Owner
+                    <span className="flex items-center gap-2">
+                      <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                      Connected to Supabase Diagnostics Bucket
+                    </span>
+                    <span className="font-bold uppercase tracking-wider text-[9px] font-mono px-2.5 py-0.5 rounded bg-amber-500/10 text-amber-500 border border-amber-500/20">
+                      Hexky Owner Mode
                     </span>
                   </div>
                 </motion.div>

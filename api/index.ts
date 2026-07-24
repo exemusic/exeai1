@@ -732,7 +732,7 @@ app.post("/api/db/metrics", async (req, res) => {
 // --- ADMIN & FEEDBACK SYSTEM ENDPOINTS ---
 app.post("/api/feedback/submit", async (req, res) => {
   try {
-    const { email, message, attachment } = req.body;
+    const { email, message, attachment, category, chatHistory, modelInfo, clientMeta } = req.body;
     if (!email || !message) {
       return res.status(400).json({ error: "Email and message are required fields." });
     }
@@ -777,6 +777,7 @@ app.post("/api/feedback/submit", async (req, res) => {
     // 2. PROCESS FILE ATTACHMENT
     let attachmentUrl = null;
     let attachmentName = null;
+    let attachmentType = null;
     
     if (attachment && attachment.base64 && attachment.name) {
       // Decode Base64
@@ -808,6 +809,7 @@ app.post("/api/feedback/submit", async (req, res) => {
 
       attachmentUrl = publicUrlData?.publicUrl || `/api/feedback/attachment?path=${encodeURIComponent(attachmentPath)}`;
       attachmentName = attachment.name;
+      attachmentType = attachment.type || null;
     }
 
     // 3. WRITE THE FEEDBACK TO STORAGE
@@ -816,8 +818,14 @@ app.post("/api/feedback/submit", async (req, res) => {
       id: feedbackId,
       email,
       message,
+      category: category || "Suggestion",
+      chatHistory: chatHistory || null,
+      modelInfo: modelInfo || null,
+      clientMeta: clientMeta || null,
       attachmentUrl,
       attachmentName,
+      attachmentType,
+      status: "new",
       timestamp: Date.now()
     };
 
@@ -1008,6 +1016,58 @@ app.post("/api/feedback/delete", async (req, res) => {
   } catch (error: any) {
     console.error("Feedback delete error:", error);
     res.status(500).json({ error: error.message || "Failed to delete feedback." });
+  }
+});
+
+// Update feedback status (for nairicintia@gmail.com or opengsukadiaa@gmail.com)
+app.post("/api/feedback/update-status", async (req, res) => {
+  try {
+    const { email, feedbackId, status } = req.body;
+    const isOwner = email === "nairicintia@gmail.com" || email === "opengsukadiaa@gmail.com";
+    if (!isOwner) {
+      return res.status(403).json({ error: "Forbidden: You are not authorized to perform this action." });
+    }
+    if (!feedbackId || !status) {
+      return res.status(400).json({ error: "Feedback ID and status are required." });
+    }
+
+    const supabase = getSupabaseClient();
+    if (!supabase) {
+      return res.status(400).json({ error: "Supabase client not configured." });
+    }
+
+    const bucket = "feedback";
+    const feedbackPath = `feedback/${feedbackId}.json`;
+
+    const { data: fileData, error: downloadErr } = await supabase.storage
+      .from(bucket)
+      .download(feedbackPath);
+
+    if (downloadErr || !fileData) {
+      return res.status(404).json({ error: "Feedback not found." });
+    }
+
+    const textContent = await fileData.text();
+    const parsed = JSON.parse(textContent);
+    parsed.status = status;
+    parsed.updatedAt = Date.now();
+
+    const fbBuffer = Buffer.from(JSON.stringify(parsed, null, 2), "utf-8");
+    const { error: writeErr } = await supabase.storage
+      .from(bucket)
+      .upload(feedbackPath, fbBuffer, {
+        contentType: "application/json",
+        upsert: true
+      });
+
+    if (writeErr) {
+      throw writeErr;
+    }
+
+    res.json({ success: true, feedback: parsed });
+  } catch (error: any) {
+    console.error("Feedback update status error:", error);
+    res.status(500).json({ error: error.message || "Failed to update feedback status." });
   }
 });
 
