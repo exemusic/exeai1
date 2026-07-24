@@ -399,7 +399,15 @@ export default function App() {
     const saved = localStorage.getItem("exeai_sessions");
     if (saved) {
       try {
-        return JSON.parse(saved);
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          return parsed
+            .filter((s: any) => s && typeof s === "object")
+            .map((s: any) => ({
+              ...s,
+              messages: Array.isArray(s.messages) ? s.messages : [],
+            }));
+        }
       } catch (e) {
         console.error("Failed to parse sessions", e);
       }
@@ -413,7 +421,7 @@ export default function App() {
       if (savedSessionsRaw) {
         try {
           const parsed = JSON.parse(savedSessionsRaw);
-          if (Array.isArray(parsed) && parsed.some((s: any) => s.id === match[1])) {
+          if (Array.isArray(parsed) && parsed.some((s: any) => s && s.id === match[1])) {
             return match[1];
           }
         } catch (e) {
@@ -1041,13 +1049,15 @@ export default function App() {
         const elapsed = Math.max(0.1, Number(((Date.now() - startTime) / 1000).toFixed(1)));
         
         setSessions((prev) =>
-          prev.map((s) => {
-            const hasMsg = s.messages.some(m => m.id === activeId);
+          (prev || []).map((s) => {
+            if (!s) return s;
+            const msgs = Array.isArray(s.messages) ? s.messages : [];
+            const hasMsg = msgs.some((m) => m && m.id === activeId);
             if (hasMsg) {
               return {
                 ...s,
-                messages: s.messages.map((m) => {
-                  if (m.id === activeId) {
+                messages: msgs.map((m) => {
+                  if (m && m.id === activeId) {
                     if (m.content && m.content.includes("</think>")) {
                       return m;
                     }
@@ -1057,7 +1067,7 @@ export default function App() {
                 })
               };
             }
-            return s;
+            return { ...s, messages: msgs };
           })
         );
       }, 100); // Check every 100ms for high responsiveness
@@ -1150,7 +1160,7 @@ export default function App() {
       const match = window.location.pathname.match(/\/chat\/([a-zA-Z0-9_-]+)/);
       if (match) {
         const chatId = match[1];
-        if (sessions.some((s) => s.id === chatId)) {
+        if (sessions && sessions.some((s) => s && s.id === chatId)) {
           setCurrentSessionId(chatId);
         } else {
           setCurrentSessionId(null);
@@ -1228,7 +1238,14 @@ export default function App() {
                 localStorage.setItem("exechat_user_language", userDb.language);
               }
               if (userDb.sessions && Array.isArray(userDb.sessions)) {
-                setSessions(userDb.sessions);
+                setSessions(
+                  userDb.sessions
+                    .filter((s: any) => s && typeof s === "object")
+                    .map((s: any) => ({
+                      ...s,
+                      messages: Array.isArray(s.messages) ? s.messages : [],
+                    }))
+                );
               }
             } else {
               setUserName(localStorage.getItem("exechat_username") || "");
@@ -1558,7 +1575,14 @@ export default function App() {
           }
 
           if (userDb.sessions && Array.isArray(userDb.sessions)) {
-            setSessions(userDb.sessions);
+            setSessions(
+              userDb.sessions
+                .filter((s: any) => s && typeof s === "object")
+                .map((s: any) => ({
+                  ...s,
+                  messages: Array.isArray(s.messages) ? s.messages : [],
+                }))
+            );
           }
 
           localStorage.setItem(`exechat_has_registered_${uid}`, "true");
@@ -2134,12 +2158,12 @@ export default function App() {
     setErrorText(null);
 
     let targetSessionId = currentSessionId;
-    const activeSessionObj = sessions.find((s) => s.id === targetSessionId);
-    if (activeSessionObj && activeSessionObj.messages.length > 0) {
-      const userMsgs = activeSessionObj.messages.filter((m) => m.role === "user");
+    const activeSessionObj = sessions.find((s) => s && s.id === targetSessionId);
+    if (activeSessionObj && Array.isArray(activeSessionObj.messages) && activeSessionObj.messages.length > 0) {
+      const userMsgs = activeSessionObj.messages.filter((m) => m && m.role === "user");
       if (userMsgs.length > 0) {
         const lastMsg = userMsgs[userMsgs.length - 1];
-        if (lastMsg.content.trim().toLowerCase() === text.toLowerCase()) {
+        if (lastMsg && lastMsg.content && lastMsg.content.trim().toLowerCase() === text.toLowerCase()) {
           setErrorText("Spam detected! You sent the exact same message consecutively.");
           return;
         }
@@ -2196,13 +2220,13 @@ export default function App() {
     };
 
     setSessions((prev) =>
-      prev.map((s) => {
-        if (s.id === targetSessionId) {
-
+      (prev || []).map((s) => {
+        if (s && s.id === targetSessionId) {
+          const msgs = Array.isArray(s.messages) ? s.messages : [];
           return {
             ...s,
             title: s.title === "New Chat" ? generateSmartTitle(text) : s.title,
-            messages: [...s.messages, userMessage],
+            messages: [...msgs, userMessage],
           };
         }
         return s;
@@ -2217,7 +2241,7 @@ export default function App() {
     setIsGenerating(true);
     scrollToBottom("smooth");
 
-    const activeSessionState = sessions.find((s) => s.id === targetSessionId);
+    const activeSessionState = sessions.find((s) => s && s.id === targetSessionId);
     const rawModel = activeSessionState ? activeSessionState.model : selectedModelId;
     const { routedModelId } = getRoutedModelInfo(rawModel, text, attachmentObj);
     const apiModel = routedModelId;
@@ -2227,8 +2251,10 @@ export default function App() {
     const apiTemp = activeSessionState ? activeSessionState.temperature : temperature;
     const apiWebSearch = apiModel === "gemini-ai";
 
-    const updatedSession = sessions.find((s) => s.id === targetSessionId);
-    const conversationHistory = updatedSession ? [...updatedSession.messages, userMessage] : [userMessage];
+    const updatedSession = sessions.find((s) => s && s.id === targetSessionId);
+    const conversationHistory = updatedSession && Array.isArray(updatedSession.messages)
+      ? [...updatedSession.messages, userMessage] 
+      : [userMessage];
 
     const formattedHistory = conversationHistory.map((m) => {
       let content = m.content;
@@ -2279,14 +2305,15 @@ export default function App() {
         };
 
         setSessions((prev) =>
-          prev.map((s) => {
-            if (s.id === targetSessionId) {
-              const alreadyAdded = s.messages.some((m) => m.id === assistantMsgId);
-              if (alreadyAdded) return s;
+          (prev || []).map((s) => {
+            if (s && s.id === targetSessionId) {
+              const msgs = Array.isArray(s.messages) ? s.messages : [];
+              const alreadyAdded = msgs.some((m) => m && m.id === assistantMsgId);
+              if (alreadyAdded) return { ...s, messages: msgs };
               return {
                 ...s,
-                messages: s.messages.map((m) =>
-                  m.id === userMessage.id ? { ...m, isPending: false } : m
+                messages: msgs.map((m) =>
+                  m && m.id === userMessage.id ? { ...m, isPending: false } : m
                 ).concat(assistantPlaceholder),
               };
             }
@@ -2334,13 +2361,14 @@ export default function App() {
       };
 
       setSessions((prev) =>
-        prev.map((s) => {
-          if (s.id === targetSessionId) {
-            const alreadyAdded = s.messages.some((m) => m.id === assistantMsgId);
+        (prev || []).map((s) => {
+          if (s && s.id === targetSessionId) {
+            const msgs = Array.isArray(s.messages) ? s.messages : [];
+            const alreadyAdded = msgs.some((m) => m && m.id === assistantMsgId);
             return {
               ...s,
-              messages: s.messages.map((m) =>
-                m.id === userMessage.id ? { ...m, isPending: false } : m
+              messages: msgs.map((m) =>
+                m && m.id === userMessage.id ? { ...m, isPending: false } : m
               ).concat(alreadyAdded ? [] : [assistantPlaceholder]),
             };
           }
@@ -2390,12 +2418,13 @@ export default function App() {
               }
 
               setSessions((prev) =>
-                prev.map((s) => {
-                  if (s.id === targetSessionId) {
+                (prev || []).map((s) => {
+                  if (s && s.id === targetSessionId) {
+                    const msgs = Array.isArray(s.messages) ? s.messages : [];
                     return {
                       ...s,
-                      messages: s.messages.map((m) => {
-                        if (m.id === assistantMsgId) {
+                      messages: msgs.map((m) => {
+                        if (m && m.id === assistantMsgId) {
                           const baseContent = (m.content === "<think>Thinking...</think>" || m.content === "<think>Thinking...") ? "" : m.content;
                           const newContent = baseContent + parsed.text;
                           let thinkingDuration = m.thinkingDuration;
@@ -2413,7 +2442,7 @@ export default function App() {
                             thinkingDuration
                           };
                         }
-                        if (m.isPending) {
+                        if (m && m.isPending) {
                           return { ...m, isPending: false };
                         }
                         return m;
@@ -2431,12 +2460,13 @@ export default function App() {
             if (errMsg.includes("cerebras") || messageLower.includes("too_many_requests") || messageLower.includes("queue_exceeded") || errMsg.includes("queue_exceeded") || errMsg.includes("too_many_requests")) {
 
               setSessions((prev) =>
-                prev.map((s) => {
-                  if (s.id === targetSessionId) {
+                (prev || []).map((s) => {
+                  if (s && s.id === targetSessionId) {
+                    const msgs = Array.isArray(s.messages) ? s.messages : [];
                     return {
                       ...s,
-                      messages: s.messages.map((m) =>
-                        m.id === assistantMsgId
+                      messages: msgs.map((m) =>
+                        m && m.id === assistantMsgId
                           ? { ...m, content: (m.content || "") + "\n\nServer is busy at this time. Please try again later." }
                           : m
                       ),
@@ -2457,11 +2487,12 @@ export default function App() {
       if (!connectionSucceeded) {
         // Automatically delete the failed user message from the session
         setSessions((prev) =>
-          prev.map((s) => {
-            if (s.id === targetSessionId) {
+          (prev || []).map((s) => {
+            if (s && s.id === targetSessionId) {
+              const msgs = Array.isArray(s.messages) ? s.messages : [];
               return {
                 ...s,
-                messages: s.messages.filter((m) => m.id !== userMessage.id),
+                messages: msgs.filter((m) => m && m.id !== userMessage.id),
               };
             }
             return s;
@@ -2477,12 +2508,13 @@ export default function App() {
 
           setErrorText("Server is busy. Please try again later.");
           setSessions((prev) =>
-            prev.map((s) => {
-              if (s.id === targetSessionId) {
+            (prev || []).map((s) => {
+              if (s && s.id === targetSessionId) {
+                const msgs = Array.isArray(s.messages) ? s.messages : [];
                 return {
                   ...s,
-                  messages: s.messages.map((m) =>
-                    m.id === assistantMsgId && m.content === ""
+                  messages: msgs.map((m) =>
+                    m && m.id === assistantMsgId && m.content === ""
                       ? { ...m, content: "Server is busy at this time. Please try again later." }
                       : m
                   ),
@@ -2497,12 +2529,13 @@ export default function App() {
           setErrorText(err.message || "An error occurred while processing the response.");
 
           setSessions((prev) =>
-            prev.map((s) => {
-              if (s.id === targetSessionId) {
+            (prev || []).map((s) => {
+              if (s && s.id === targetSessionId) {
+                const msgs = Array.isArray(s.messages) ? s.messages : [];
                 return {
                   ...s,
-                  messages: s.messages.map((m) =>
-                    m.id === assistantMsgId && m.content === ""
+                  messages: msgs.map((m) =>
+                    m && m.id === assistantMsgId && m.content === ""
                       ? { ...m, content: "A connection error or API Key configuration issue occurred. Please refresh the page if the issue persists." }
                       : m
                   ),
@@ -2517,9 +2550,10 @@ export default function App() {
       setIsGenerating(false);
       abortControllerRef.current = null;
       setSessions((prev) =>
-        prev.map((s) => {
-          if (s.id === targetSessionId) {
-            const firstUserMsg = s.messages.find((m) => m.role === "user");
+        (prev || []).map((s) => {
+          if (s && s.id === targetSessionId) {
+            const msgs = Array.isArray(s.messages) ? s.messages : [];
+            const firstUserMsg = msgs.find((m) => m && m.role === "user");
             const finalTitle = (s.title === "New Chat" && firstUserMsg)
               ? generateSmartTitle(firstUserMsg.content)
               : s.title;
@@ -2527,8 +2561,8 @@ export default function App() {
             return {
               ...s,
               title: finalTitle,
-              messages: s.messages.map((m) =>
-                m.isPending ? { ...m, isPending: false } : m
+              messages: msgs.map((m) =>
+                m && m.isPending ? { ...m, isPending: false } : m
               ),
             };
           }
@@ -2543,12 +2577,12 @@ export default function App() {
       abortControllerRef.current.abort();
       setIsGenerating(false);
       setSessions((prev) =>
-        prev.map((s) => {
-          if (s.id === currentSessionId) {
-            const messages = s.messages;
+        (prev || []).map((s) => {
+          if (s && s.id === currentSessionId) {
+            const messages = Array.isArray(s.messages) ? s.messages : [];
             if (messages.length > 0) {
               const lastMsg = messages[messages.length - 1];
-              if (lastMsg.role === "model") {
+              if (lastMsg && lastMsg.role === "model") {
                 const updatedMessages = [...messages];
                 updatedMessages[messages.length - 1] = {
                   ...lastMsg,
@@ -2557,6 +2591,7 @@ export default function App() {
                 return { ...s, messages: updatedMessages };
               }
             }
+            return { ...s, messages };
           }
           return s;
         })
@@ -2567,15 +2602,15 @@ export default function App() {
   const handleEditMessageSave = async (messageId: string, newContent: string) => {
     if (isGenerating || !currentSessionId) return;
 
-    const activeSessionObj = sessions.find((s) => s.id === currentSessionId);
-    if (!activeSessionObj) return;
+    const activeSessionObj = sessions.find((s) => s && s.id === currentSessionId);
+    if (!activeSessionObj || !Array.isArray(activeSessionObj.messages)) return;
 
-    const msgIndex = activeSessionObj.messages.findIndex((m) => m.id === messageId);
+    const msgIndex = activeSessionObj.messages.findIndex((m) => m && m.id === messageId);
     if (msgIndex === -1) return;
 
     // Retrieve prior messages up to the user message index, and replace its content
     const truncatedMessages = activeSessionObj.messages.slice(0, msgIndex + 1).map((m) => {
-      if (m.id === messageId) {
+      if (m && m.id === messageId) {
         return { ...m, content: newContent };
       }
       return m;
@@ -2713,10 +2748,11 @@ export default function App() {
                 accumulatedText += parsed.text;
 
                 setSessions((prev) =>
-                  prev.map((s) => {
-                    if (s.id === currentSessionId) {
-                      const updatedMsgs = s.messages.map((m) => {
-                        if (m.id === assistantMsgId) {
+                  (prev || []).map((s) => {
+                    if (s && s.id === currentSessionId) {
+                      const msgs = Array.isArray(s.messages) ? s.messages : [];
+                      const updatedMsgs = msgs.map((m) => {
+                        if (m && m.id === assistantMsgId) {
                           let thinkingDuration = m.thinkingDuration;
                           const startTime = thinkingStartTimesRef.current[assistantMsgId];
                           if (startTime) {
@@ -2762,10 +2798,10 @@ export default function App() {
   const handleRegenerateMessage = async (assistantMsgId: string) => {
     if (isGenerating || !currentSessionId) return;
 
-    const activeSessionObj = sessions.find((s) => s.id === currentSessionId);
-    if (!activeSessionObj) return;
+    const activeSessionObj = sessions.find((s) => s && s.id === currentSessionId);
+    if (!activeSessionObj || !Array.isArray(activeSessionObj.messages)) return;
 
-    const msgIndex = activeSessionObj.messages.findIndex((m) => m.id === assistantMsgId);
+    const msgIndex = activeSessionObj.messages.findIndex((m) => m && m.id === assistantMsgId);
     if (msgIndex === -1) return;
 
     const priorMessages = activeSessionObj.messages.slice(0, msgIndex);
@@ -2779,10 +2815,11 @@ export default function App() {
     const apiModel = routedModelId;
 
     setSessions((prev) =>
-      prev.map((s) => {
-        if (s.id === currentSessionId) {
-          const updatedMsgs = s.messages.map((m) => {
-            if (m.id === assistantMsgId) {
+      (prev || []).map((s) => {
+        if (s && s.id === currentSessionId) {
+          const msgs = Array.isArray(s.messages) ? s.messages : [];
+          const updatedMsgs = msgs.map((m) => {
+            if (m && m.id === assistantMsgId) {
               return { 
                 ...m, 
                 content: "", 
@@ -2901,10 +2938,11 @@ export default function App() {
                 accumulatedText += parsed.text;
 
                 setSessions((prev) =>
-                  prev.map((s) => {
-                    if (s.id === currentSessionId) {
-                      const updatedMsgs = s.messages.map((m) => {
-                        if (m.id === assistantMsgId) {
+                  (prev || []).map((s) => {
+                    if (s && s.id === currentSessionId) {
+                      const msgs = Array.isArray(s.messages) ? s.messages : [];
+                      const updatedMsgs = msgs.map((m) => {
+                        if (m && m.id === assistantMsgId) {
                           let thinkingDuration = m.thinkingDuration;
                           const startTime = thinkingStartTimesRef.current[assistantMsgId];
                           if (startTime) {
