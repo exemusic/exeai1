@@ -254,18 +254,19 @@ app.post("/api/projects/list", async (req, res) => {
 
     let projects: any[] = [];
 
-    if (userProjectsCache.has(userKey)) {
+    // Prioritize reading from Realtime Database
+    const rtdb = getFirebaseRtdb();
+    if (rtdb) {
+      try {
+        const snap = await rtdb.ref(`user_projects/${userKey}/projects`).once("value");
+        if (snap.exists() && Array.isArray(snap.val())) {
+          projects = snap.val();
+        }
+      } catch (e) {}
+    }
+
+    if (projects.length === 0 && userProjectsCache.has(userKey)) {
       projects = userProjectsCache.get(userKey) || [];
-    } else {
-      const rtdb = getFirebaseRtdb();
-      if (rtdb) {
-        try {
-          const snap = await rtdb.ref(`user_projects/${userKey}/projects`).once("value");
-          if (snap.exists() && Array.isArray(snap.val())) {
-            projects = snap.val();
-          }
-        } catch (e) {}
-      }
     }
 
     // Ensure default project exists in user's project list
@@ -284,7 +285,6 @@ app.post("/api/projects/list", async (req, res) => {
 
     userProjectsCache.set(userKey, projects);
 
-    const rtdb = getFirebaseRtdb();
     if (rtdb) {
       try {
         await rtdb.ref(`user_projects/${userKey}`).set({
@@ -323,18 +323,19 @@ app.post("/api/projects/create", async (req, res) => {
       return res.status(400).json({ error: "Project name can only contain letters, numbers, hyphens, and underscores." });
     }
 
-    let currentProjects: any[] = userProjectsCache.get(userKey) || [];
+    let currentProjects: any[] = [];
+    const rtdb = getFirebaseRtdb();
+    if (rtdb) {
+      try {
+        const snap = await rtdb.ref(`user_projects/${userKey}/projects`).once("value");
+        if (snap.exists() && Array.isArray(snap.val())) {
+          currentProjects = snap.val();
+        }
+      } catch (err) {}
+    }
 
-    if (currentProjects.length === 0) {
-      const rtdb = getFirebaseRtdb();
-      if (rtdb) {
-        try {
-          const snap = await rtdb.ref(`user_projects/${userKey}/projects`).once("value");
-          if (snap.exists() && Array.isArray(snap.val())) {
-            currentProjects = snap.val();
-          }
-        } catch (err) {}
-      }
+    if (currentProjects.length === 0 && userProjectsCache.has(userKey)) {
+      currentProjects = userProjectsCache.get(userKey) || [];
     }
 
     // Ensure default project is present in current projects count
@@ -375,7 +376,6 @@ app.post("/api/projects/create", async (req, res) => {
     currentProjects.push(newProj);
     userProjectsCache.set(userKey, currentProjects);
 
-    const rtdb = getFirebaseRtdb();
     if (rtdb) {
       try {
         await rtdb.ref(`user_projects/${userKey}`).set({
@@ -402,6 +402,84 @@ app.post("/api/projects/create", async (req, res) => {
   }
 });
 
+app.post("/api/projects/rename", async (req, res) => {
+  try {
+    const { uid, userEmail, oldName, newName } = req.body;
+    const userKey = getSanitizedUserKey(uid, userEmail);
+    const defaultProjName = getDefaultProjectName(uid, userEmail);
+
+    if (!oldName || !newName || !newName.trim()) {
+      return res.status(400).json({ error: "Old and new project names are required." });
+    }
+
+    const sanitizedNewName = newName.trim().replace(/[^a-zA-Z0-9-_]/g, "");
+    if (!sanitizedNewName) {
+      return res.status(400).json({ error: "Project name can only contain letters, numbers, hyphens, and underscores." });
+    }
+
+    let currentProjects: any[] = [];
+    const rtdb = getFirebaseRtdb();
+    if (rtdb) {
+      try {
+        const snap = await rtdb.ref(`user_projects/${userKey}/projects`).once("value");
+        if (snap.exists() && Array.isArray(snap.val())) {
+          currentProjects = snap.val();
+        }
+      } catch (err) {}
+    }
+
+    if (currentProjects.length === 0 && userProjectsCache.has(userKey)) {
+      currentProjects = userProjectsCache.get(userKey) || [];
+    }
+
+    // Check if new name already exists on another project
+    if (currentProjects.some(p => (p.name !== oldName && p.id !== oldName) && p.name.toLowerCase() === sanitizedNewName.toLowerCase())) {
+      return res.status(400).json({ error: `Project with name '${sanitizedNewName}' already exists.` });
+    }
+
+    let updated = false;
+    currentProjects = currentProjects.map(p => {
+      if (p.name === oldName || p.id === oldName) {
+        updated = true;
+        return {
+          ...p,
+          name: sanitizedNewName,
+          updatedAt: Date.now()
+        };
+      }
+      return p;
+    });
+
+    if (!updated) {
+      return res.status(404).json({ error: `Project '${oldName}' not found.` });
+    }
+
+    userProjectsCache.set(userKey, currentProjects);
+
+    if (rtdb) {
+      try {
+        await rtdb.ref(`user_projects/${userKey}`).set({
+          projects: currentProjects,
+          default_project_name: defaultProjName,
+          updated_at: new Date().toISOString()
+        });
+      } catch (e) {
+        console.error("Firebase RTDB save error on project rename:", e);
+      }
+    }
+
+    res.json({
+      success: true,
+      message: `Project renamed to '${sanitizedNewName}' successfully.`,
+      projects: currentProjects,
+      newName: sanitizedNewName
+    });
+  } catch (err: any) {
+    console.error("Rename Project Error:", err);
+    res.status(500).json({ error: err.message || "Failed to rename project." });
+  }
+});
+
 app.post("/api/projects/delete", async (req, res) => {
   try {
     const { uid, userEmail, projectName } = req.body;
@@ -416,18 +494,19 @@ app.post("/api/projects/delete", async (req, res) => {
       return res.status(400).json({ error: "Default user project cannot be deleted." });
     }
 
-    let currentProjects: any[] = userProjectsCache.get(userKey) || [];
+    let currentProjects: any[] = [];
+    const rtdb = getFirebaseRtdb();
+    if (rtdb) {
+      try {
+        const snap = await rtdb.ref(`user_projects/${userKey}/projects`).once("value");
+        if (snap.exists() && Array.isArray(snap.val())) {
+          currentProjects = snap.val();
+        }
+      } catch (err) {}
+    }
 
-    if (currentProjects.length === 0) {
-      const rtdb = getFirebaseRtdb();
-      if (rtdb) {
-        try {
-          const snap = await rtdb.ref(`user_projects/${userKey}/projects`).once("value");
-          if (snap.exists() && Array.isArray(snap.val())) {
-            currentProjects = snap.val();
-          }
-        } catch (err) {}
-      }
+    if (currentProjects.length === 0 && userProjectsCache.has(userKey)) {
+      currentProjects = userProjectsCache.get(userKey) || [];
     }
 
     let updatedProjects = currentProjects.filter(p => p.name !== projectName && p.id !== projectName);
@@ -444,7 +523,6 @@ app.post("/api/projects/delete", async (req, res) => {
 
     userProjectsCache.set(userKey, updatedProjects);
 
-    const rtdb = getFirebaseRtdb();
     if (rtdb) {
       try {
         await rtdb.ref(`user_projects/${userKey}`).set({

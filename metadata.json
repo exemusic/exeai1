@@ -1,6 +1,6 @@
 {
   "name": "ExeChat",
-  "description": "Seebuah aplikasi web chat AI modern dengan desain futuristik bertema hitam dan abu-abu, ditenagai oleh Gemini API.",
+  "description": "Sebuah aplikasi web chat AI modern dengan desain futuristik bertema hitam dan abu-abu, ditenagai oleh Gemini API.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

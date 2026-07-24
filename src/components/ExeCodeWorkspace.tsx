@@ -40,7 +40,9 @@ import {
   Menu,
   Info,
   FileUp,
-  Square
+  Square,
+  Pencil,
+  Check
 } from "lucide-react";
 import JSZip from "jszip";
 import { createClient } from "@supabase/supabase-js";
@@ -226,6 +228,8 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId, us
   const [newProjInputName, setNewProjInputName] = useState<string>("");
   const [isCreatingProj, setIsCreatingProj] = useState<boolean>(false);
   const [maxProjectLimit, setMaxProjectLimit] = useState<number>(5);
+  const [editingProjectName, setEditingProjectName] = useState<string | null>(null);
+  const [editingProjectValue, setEditingProjectValue] = useState<string>("");
   const realtimeChannelRef = useRef<any>(null);
   const mySessionIdRef = useRef<string>("sess-" + Math.random().toString(36).substring(2, 9));
 
@@ -1133,12 +1137,53 @@ body {
     }
   };
 
+  const handleRenameProjectInServer = async (oldName: string, newName: string) => {
+    const isEn = appLanguage === "en";
+    const sanitized = newName.trim().replace(/[^a-zA-Z0-9-_]/g, "");
+    if (!sanitized) {
+      triggerStatus(isEn ? "Project name cannot be empty!" : "Nama proyek tidak boleh kosong!", "error");
+      setEditingProjectName(null);
+      return;
+    }
+    if (oldName === sanitized) {
+      setEditingProjectName(null);
+      return;
+    }
+
+    try {
+      const res = await fetch("/api/projects/rename", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          uid: userId,
+          userEmail,
+          oldName,
+          newName: sanitized
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || (isEn ? "Failed to rename project." : "Gagal mengubah nama proyek."));
+
+      setUserProjects(data.projects || []);
+      if (projectName === oldName) {
+        setProjectName(data.newName);
+        localStorage.setItem("execode_persistent_project_id", data.newName);
+        localStorage.setItem("execode_project_name", data.newName);
+        window.history.replaceState(null, "", `/project/${data.newName}`);
+      }
+      triggerStatus(isEn ? `Project renamed to '${data.newName}'!` : `Nama proyek diubah menjadi '${data.newName}'!`, "success");
+    } catch (err: any) {
+      triggerStatus(err.message || (isEn ? "Failed to rename project." : "Gagal mengubah nama proyek."), "error");
+    } finally {
+      setEditingProjectName(null);
+    }
+  };
+
   const handleProjectNameChange = (newName: string) => {
     const sanitized = newName.replace(/[^a-zA-Z0-9-_]/g, "");
-    setProjectName(sanitized);
-    localStorage.setItem("execode_persistent_project_id", sanitized);
-    localStorage.setItem("execode_project_name", sanitized);
-    window.history.replaceState(null, "", `/project/${sanitized}`);
+    if (sanitized && sanitized !== projectName) {
+      handleRenameProjectInServer(projectName, sanitized);
+    }
   };
 
   const handleShareProject = () => {
@@ -3990,14 +4035,54 @@ body {
                         <div className="flex items-center gap-3 min-w-0">
                           <Folder className={`h-4 w-4 shrink-0 ${isActive ? "text-amber-400" : "text-zinc-400"}`} />
                           <div className="flex flex-col min-w-0">
-                            <div className="flex items-center gap-1.5">
-                              <span className="text-xs font-semibold truncate">{p.name}</span>
-                              {isDefault && (
-                                <span className="px-1.5 py-0.2 text-[9px] font-bold rounded bg-sky-500/15 text-sky-400 border border-sky-500/20 uppercase tracking-wide">
-                                  Default
-                                </span>
-                              )}
-                            </div>
+                            {editingProjectName === p.name ? (
+                              <div className="flex items-center gap-1 my-0.5">
+                                <input
+                                  type="text"
+                                  value={editingProjectValue}
+                                  onChange={(e) => setEditingProjectValue(e.target.value)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter") handleRenameProjectInServer(p.name, editingProjectValue);
+                                    if (e.key === "Escape") setEditingProjectName(null);
+                                  }}
+                                  autoFocus
+                                  className="px-2 py-0.5 text-xs rounded bg-zinc-900 border border-amber-500/50 text-white outline-none w-28"
+                                />
+                                <button
+                                  onClick={() => handleRenameProjectInServer(p.name, editingProjectValue)}
+                                  className="p-1 rounded hover:bg-emerald-500/20 text-emerald-400 cursor-pointer"
+                                  title="Save name"
+                                >
+                                  <Check className="h-3.5 w-3.5" />
+                                </button>
+                                <button
+                                  onClick={() => setEditingProjectName(null)}
+                                  className="p-1 rounded hover:bg-zinc-700/50 text-zinc-400 cursor-pointer"
+                                  title="Cancel"
+                                >
+                                  <X className="h-3.5 w-3.5" />
+                                </button>
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-xs font-semibold truncate">{p.name}</span>
+                                {isDefault && (
+                                  <span className="px-1.5 py-0.2 text-[9px] font-bold rounded bg-sky-500/15 text-sky-400 border border-sky-500/20 uppercase tracking-wide">
+                                    Default
+                                  </span>
+                                )}
+                                <button
+                                  onClick={() => {
+                                    setEditingProjectName(p.name);
+                                    setEditingProjectValue(p.name);
+                                  }}
+                                  className="p-1 text-zinc-400 hover:text-amber-400 transition-colors cursor-pointer"
+                                  title={appLanguage === "en" ? "Rename project" : "Ubah nama proyek"}
+                                >
+                                  <Pencil className="h-3 w-3" />
+                                </button>
+                              </div>
+                            )}
                             <span className="text-[10px] text-zinc-500">
                               {p.fileCount || 3} {appLanguage === "en" ? "files" : "file"} • {appLanguage === "en" ? "Updated:" : "Perubahan:"} {new Date(p.updatedAt || Date.now()).toLocaleDateString()}
                             </span>
