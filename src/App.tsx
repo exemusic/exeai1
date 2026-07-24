@@ -478,7 +478,7 @@ export default function App() {
   const [temperature, setTemperature] = useState(0.7);
   const [showSettings, setShowSettings] = useState(false);
   const [showExeCode, setShowExeCode] = useState(() => {
-    return typeof window !== "undefined" && window.location.pathname.startsWith("/project/");
+    return typeof window !== "undefined" && window.location.pathname.startsWith("/project/") && window.innerWidth >= 768;
   });
   const [settingsTab, setSettingsTab] = useState<"akun" | "model" | "tampilan" | "ingatan" | "feedback">("akun");
   const [cookieConsent, setCookieConsent] = useState<string | null>(() => {
@@ -489,8 +489,17 @@ export default function App() {
   const [showModelModal, setShowModelModal] = useState(false);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [hasApiKey, setHasApiKey] = useState<boolean | null>(null);
+  const [isMobile, setIsMobile] = useState(() => typeof window !== "undefined" && window.innerWidth < 768);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [isDesktopSidebarOpen, setIsDesktopSidebarOpen] = useState(false); 
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
   const [isHistoryCollapsed, setIsHistoryCollapsed] = useState(false);
   const [showAllHistory, setShowAllHistory] = useState(false);
   const [showSearchModal, setShowSearchModal] = useState(false);
@@ -3080,8 +3089,8 @@ export default function App() {
                 <ShieldCheck className="h-5 w-5" />
               </div>
               <div>
-                <h4 className="text-sm font-bold text-amber-500">Hexky Admin Diagnostic Portal</h4>
-                <p className="text-xs text-zinc-400">View complete user feedbacks, attachments, and user chat transcripts.</p>
+                <h4 className="text-sm font-bold text-amber-500">Admin Feedback Portal</h4>
+                <p className="text-xs text-zinc-400">Review user feedback submissions, attachments, and chat logs.</p>
               </div>
             </div>
             <button
@@ -3332,7 +3341,7 @@ export default function App() {
             setShowSettings(false);
             if (isMobile) setIsMobileSidebarOpen(false);
           }}
-          className={`w-full flex items-center justify-center gap-2 rounded-xl font-semibold py-3 px-4 transition-all duration-205 text-sm tracking-wide border ${
+          className={`hidden md:flex w-full items-center justify-center gap-2 rounded-xl font-semibold py-3 px-4 transition-all duration-205 text-sm tracking-wide border ${
             showExeCode
               ? "bg-amber-500/20 text-amber-500 border-amber-500/40"
               : isDark 
@@ -3879,7 +3888,7 @@ export default function App() {
                     setShowExeCode(prev => !prev);
                     setShowSettings(false);
                   }}
-                  className={`p-2 rounded-xl transition-all duration-200 cursor-pointer ${
+                  className={`hidden md:flex p-2 rounded-xl transition-all duration-200 cursor-pointer ${
                     showExeCode 
                       ? "bg-amber-500/10 text-amber-500" 
                       : `hover:bg-zinc-500/10 ${isDark ? "text-zinc-400 hover:text-white" : "text-zinc-650 hover:text-zinc-900"}`
@@ -4845,7 +4854,7 @@ export default function App() {
                             {userLanguage === "id" ? "Setelan" : "Settings"}
                           </h2>
                           <p className={`text-[11px] font-medium ${isDark ? "text-zinc-400" : "text-teal-100"}`}>
-                            ExeChat Account & System
+                            {userLanguage === "id" ? "Akun & Preferensi Aplikasi" : "Account & App Preferences"}
                           </p>
                         </div>
                       </div>
@@ -4931,7 +4940,7 @@ export default function App() {
                              (userLanguage === "id" ? "Kirim Masukan" : "Submit Feedback")}
                           </h2>
                           <p className={`text-[10px] font-medium ${isDark ? "text-zinc-400" : "text-teal-100"}`}>
-                            {userLanguage === "id" ? "Pengaturan Konfigurasi ExeChat" : "ExeChat Configuration Panel"}
+                            {userLanguage === "id" ? "Setelan Aplikasi" : "App Preferences"}
                           </p>
                         </div>
                       </div>
@@ -5290,8 +5299,8 @@ export default function App() {
                             <Settings className="h-5 w-5" />
                           </div>
                           <div>
-                            <h2 className="text-base font-bold text-zinc-900 dark:text-zinc-100 tracking-tight leading-none">Settings</h2>
-                            <p className="text-[11px] text-zinc-500 dark:text-zinc-400 font-medium mt-1">ExeChat Control Center</p>
+                            <h2 className="text-base font-bold text-zinc-900 dark:text-zinc-100 tracking-tight leading-none">{getTranslation("settings", userLanguage)}</h2>
+                            <p className="text-[11px] text-zinc-500 dark:text-zinc-400 font-medium mt-1">{userLanguage === "id" ? "Pengaturan Aplikasi" : "Preferences & Account"}</p>
                           </div>
                         </div>
 
@@ -5884,18 +5893,20 @@ export default function App() {
             )}
           </AnimatePresence>
 
-          {/* EXECODE WORKSPACE COMPONENT OVERLAY */}
+          {/* EXECODE WORKSPACE COMPONENT OVERLAY (DESKTOP ONLY) */}
           <AnimatePresence>
-            {showExeCode && (
-              <ExeCodeWorkspace
-                isDark={isDark}
-                curTheme={curTheme}
-                onClose={() => setShowExeCode(false)}
-                defaultModelId={selectedModelId}
-                userEmail={userEmail}
-                userId={userId}
-                appLanguage={userLanguage}
-              />
+            {showExeCode && !isMobile && (
+              <div className="hidden md:block">
+                <ExeCodeWorkspace
+                  isDark={isDark}
+                  curTheme={curTheme}
+                  onClose={() => setShowExeCode(false)}
+                  defaultModelId={selectedModelId}
+                  userEmail={userEmail}
+                  userId={userId}
+                  appLanguage={userLanguage}
+                />
+              </div>
             )}
           </AnimatePresence>
 
@@ -6578,13 +6589,13 @@ export default function App() {
                       </div>
                       <div>
                         <div className="flex items-center gap-2">
-                          <h3 className="font-display font-bold text-base md:text-lg leading-tight">Hexky Admin Diagnostic Portal</h3>
+                          <h3 className="font-display font-bold text-base md:text-lg leading-tight">Admin Feedback Portal</h3>
                           <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-500 font-bold border border-amber-500/20">
                             nairicintia@gmail.com
                           </span>
                         </div>
                         <p className={`text-xs mt-0.5 ${isDark ? "text-zinc-400" : "text-zinc-500"}`}>
-                          Manage user feedbacks, inspect bug attachments, and review chat transcripts
+                          Review user feedback submissions, attachments, and chat logs
                         </p>
                       </div>
                     </div>
@@ -7035,10 +7046,10 @@ export default function App() {
                   }`}>
                     <span className="flex items-center gap-2">
                       <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-                      Connected to Supabase Diagnostics Bucket
+                      Connected to Feedback Storage
                     </span>
                     <span className="font-bold uppercase tracking-wider text-[9px] font-mono px-2.5 py-0.5 rounded bg-amber-500/10 text-amber-500 border border-amber-500/20">
-                      Hexky Owner Mode
+                      Admin Mode
                     </span>
                   </div>
                 </motion.div>
