@@ -76,17 +76,24 @@ app.get("/api/supabase/config", (req, res) => {
 });
 
 // --- FIREBASE REALTIME DATABASE ENGINE ---
-const FIREBASE_SERVICE_ACCOUNT_PATH = path.join(process.cwd(), "exechat-data-firebase-adminsdk-fbsvc-61e71a9487.json");
+const FIREBASE_SECRET_PATHS = [
+  path.join(process.cwd(), ".secrets", "firebase-service-account.json"),
+  path.join(process.cwd(), "exechat-data-firebase-adminsdk-fbsvc-61e71a9487.json")
+];
 const FIREBASE_DATABASE_URL = "https://exechat-data-default-rtdb.asia-southeast1.firebasedatabase.app/";
 
 function getFirebaseRtdb(): Database | null {
   try {
     if (!getApps().length) {
       let serviceAccount: any = null;
-      if (fs.existsSync(FIREBASE_SERVICE_ACCOUNT_PATH)) {
-        const raw = fs.readFileSync(FIREBASE_SERVICE_ACCOUNT_PATH, "utf-8");
-        serviceAccount = JSON.parse(raw);
-      } else if (process.env.FIREBASE_SERVICE_ACCOUNT_JSON) {
+      for (const secretPath of FIREBASE_SECRET_PATHS) {
+        if (fs.existsSync(secretPath)) {
+          const raw = fs.readFileSync(secretPath, "utf-8");
+          serviceAccount = JSON.parse(raw);
+          break;
+        }
+      }
+      if (!serviceAccount && process.env.FIREBASE_SERVICE_ACCOUNT_JSON) {
         serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON);
       }
 
@@ -97,7 +104,7 @@ function getFirebaseRtdb(): Database | null {
         });
         console.log("Firebase Admin SDK initialized with Realtime Database URL:", FIREBASE_DATABASE_URL);
       } else {
-        console.warn("Firebase service account file not found at:", FIREBASE_SERVICE_ACCOUNT_PATH);
+        console.warn("Firebase service account credentials not found.");
       }
     }
 
@@ -114,8 +121,7 @@ app.get("/api/firebase/config", (req, res) => {
   const rtdb = getFirebaseRtdb();
   res.json({
     databaseUrl: FIREBASE_DATABASE_URL,
-    isConfigured: !!rtdb,
-    serviceAccountFile: "exechat-data-firebase-adminsdk-fbsvc-61e71a9487.json"
+    isConfigured: !!rtdb
   });
 });
 

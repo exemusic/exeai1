@@ -1099,7 +1099,7 @@ export default function App() {
   }, [isLoggedIn, userEmail, userId, userName, userDisplayName, userPhoto]);
 
   useEffect(() => {
-    if (!userId || userId.startsWith("guest_") || userId.startsWith("guest-")) return;
+    if (!userId) return;
     
     const handler = setTimeout(() => {
       saveToSupabase(userId, userEmail, userName, userDisplayName, sessions, userLanguage);
@@ -1649,7 +1649,7 @@ export default function App() {
     currentSessions: ChatSession[] = sessions,
     currentLanguage: string = userLanguage
   ) => {
-    if (!currentUid || currentUid.startsWith("guest_") || currentUid.startsWith("guest-")) return;
+    if (!currentUid) return;
     try {
       await fetch("/api/db/save-all", {
         method: "POST",
@@ -1672,7 +1672,7 @@ export default function App() {
     setUserLanguage(langCode);
     localStorage.setItem("exechat_user_language", langCode);
     setShowLanguagePopup(false);
-    if (userId && !userId.startsWith("guest_")) {
+    if (userId) {
       await saveToSupabase(userId, userEmail, userName, userDisplayName, sessions, langCode);
     }
   };
