@@ -732,7 +732,7 @@ app.post("/api/db/metrics", async (req, res) => {
 // --- ADMIN & FEEDBACK SYSTEM ENDPOINTS ---
 app.post("/api/feedback/submit", async (req, res) => {
   try {
-    const { email, message, attachment, category, chatHistory, modelInfo, clientMeta } = req.body;
+    const { email, message, attachment, category, chatHistory, modelInfo, topicInfo, targetMessageDetails, clientMeta } = req.body;
     if (!email || !message) {
       return res.status(400).json({ error: "Email and message are required fields." });
     }
@@ -743,34 +743,35 @@ app.post("/api/feedback/submit", async (req, res) => {
     }
 
     const bucket = "feedback";
-    
-    // 1. SPAM PROTECTION CHECK (30-minute delay per Google account stored securely in Supabase)
     const sanitizedEmail = email.replace(/[^a-zA-Z0-9]/g, "_");
     const timerPath = `feedback_timers/${sanitizedEmail}.json`;
+    
+    // 1. SPAM PROTECTION CHECK (30-minute delay per Google account, except for Dislike / Chat Error)
+    if (category !== "Dislike / Chat Error") {
+      try {
+        const { data: timerData } = await supabase.storage
+          .from(bucket)
+          .download(timerPath);
 
-    try {
-      const { data: timerData } = await supabase.storage
-        .from(bucket)
-        .download(timerPath);
-
-      if (timerData) {
-        const textContent = await timerData.text();
-        const parsedTimer = JSON.parse(textContent);
-        if (parsedTimer && parsedTimer.lastSubmittedAt) {
-          const elapsed = Date.now() - parsedTimer.lastSubmittedAt;
-          const waitTimeLimit = 30 * 60 * 1000; // 30 minutes in milliseconds
-          if (elapsed < waitTimeLimit) {
-            const minutesLeft = Math.ceil((waitTimeLimit - elapsed) / 1000 / 60);
-            return res.status(429).json({
-              error: `Spam Protection: You can only send 1 feedback every 30 minutes. Please wait ${minutesLeft} minute(s) before trying again.`
-            });
+        if (timerData) {
+          const textContent = await timerData.text();
+          const parsedTimer = JSON.parse(textContent);
+          if (parsedTimer && parsedTimer.lastSubmittedAt) {
+            const elapsed = Date.now() - parsedTimer.lastSubmittedAt;
+            const waitTimeLimit = 30 * 60 * 1000; // 30 minutes in milliseconds
+            if (elapsed < waitTimeLimit) {
+              const minutesLeft = Math.ceil((waitTimeLimit - elapsed) / 1000 / 60);
+              return res.status(429).json({
+                error: `Spam Protection: You can only send 1 feedback every 30 minutes. Please wait ${minutesLeft} minute(s) before trying again.`
+              });
+            }
           }
         }
-      }
-    } catch (err: any) {
-      // If timer file doesn't exist, it is fine to proceed
-      if (!err.message?.includes("Object not found") && err.status !== 404) {
-        console.warn("Feedback timer load error (non-fatal):", err);
+      } catch (err: any) {
+        // If timer file doesn't exist, it is fine to proceed
+        if (!err.message?.includes("Object not found") && err.status !== 404) {
+          console.warn("Feedback timer load error (non-fatal):", err);
+        }
       }
     }
 
@@ -821,6 +822,8 @@ app.post("/api/feedback/submit", async (req, res) => {
       category: category || "Suggestion",
       chatHistory: chatHistory || null,
       modelInfo: modelInfo || null,
+      topicInfo: topicInfo || null,
+      targetMessageDetails: targetMessageDetails || null,
       clientMeta: clientMeta || null,
       attachmentUrl,
       attachmentName,

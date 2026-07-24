@@ -601,7 +601,13 @@ export default function App() {
   const [feedbackSuccess, setFeedbackSuccess] = useState<string | null>(null);
   const [feedbackError, setFeedbackError] = useState<string | null>(null);
 
-  const [dislikeFeedbackToast, setDislikeFeedbackToast] = useState<{ msgId: string; msgContent?: string } | null>(null);
+  const [dislikeFeedbackToast, setDislikeFeedbackToast] = useState<{
+    msgId: string;
+    msgContent?: string;
+    msgThinking?: string;
+    msgTimestamp?: number;
+    msgModelId?: string;
+  } | null>(null);
   const [dislikeReason, setDislikeReason] = useState("");
   const [dislikeSubmitting, setDislikeSubmitting] = useState(false);
   const [dislikeFeedbackSuccess, setDislikeFeedbackSuccess] = useState(false);
@@ -892,30 +898,20 @@ export default function App() {
     });
   };
 
-  const handleFileSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
-    console.log("[File] Handler triggered, files count:", e.target.files ? e.target.files.length : 0);
-    const file = e.target.files?.[0];
-    if (!file) {
-      console.log("[File] No file selected");
-      return;
-    }
-
-    console.log("[File] Selected file:", file.name, "| Type:", file.type, "| Size:", file.size);
+  const processFileObject = (file: File) => {
+    if (!file) return;
+    console.log("[File] Processing file object:", file.name, "| Type:", file.type, "| Size:", file.size);
 
     const maxBytes = 20 * 1024 * 1024; 
 
     if (file.size > maxBytes) {
       console.log("[File] File too large:", file.size);
       setErrorText("File size exceeds the 20MB limit.");
-      e.currentTarget.value = "";
       return;
     }
 
-    console.log("[File] Accepting file, creating object URL...");
-
     setErrorText(null);
     const url = URL.createObjectURL(file);
-    console.log("[File] Object URL created:", url);
 
     const isTextFile = (f: File): boolean => {
       const textExtensions = [
@@ -953,9 +949,7 @@ export default function App() {
       };
       reader.readAsText(file);
     } else if (file.type.startsWith("image/")) {
-      console.log("[File] Compressing image before upload...");
       compressImage(file).then(({ base64, size }) => {
-        console.log("[File] Image compressed from", file.size, "bytes to", size, "bytes");
         setSelectedFile({
           name: file.name.replace(/\.[^/.]+$/, "") + ".jpg",
           url,
@@ -964,7 +958,6 @@ export default function App() {
           base64: base64,
         });
       }).catch((err) => {
-        console.error("[File] Error compressing image, falling back to original:", err);
         const reader = new FileReader();
         reader.onload = (event) => {
           const base64Data = event.target?.result as string;
@@ -987,9 +980,32 @@ export default function App() {
       });
     }
 
-    console.log("[File] setSelectedFile triggered, should appear in UI now");
     playNotifySound();
+  };
+
+  const handleFileSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      processFileObject(file);
+    }
     e.currentTarget.value = "";
+  };
+
+  const handlePaste = (e: React.ClipboardEvent) => {
+    const items = e.clipboardData?.items;
+    if (items && items.length > 0) {
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        if (item.kind === "file") {
+          const file = item.getAsFile();
+          if (file) {
+            e.preventDefault();
+            processFileObject(file);
+            break;
+          }
+        }
+      }
+    }
   };
 
   useEffect(() => {
@@ -1770,10 +1786,27 @@ export default function App() {
     if (!dislikeReason.trim() || dislikeSubmitting || !dislikeFeedbackToast) return;
     setDislikeSubmitting(true);
     try {
-      const formattedMessage = `[Dislike / Chat Error - Msg ID: ${dislikeFeedbackToast.msgId}] ${dislikeReason.trim()}${
-        dislikeFeedbackToast.msgContent ? `\n\nTarget Message Excerpt:\n"${dislikeFeedbackToast.msgContent}"` : ""
-      }`;
+      const formattedMessage = `[Dislike / Chat Error - Msg ID: ${dislikeFeedbackToast.msgId}]\n` +
+        `Selected Problem Template: ${dislikeReason.trim()}\n\n` +
+        `Model: ${dislikeFeedbackToast.msgModelId || selectedModelId}\n` +
+        `Topic: ${activePreset ? activePreset.name : "General Assistant"}\n` +
+        `Timestamp: ${dislikeFeedbackToast.msgTimestamp ? new Date(dislikeFeedbackToast.msgTimestamp).toLocaleString() : new Date().toLocaleString()}\n\n` +
+        `Target AI Message Content:\n"${dislikeFeedbackToast.msgContent || ''}"\n\n` +
+        `Target AI Thinking Process:\n"${dislikeFeedbackToast.msgThinking || 'No thinking process recorded.'}"`;
+
       const activeMessages = currentSession?.messages || [];
+      const formattedHistory = activeMessages.map(m => {
+        const parsed = parseMessageThinking(m.content);
+        return {
+          id: m.id,
+          role: m.role,
+          content: parsed.actual || m.content,
+          thinkingProcess: parsed.thinking || (m as any).thinkingProcess || null,
+          timestamp: m.timestamp,
+          modelId: (m as any).modelId || m.routedModelId || selectedModelId
+        };
+      });
+
       const res = await fetch("/api/feedback/submit", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1781,14 +1814,16 @@ export default function App() {
           email: userEmail || "anonymous@gmail.com",
           message: formattedMessage,
           category: "Dislike / Chat Error",
-          chatHistory: activeMessages.length > 0 ? activeMessages.slice(-20).map(m => ({
-            id: m.id,
-            role: m.role,
-            content: m.content,
-            timestamp: m.timestamp,
-            modelId: (m as any).modelId || m.routedModelId || selectedModelId
-          })) : null,
-          modelInfo: selectedModelId,
+          chatHistory: formattedHistory,
+          modelInfo: dislikeFeedbackToast.msgModelId || selectedModelId,
+          topicInfo: activePreset ? activePreset.name : "General Assistant",
+          targetMessageDetails: {
+            id: dislikeFeedbackToast.msgId,
+            content: dislikeFeedbackToast.msgContent,
+            thinkingProcess: dislikeFeedbackToast.msgThinking,
+            timestamp: dislikeFeedbackToast.msgTimestamp,
+            modelId: dislikeFeedbackToast.msgModelId
+          },
           clientMeta: {
             userAgent: typeof navigator !== "undefined" ? navigator.userAgent : "",
             language: userLanguage,
@@ -4151,6 +4186,7 @@ export default function App() {
                           ref={homeTextareaRef}
                           value={inputMessage}
                           onChange={(e) => setInputMessage(e.target.value)}
+                          onPaste={handlePaste}
                           onKeyDown={(e) => {
                             if (e.key === "Enter" && !e.shiftKey) {
                               e.preventDefault();
@@ -4443,7 +4479,14 @@ export default function App() {
                                     setDislikedMessages((prev) => ({ ...prev, [msg.id]: nextDisliked }));
                                     setLikedMessages((prev) => ({ ...prev, [msg.id]: false }));
                                     if (nextDisliked) {
-                                      setDislikeFeedbackToast({ msgId: msg.id, msgContent: msg.content });
+                                      const parsed = parseMessageThinking(msg.content);
+                                      setDislikeFeedbackToast({
+                                        msgId: msg.id,
+                                        msgContent: parsed.actual || msg.content,
+                                        msgThinking: parsed.thinking || (msg as any).thinkingProcess || null,
+                                        msgTimestamp: msg.timestamp,
+                                        msgModelId: (msg as any).modelId || msg.routedModelId || selectedModelId
+                                      });
                                       setDislikeReason("");
                                       setDislikeFeedbackSuccess(false);
                                     } else if (dislikeFeedbackToast?.msgId === msg.id) {
@@ -4603,41 +4646,6 @@ export default function App() {
               }`}>
                 <div className="max-w-3xl mx-auto relative">
 
-                  {/* Quick actions box directly above inputs */}
-                  <div className="flex flex-wrap items-center justify-between gap-1.5 mb-2 md:mb-3 text-[10px] md:text-xs text-zinc-500 px-0.5">
-                    <div className="flex flex-wrap items-center gap-1.5 md:gap-2">
-                      {/* Model Selector */}
-                      <button
-                        type="button"
-                        onClick={() => setShowModelModal(true)}
-                        className={`border text-[10px] md:text-[11px] rounded-lg py-1 px-2.5 font-semibold font-sans max-w-[125px] sm:max-w-none truncate cursor-pointer focus:outline-none transition-all shadow-sm flex items-center gap-1 ${
-                          isDark 
-                            ? "bg-zinc-900 hover:bg-zinc-900/80 text-zinc-300 border-zinc-850 hover:border-zinc-850" 
-                            : "bg-zinc-50 hover:bg-zinc-100 text-zinc-700 border-zinc-200 hover:border-zinc-200"
-                        }`}
-                      >
-                        <Cpu className="h-2.5 w-2.5 text-purple-500 shrink-0" />
-                        <span className="truncate">{activeModel.name}</span>
-                        <ChevronDown className="h-2.5 w-2.5 text-zinc-500 shrink-0" />
-                      </button>
-
-                      {/* Topic/Instruction Selector */}
-                      <button
-                        type="button"
-                        onClick={() => setShowPresetModal(true)}
-                        className={`border text-[10px] md:text-[11px] rounded-lg py-1 px-2.5 font-semibold font-sans max-w-[125px] sm:max-w-none truncate cursor-pointer focus:outline-none transition-all shadow-sm flex items-center gap-1 ${
-                          isDark 
-                            ? "bg-zinc-900 hover:bg-zinc-900/80 text-zinc-300 border-zinc-850 hover:border-zinc-850" 
-                            : "bg-zinc-50 hover:bg-zinc-100 text-zinc-700 border-zinc-200 hover:border-zinc-200"
-                        }`}
-                      >
-                        <Sparkles className="h-2.5 w-2.5 text-amber-500 shrink-0" />
-                        <span className="truncate">{userLanguage === "id" ? "Topik: " : "Topic: "}{activePreset.name}</span>
-                        <ChevronDown className="h-2.5 w-2.5 text-zinc-500 shrink-0" />
-                      </button>
-                    </div>
-                  </div>
-
                   {/* Input block */}
                   <div className={`relative rounded-[26px] md:rounded-[30px] border p-2 px-3 md:px-4 transition-all duration-300 flex flex-col ${
                     isDark 
@@ -4672,51 +4680,71 @@ export default function App() {
                     )}
 
                     <div className="flex items-center w-full gap-1.5 md:gap-2">
-                      {/* Upload button inside textbox - left side */}
-                      <div className="relative">
-                        <button
-                          onClick={() => setShowUploadMenuChat(!showUploadMenuChat)}
-                          className={`h-9 w-9 md:h-10 md:w-10 rounded-full hover:text-amber-400 transition-all duration-200 text-zinc-500 shrink-0 flex items-center justify-center cursor-pointer ${
-                            isDark ? "hover:bg-zinc-800" : "hover:bg-zinc-200"
-                          }`}
-                          title="Options"
-                        >
-                          <Plus className={`h-4.5 w-4.5 md:h-5 md:w-5 stroke-[2] transition-transform duration-300 ${showUploadMenuChat ? "rotate-[135deg]" : ""}`} />
-                        </button>
+                      {/* Upload button + Model chip inside prompt box */}
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <div className="relative">
+                          <button
+                            onClick={() => setShowUploadMenuChat(!showUploadMenuChat)}
+                            className={`h-9 w-9 md:h-10 md:w-10 rounded-full hover:text-amber-400 transition-all duration-200 text-zinc-500 shrink-0 flex items-center justify-center cursor-pointer ${
+                              isDark ? "hover:bg-zinc-800" : "hover:bg-zinc-200"
+                            }`}
+                            title="Options"
+                          >
+                            <Plus className={`h-4.5 w-4.5 md:h-5 md:w-5 stroke-[2] transition-transform duration-300 ${showUploadMenuChat ? "rotate-[135deg]" : ""}`} />
+                          </button>
 
-                        <AnimatePresence>
-                          {showUploadMenuChat && (
-                            <>
-                              <div className="fixed inset-0 z-40" onClick={() => setShowUploadMenuChat(false)} />
-                              <motion.div
-                                initial={{ opacity: 0, scale: 0.95, y: -8 }}
-                                animate={{ opacity: 1, scale: 1, y: 0 }}
-                                exit={{ opacity: 0, scale: 0.95, y: -8 }}
-                                transition={{ duration: 0.15 }}
-                                className={`absolute bottom-full left-0 mb-2 w-44 rounded-xl p-1.5 shadow-xl border z-50 transition-all ${
-                                  isDark 
-                                    ? "bg-zinc-900/95 border-zinc-800 text-zinc-100 backdrop-blur-md" 
-                                    : "bg-white/95 border-zinc-250 text-zinc-900 backdrop-blur-md"
-                                }`}
-                              >
-                                <button
-                                  onClick={() => {
-                                    setShowUploadMenuChat(false);
-                                    fileInputRef.current?.click();
-                                  }}
-                                  className={`flex items-center gap-2.5 w-full text-left px-3 py-2 text-xs md:text-sm font-semibold transition-colors rounded-lg cursor-pointer ${
+                          <AnimatePresence>
+                            {showUploadMenuChat && (
+                              <>
+                                <div className="fixed inset-0 z-40" onClick={() => setShowUploadMenuChat(false)} />
+                                <motion.div
+                                  initial={{ opacity: 0, scale: 0.95, y: -8 }}
+                                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                                  exit={{ opacity: 0, scale: 0.95, y: -8 }}
+                                  transition={{ duration: 0.15 }}
+                                  className={`absolute bottom-full left-0 mb-2 w-44 rounded-xl p-1.5 shadow-xl border z-50 transition-all ${
                                     isDark 
-                                      ? "hover:bg-zinc-800 text-zinc-300 hover:text-white" 
-                                      : "hover:bg-zinc-150 text-zinc-700 hover:text-zinc-900"
+                                      ? "bg-zinc-900/95 border-zinc-800 text-zinc-100 backdrop-blur-md" 
+                                      : "bg-white/95 border-zinc-250 text-zinc-900 backdrop-blur-md"
                                   }`}
                                 >
-                                  <Paperclip className="h-4 w-4 text-amber-500 shrink-0" />
-                                  <span>{userLanguage === "id" ? "Unggah File" : "Upload File"}</span>
-                                </button>
-                              </motion.div>
-                            </>
-                          )}
-                        </AnimatePresence>
+                                  <button
+                                    onClick={() => {
+                                      setShowUploadMenuChat(false);
+                                      fileInputRef.current?.click();
+                                    }}
+                                    className={`flex items-center gap-2.5 w-full text-left px-3 py-2 text-xs md:text-sm font-semibold transition-colors rounded-lg cursor-pointer ${
+                                      isDark 
+                                        ? "hover:bg-zinc-800 text-zinc-300 hover:text-white" 
+                                        : "hover:bg-zinc-150 text-zinc-700 hover:text-zinc-900"
+                                    }`}
+                                  >
+                                    <Paperclip className="h-4 w-4 text-amber-500 shrink-0" />
+                                    <span>{userLanguage === "id" ? "Unggah File" : "Upload File"}</span>
+                                  </button>
+                                </motion.div>
+                              </>
+                            )}
+                          </AnimatePresence>
+                        </div>
+
+                        {/* Inline Model Picker Chip */}
+                        <button
+                          type="button"
+                          onClick={() => setShowModelModal(true)}
+                          className={`flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold rounded-full border transition-all cursor-pointer ${
+                            isDark
+                              ? "bg-zinc-800/80 hover:bg-zinc-800 text-purple-300 border-zinc-700/80"
+                              : "bg-purple-50 hover:bg-purple-100 text-purple-700 border-purple-200"
+                          }`}
+                          title={userLanguage === "id" ? "Ganti Model AI" : "Switch AI Model"}
+                        >
+                          <Cpu className="h-3 w-3 text-purple-500 shrink-0" />
+                          <span className="truncate max-w-[85px] sm:max-w-[130px] font-mono text-[10px] md:text-[11px]">
+                            ^ {activeModel.name}
+                          </span>
+                          <ChevronDown className="h-3 w-3 text-purple-400 shrink-0" />
+                        </button>
                       </div>
 
                      <textarea
@@ -4724,6 +4752,7 @@ export default function App() {
                        rows={1}
                        value={inputMessage}
                        onChange={(e) => setInputMessage(e.target.value)}
+                       onPaste={handlePaste}
                        onKeyDown={(e) => {
                          if (e.key === "Enter" && !e.shiftKey) {
                            e.preventDefault();
@@ -6749,7 +6778,11 @@ export default function App() {
                               </h4>
                               <div className="flex justify-between py-1 border-b border-zinc-500/10">
                                 <span>Model:</span>
-                                <span className="text-amber-500 font-bold">{selectedAdminFeedback.modelInfo || "Default"}</span>
+                                <span className="text-purple-400 font-bold">{selectedAdminFeedback.modelInfo || "Default"}</span>
+                              </div>
+                              <div className="flex justify-between py-1 border-b border-zinc-500/10">
+                                <span>Topic:</span>
+                                <span className="text-amber-400 font-bold">{selectedAdminFeedback.topicInfo || "General Assistant"}</span>
                               </div>
                               <div className="flex justify-between py-1 border-b border-zinc-500/10">
                                 <span>Language:</span>
@@ -6805,6 +6838,17 @@ export default function App() {
                                             ? "bg-zinc-800/90 text-zinc-100 border border-zinc-700/60 rounded-tl-none"
                                             : "bg-zinc-100 text-zinc-900 border border-zinc-200 rounded-tl-none"
                                       }`}>
+                                        {msg.thinkingProcess && (
+                                          <details className="mb-2.5 p-2.5 rounded-xl bg-purple-950/40 border border-purple-800/50 text-purple-200">
+                                            <summary className="cursor-pointer text-[11px] font-bold text-purple-400 select-none flex items-center gap-1.5 hover:text-purple-300">
+                                              <Brain className="h-3.5 w-3.5 text-purple-400 shrink-0" />
+                                              <span>Full AI Thinking Process</span>
+                                            </summary>
+                                            <p className="mt-2 text-[11px] font-mono whitespace-pre-wrap opacity-90 border-t border-purple-800/30 pt-2 select-text">
+                                              {msg.thinkingProcess}
+                                            </p>
+                                          </details>
+                                        )}
                                         <p className="whitespace-pre-wrap select-text font-sans">{msg.content}</p>
                                       </div>
                                     </div>
@@ -7090,13 +7134,15 @@ export default function App() {
                     {/* Quick Reasons Chips */}
                     <div className="flex flex-wrap gap-1.5">
                       {[
-                        userLanguage === "id" ? "Jawaban salah/kurang tepat" : "Inaccurate answer",
-                        userLanguage === "id" ? "Jawaban tidak lengkap" : "Incomplete response",
-                        userLanguage === "id" ? "Sulit dipahami" : "Hard to understand",
-                        userLanguage === "id" ? "Lambat / Lag" : "Slow or laggy"
+                        userLanguage === "id" ? "Jawaban salah / Halusinasi" : "Inaccurate / Hallucination",
+                        userLanguage === "id" ? "Format / Coding cacat" : "Incorrect code or format",
+                        userLanguage === "id" ? "Terlalu singkat / Mengabaikan instruksi" : "Too brief / Ignored instructions",
+                        userLanguage === "id" ? "Chat lambat / Respon gantung" : "Slow chat / Stalled response",
+                        userLanguage === "id" ? "Penjelasan kurang jelas" : "Unclear explanation"
                       ].map((preset) => (
                         <button
                           key={preset}
+                          type="button"
                           onClick={() => setDislikeReason(preset)}
                           className={`text-[11px] px-2.5 py-1 rounded-lg border transition-all ${
                             dislikeReason === preset
