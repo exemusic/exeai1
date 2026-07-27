@@ -106,6 +106,7 @@ interface TypewriterMessageProps {
   setExpandedThoughts: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
   parseMessageThinking: (content: string) => { thinking: string | null; actual: string; isThinking: boolean };
   thinkingDuration?: number;
+  language: string;
 }
 
 function TypewriterMessage({
@@ -117,7 +118,8 @@ function TypewriterMessage({
   expandedThoughts,
   setExpandedThoughts,
   parseMessageThinking,
-  thinkingDuration
+  thinkingDuration,
+  language
 }: TypewriterMessageProps) {
   const [displayedContent, setDisplayedContent] = useState(() => {
     return (isLatest && isGenerating) ? "" : content;
@@ -217,7 +219,7 @@ function TypewriterMessage({
           >
             <Lightbulb className="h-3.5 w-3.5 text-amber-500 shrink-0" />
             <span className="flex items-center gap-1">
-              {`Thought for ${typeof duration === "number" ? duration.toFixed(1) : duration}s`}
+              {getTranslation("thoughtFor", language, { duration: String(typeof duration === "number" ? duration.toFixed(1) : duration) })}
             </span>
             <ChevronDown className={`h-3 w-3 text-zinc-400 shrink-0 transition-transform duration-200 ${expandedThoughts[msgId] ? "rotate-180" : ""}`} />
           </button>
@@ -232,7 +234,7 @@ function TypewriterMessage({
                 className="overflow-hidden w-full"
               >
                 <div className="mt-2 ml-3.5 pl-3.5 border-l-2 border-zinc-200 dark:border-zinc-800 text-xs text-zinc-500 dark:text-zinc-400 font-mono leading-relaxed whitespace-pre-wrap py-1">
-                  {effectiveThinking || "Processing reasoning..."}
+                  {effectiveThinking || getTranslation("processingReasoning", language)}
                 </div>
               </motion.div>
             )}
@@ -253,7 +255,7 @@ function TypewriterMessage({
         /* CHAT ERROR / EMPTY RESPONSE WARNING - ONLY SHOWN IF GENERATION FINISHED AND NO TEXT/THINKING IS PRESENT */
         <div className="text-rose-600 dark:text-rose-400 text-xs mt-1 select-none font-sans flex items-center gap-2 bg-rose-500/10 border border-rose-500/20 px-3.5 py-2 rounded-xl w-fit">
           <AlertCircle className="h-4 w-4 text-rose-500 shrink-0" />
-          <span>No text response was generated. Please try resending or rephrasing your message!</span>
+          <span>{getTranslation("noResponseGenerated", language)}</span>
         </div>
       ) : null}
     </div>
@@ -4160,14 +4162,9 @@ export default function App() {
                         transition={{ delay: 0.1, duration: 0.4 }}
                         className="font-display font-semibold text-2xl sm:text-3xl md:text-[42px] tracking-tight leading-tight bg-gradient-to-r from-[#59a6ff] via-[#c084fc] to-[#ff8da1] bg-clip-text text-transparent select-none"
                       >
-                        {userLanguage === "id"
-                          ? (userDisplayName || userName 
-                              ? `Halo ${userDisplayName || userName}, ${welcomeGreeting}` 
-                              : `Halo, ${welcomeGreeting.charAt(0).toUpperCase() + welcomeGreeting.slice(1)}`)
-                          : (userDisplayName || userName 
-                              ? `Hello ${userDisplayName || userName}, ${welcomeGreeting}` 
-                              : `Hello, ${welcomeGreeting.charAt(0).toUpperCase() + welcomeGreeting.slice(1)}`)
-                        }
+                        {userDisplayName || userName
+                          ? `${getTranslation("hello", userLanguage)} ${userDisplayName || userName}, ${welcomeGreeting}`
+                          : `${getTranslation("hello", userLanguage)}, ${welcomeGreeting.charAt(0).toUpperCase() + welcomeGreeting.slice(1)}`}
                       </motion.h2>
                     </div>
 
@@ -4192,7 +4189,7 @@ export default function App() {
                             <span className={`text-[9px] px-1.5 py-0.5 rounded font-mono border ${
                               isDark ? "bg-zinc-900 text-zinc-400 border-zinc-850" : "bg-zinc-100 text-zinc-500 border-zinc-200"
                             }`}>
-                              Text Read
+                              {getTranslation("textRead", userLanguage)}
                             </span>
                           )}
                           <button
@@ -4200,7 +4197,7 @@ export default function App() {
                             className={`ml-auto p-1.5 rounded-lg transition-colors ${
                               isDark ? "text-zinc-500 hover:text-red-400 hover:bg-zinc-900" : "text-zinc-500 hover:text-red-500 hover:bg-zinc-100"
                             }`}
-                            title="Remove attachment"
+                            title={getTranslation("removeAttachment", userLanguage)}
                           >
                             <X className="h-3.5 w-3.5" />
                           </button>
@@ -4216,7 +4213,7 @@ export default function App() {
                                 ? "hover:bg-zinc-800/50 hover:text-amber-400 text-zinc-400" 
                                 : "hover:bg-zinc-200 text-zinc-600 hover:text-[#1a73e8]"
                             }`}
-                            title="Options"
+                            title={getTranslation("options", userLanguage)}
                           >
                             <Plus className={`h-5 w-5 stroke-[2] transition-transform duration-300 ${showUploadMenuHome ? "rotate-[135deg]" : ""}`} />
                           </button>
@@ -4248,7 +4245,7 @@ export default function App() {
                                     }`}
                                   >
                                     <Paperclip className="h-4 w-4 text-amber-500 shrink-0" />
-                                    <span>{userLanguage === "id" ? "Unggah File" : "Upload File"}</span>
+                                    <span>{getTranslation("uploadFile", userLanguage)}</span>
                                   </button>
                                 </motion.div>
                               </>
@@ -4267,7 +4264,7 @@ export default function App() {
                               handleSendMessage();
                             }
                           }}
-                          placeholder={userLanguage === "id" ? "Tanyakan apa saja pada ExeChat..." : "Ask ExeChat anything..."}
+                          placeholder={getTranslation("askPlaceholder", userLanguage)}
                           disabled={isGenerating}
                           className={`flex-1 bg-transparent resize-none border-none outline-none focus:ring-0 text-[15px] sm:text-base md:text-base min-h-[44px] md:min-h-[50px] max-h-40 font-sans py-2.5 ${
                             isDark ? "text-zinc-100 placeholder:text-zinc-500" : "text-zinc-900 placeholder:text-zinc-500"
@@ -4288,7 +4285,7 @@ export default function App() {
                                 ? "bg-black hover:bg-zinc-900 text-zinc-400 border-zinc-900 hover:border-zinc-800" 
                                : "bg-white hover:bg-zinc-100 text-zinc-600 border-zinc-200 hover:border-zinc-350"
                             }`}
-                            title="Select AI Model"
+                            title={getTranslation("selectAiModel", userLanguage)}
                           >
                             <Cpu className="h-3 w-3 text-purple-500 shrink-0" />
                             <span className="truncate">{activeModel.name}</span>
@@ -4302,10 +4299,10 @@ export default function App() {
                                 ? "bg-black hover:bg-zinc-900 text-zinc-400 border-zinc-900 hover:border-zinc-800" 
                                 : "bg-white hover:bg-zinc-100 text-zinc-600 border-zinc-200 hover:border-zinc-350"
                             }`}
-                            title="Select Topic"
+                            title={getTranslation("selectTopic", userLanguage)}
                           >
                             <Sparkles className="h-3 w-3 text-amber-500 shrink-0" />
-                            <span className="truncate">{userLanguage === "id" ? "Topik: " : "Topic: "}{activePreset.name}</span>
+                            <span className="truncate">{getTranslation("topic", userLanguage)}: {activePreset.name}</span>
                             <ChevronDown className="h-3 w-3 text-zinc-500 shrink-0" />
                           </button>
                         </div>
@@ -4322,7 +4319,7 @@ export default function App() {
                                   ? "bg-zinc-900 text-zinc-600 cursor-not-allowed" 
                                   : "bg-zinc-200 text-zinc-400 cursor-not-allowed")
                           }`}
-                          title="Send Message"
+                          title={getTranslation("sendMessage", userLanguage)}
                         >
                           <Send className="h-3.5 w-3.5 md:h-4 md:w-4 stroke-[2.5]" />
                         </button>
@@ -4337,7 +4334,7 @@ export default function App() {
                           : "bg-zinc-100 border-zinc-200 text-zinc-500"
                       }`}>
                         <Info className="h-3 w-3 md:h-3.5 md:w-3.5 text-zinc-450" />
-                        <span>{userLanguage === "id" ? `Menggunakan model ${activeModel.name} pada topik ${activePreset.name}.` : `Using model ${activeModel.name} on the ${activePreset.name} topic.`}</span>
+                        <span>{getTranslation("usingModelInfo", userLanguage, { model: activeModel.name, preset: activePreset.name })}</span>
                       </div>
                     </div>
                   </div>
@@ -4501,9 +4498,9 @@ export default function App() {
                                         const matchedModel = MODEL_OPTIONS.find(m => m.id === msg.routedModelId);
                                         const modelDisplayName = matchedModel ? matchedModel.name : msg.routedModelId;
                                         const cleanName = modelDisplayName.split(" (")[0];
-                                        return `Loading model ${cleanName}...`;
+                                        return getTranslation("loadingModel", userLanguage, { model: cleanName });
                                       }
-                                      return "Thinking...";
+                                      return getTranslation("thinking", userLanguage);
                                     })()}
                                   </span>
                                 </div>
@@ -4519,12 +4516,13 @@ export default function App() {
                                     setExpandedThoughts={setExpandedThoughts}
                                     parseMessageThinking={parseMessageThinking}
                                     thinkingDuration={msg.thinkingDuration}
+                                    language={userLanguage}
                                   />
 
                                   {isSpeaking && (
                                     <div className="inline-flex items-center gap-1.5 mt-2 px-2.5 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-500 text-[10px] font-mono animate-pulse">
                                       <Volume2 className="h-3.5 w-3.5 animate-bounce" />
-                                      <span>TTS is speaking...</span>
+                                      <span>{getTranslation("ttsSpeaking", userLanguage)}</span>
                                     </div>
                                   )}
                                 </div>
@@ -4756,7 +4754,7 @@ export default function App() {
                                     }`}
                                   >
                                     <Paperclip className="h-4 w-4 text-amber-500 shrink-0" />
-                                    <span>{userLanguage === "id" ? "Unggah File" : "Upload File"}</span>
+                                    <span>{getTranslation("uploadFile", userLanguage)}</span>
                                   </button>
                                 </motion.div>
                               </>
@@ -4779,8 +4777,8 @@ export default function App() {
                        }}
                        placeholder={
                          isGenerating
-                           ? (userLanguage === "id" ? "Menghasilkan respon..." : "Generating response...")
-                           : (userLanguage === "id" ? "Tanyakan apa saja pada ExeChat..." : "Ask ExeChat anything...")
+                           ? getTranslation("generatingResponse", userLanguage)
+                           : getTranslation("askPlaceholder", userLanguage)
                        }
                        disabled={isGenerating}
                        className={`flex-1 max-h-40 min-h-[36px] md:min-h-[40px] bg-transparent resize-none py-1.5 md:py-2 px-2 border-none outline-none focus:ring-0 text-[15px] sm:text-base md:text-base ${
@@ -4799,7 +4797,7 @@ export default function App() {
                             ? "bg-zinc-800/80 hover:bg-zinc-800 text-purple-300 border-zinc-700/80"
                             : "bg-purple-50 hover:bg-purple-100 text-purple-700 border-purple-200"
                         }`}
-                        title={userLanguage === "id" ? "Ganti Model AI" : "Switch AI Model"}
+                        title={getTranslation("switchAiModel", userLanguage)}
                       >
                         <Cpu className="h-3 w-3 text-purple-500 shrink-0" />
                         <span className="truncate max-w-[80px] sm:max-w-[130px] font-sans text-[10px] md:text-[11px]">
@@ -4866,16 +4864,16 @@ export default function App() {
                         <button
                           onClick={() => setShowSettings(false)}
                           className={`p-1.5 rounded-full transition-colors cursor-pointer ${isDark ? "hover:bg-zinc-800 text-zinc-200" : "hover:bg-teal-700 text-white"}`}
-                          title="Close Settings"
+                          title={getTranslation("closeSettings", userLanguage)}
                         >
                           <ChevronLeft className="h-6 w-6 stroke-[2.5]" />
                         </button>
                         <div className="flex-1">
                           <h2 className="text-lg font-bold tracking-tight leading-tight">
-                            {userLanguage === "id" ? "Setelan" : "Settings"}
+                            {getTranslation("settings", userLanguage)}
                           </h2>
                           <p className={`text-[11px] font-medium ${isDark ? "text-zinc-400" : "text-teal-100"}`}>
-                            {userLanguage === "id" ? "Akun & Preferensi Aplikasi" : "Account & App Preferences"}
+                            {getTranslation("accountAppPreferences", userLanguage)}
                           </p>
                         </div>
                       </div>
@@ -4898,10 +4896,10 @@ export default function App() {
                           )}
                           <div className="flex-1 min-w-0">
                             <h3 className={`text-base font-bold truncate ${isDark ? "text-zinc-100" : "text-zinc-900"}`}>
-                              {userDisplayName || userName || "Guest Profile"}
+                              {userDisplayName || userName || getTranslation("guestProfile", userLanguage)}
                             </h3>
                             <p className="text-xs text-zinc-500 dark:text-zinc-400 truncate mt-0.5 font-medium">
-                              {userEmail || "Connected as guest offline"}
+                              {userEmail || getTranslation("connectedAsGuest", userLanguage)}
                             </p>
                           </div>
                           <ChevronRight className="h-5 w-5 text-zinc-400 shrink-0" />
@@ -4910,11 +4908,11 @@ export default function App() {
                         {/* WhatsApp Category Group */}
                         <div className={`py-2 ${isDark ? "bg-[#0b141a]" : "bg-zinc-100"}`}>
                           {[
-                            { id: "akun", name: userLanguage === "id" ? "Akun & Profil" : "Account & Profile", desc: userLanguage === "id" ? "Ubah nama panggilan, info email, bahasa" : "Change nickname, email info, language", icon: User, color: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" },
-                            { id: "model", name: userLanguage === "id" ? "Model AI & Suhu" : "AI Engine & Temperature", desc: userLanguage === "id" ? "Pilih model AI aktif dan preset kreativitas" : "Select active model and creativity preset", icon: Cpu, color: "bg-blue-500/10 text-blue-600 dark:text-blue-400" },
-                            { id: "tampilan", name: userLanguage === "id" ? "Tema & Tampilan" : "Theme & Display", desc: userLanguage === "id" ? "Mode gelap/terang, riwayat percakapan" : "Dark/light mode, chat history toggle", icon: Sun, color: "bg-amber-500/10 text-amber-600 dark:text-amber-400" },
-                            { id: "ingatan", name: userLanguage === "id" ? "Memori & Direktif AI" : "AI Memory & Directives", desc: userLanguage === "id" ? "Simpan konteks latar belakang pengguna" : "Set persistent background memory", icon: Brain, color: "bg-purple-500/10 text-purple-600 dark:text-purple-400" },
-                            { id: "feedback", name: userLanguage === "id" ? "Kirim Masukan & Laporan" : "Submit Feedback & Support", desc: userLanguage === "id" ? "Bantuan, laporan bug & saran fitur" : "Send suggestions, report bugs, admin panel", icon: MessageSquare, color: "bg-rose-500/10 text-rose-600 dark:text-rose-400" },
+                            { id: "akun", name: getTranslation("tabAccountName", userLanguage), desc: getTranslation("tabAccountDesc", userLanguage), icon: User, color: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" },
+                            { id: "model", name: getTranslation("tabModelName", userLanguage), desc: getTranslation("tabModelDesc", userLanguage), icon: Cpu, color: "bg-blue-500/10 text-blue-600 dark:text-blue-400" },
+                            { id: "tampilan", name: getTranslation("tabTampilanName", userLanguage), desc: getTranslation("tabTampilanDesc", userLanguage), icon: Sun, color: "bg-amber-500/10 text-amber-600 dark:text-amber-400" },
+                            { id: "ingatan", name: getTranslation("tabIngatanName", userLanguage), desc: getTranslation("tabIngatanDesc", userLanguage), icon: Brain, color: "bg-purple-500/10 text-purple-600 dark:text-purple-400" },
+                            { id: "feedback", name: getTranslation("tabFeedbackName", userLanguage), desc: getTranslation("tabFeedbackDesc", userLanguage), icon: MessageSquare, color: "bg-rose-500/10 text-rose-600 dark:text-rose-400" },
                           ].map((item) => {
                             const ItemIcon = item.icon;
                             return (
@@ -4948,20 +4946,20 @@ export default function App() {
                         <button
                           onClick={() => setMobileSettingsPage("menu")}
                           className={`p-1.5 rounded-full transition-colors cursor-pointer ${isDark ? "hover:bg-zinc-800 text-zinc-200" : "hover:bg-teal-700 text-white"}`}
-                          title="Back to settings menu"
+                          title={getTranslation("backToSettings", userLanguage)}
                         >
                           <ChevronLeft className="h-6 w-6 stroke-[2.5]" />
                         </button>
                         <div className="flex-1">
                           <h2 className="text-base font-bold capitalize leading-tight">
-                            {mobileSettingsPage === "akun" ? (userLanguage === "id" ? "Akun & Profil" : "Account & Profile") :
-                             mobileSettingsPage === "model" ? (userLanguage === "id" ? "Model AI & Suhu" : "AI Engine & Temperature") :
-                             mobileSettingsPage === "tampilan" ? (userLanguage === "id" ? "Tema & Tampilan" : "Theme & Display") :
-                             mobileSettingsPage === "ingatan" ? (userLanguage === "id" ? "Memori AI" : "AI Memory") : 
-                             (userLanguage === "id" ? "Kirim Masukan" : "Submit Feedback")}
+                            {mobileSettingsPage === "akun" ? getTranslation("tabAccountName", userLanguage) :
+                             mobileSettingsPage === "model" ? getTranslation("tabModelName", userLanguage) :
+                             mobileSettingsPage === "tampilan" ? getTranslation("tabTampilanName", userLanguage) :
+                             mobileSettingsPage === "ingatan" ? getTranslation("tabIngatanName", userLanguage) :
+                             getTranslation("tabFeedbackName", userLanguage)}
                           </h2>
                           <p className={`text-[10px] font-medium ${isDark ? "text-zinc-400" : "text-teal-100"}`}>
-                            {userLanguage === "id" ? "Setelan Aplikasi" : "App Preferences"}
+                            {getTranslation("appPreferences", userLanguage)}
                           </p>
                         </div>
                       </div>
@@ -4973,7 +4971,7 @@ export default function App() {
                           <div className="space-y-4 animate-fadeIn">
                             <div className={`rounded-2xl p-4 border ${isDark ? "bg-[#111b21] border-zinc-800" : "bg-white border-zinc-200 shadow-xs"}`}>
                               <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-500 mb-3">
-                                {userLanguage === "id" ? "Status Keanggotaan" : "Membership Status"}
+                                {getTranslation("membershipStatus", userLanguage)}
                               </h3>
                               <div className="flex items-center gap-3">
                                 {userPhoto ? (
@@ -4987,33 +4985,33 @@ export default function App() {
                                   <div className="flex items-center gap-1.5">
                                     <span className="h-2 w-2 rounded-full bg-emerald-500" />
                                     <span className="text-sm font-bold text-zinc-900 dark:text-zinc-100">
-                                      {userEmail ? "Connected via Google" : "Guest Mode"}
+                                      {userEmail ? getTranslation("connectedViaGoogle", userLanguage) : getTranslation("offlineMode", userLanguage)}
                                     </span>
                                   </div>
-                                  <p className="text-xs text-zinc-500 truncate mt-0.5">{userEmail || "Offline session"}</p>
+                                  <p className="text-xs text-zinc-500 truncate mt-0.5">{userEmail || getTranslation("offlineSession", userLanguage)}</p>
                                 </div>
                                 <button
                                   onClick={handleLogout}
                                   className="text-xs font-bold py-1.5 px-3 rounded-lg border border-red-500/20 text-red-500 bg-red-500/10 hover:bg-red-500/20 transition-colors cursor-pointer"
                                 >
-                                  Logout
+                                  {getTranslation("signOut", userLanguage)}
                                 </button>
                               </div>
                             </div>
 
                             <div className={`rounded-2xl p-4 border ${isDark ? "bg-[#111b21] border-zinc-800" : "bg-white border-zinc-200 shadow-xs"}`}>
                               <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-500 mb-1">
-                                {userLanguage === "id" ? "Nama Panggilan (Nickname)" : "Nickname Settings"}
+                                {getTranslation("nicknameHeader", userLanguage)}
                               </h3>
                               <p className="text-xs text-zinc-500 leading-relaxed mb-3">
-                                {userLanguage === "id" ? "Atur nama panggilan yang digunakan asisten AI untuk menyapa Anda." : "Set your preferred nickname used by the AI assistant to address you."}
+                                {getTranslation("nicknameSubheader", userLanguage)}
                               </p>
                               
                               <div className="space-y-3">
                                 <input
                                   value={userName}
                                   onChange={(e) => setUserName(e.target.value)}
-                                  placeholder="Enter nickname..."
+                                  placeholder={getTranslation("enterCustomName", userLanguage)}
                                   className={`w-full rounded-xl px-3.5 py-2.5 text-sm focus:outline-none border ${
                                     isDark ? "bg-[#202c33] border-zinc-700 text-zinc-100" : "bg-zinc-50 border-zinc-300 text-zinc-900"
                                   }`}
@@ -5022,7 +5020,7 @@ export default function App() {
                                   onClick={handleSaveUsername}
                                   className="w-full py-3 rounded-xl text-xs font-bold bg-amber-500 text-zinc-950 hover:bg-amber-400 transition-all cursor-pointer"
                                 >
-                                  {userLanguage === "id" ? "Simpan Nickname" : "Save Nickname"}
+                                  {getTranslation("saveNickname", userLanguage)}
                                 </button>
                                 {redeemFeedback && (
                                   <p className="text-xs text-emerald-500 font-semibold">✓ {redeemFeedback}</p>
@@ -5033,7 +5031,7 @@ export default function App() {
                             <div className={`rounded-2xl p-4 border ${isDark ? "bg-[#111b21] border-zinc-800" : "bg-white border-zinc-200 shadow-xs"}`}>
                               <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-500 mb-3 flex items-center gap-2">
                                 <Globe className="h-4 w-4 text-amber-500" />
-                                {userLanguage === "id" ? "Bahasa Antarmuka" : "Interface Language"}
+                                {getTranslation("prefLangHeader", userLanguage)}
                               </h3>
                               <div className="grid grid-cols-2 gap-2">
                                 {LANGUAGES.map((lang) => {
@@ -5066,7 +5064,7 @@ export default function App() {
                           <div className="space-y-4 animate-fadeIn">
                             <div className="space-y-2">
                               <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-500">
-                                {userLanguage === "id" ? "Pilihan Engine AI" : "AI Models"}
+                                {getTranslation("availEngines", userLanguage)}
                               </h3>
                               <div className="space-y-2">
                                 {MODEL_OPTIONS.map((m) => {
@@ -5090,7 +5088,7 @@ export default function App() {
                                     >
                                       <div className="flex items-center justify-between mb-1">
                                         <span className="text-sm font-bold">{m.name}</span>
-                                        {isSelected && <span className="text-[10px] px-2 py-0.5 rounded-full font-mono font-bold bg-amber-500/20 text-amber-500">Active</span>}
+                                        {isSelected && <span className="text-[10px] px-2 py-0.5 rounded-full font-mono font-bold bg-amber-500/20 text-amber-500">{getTranslation("active", userLanguage)}</span>}
                                       </div>
                                       <p className="text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed">{m.description}</p>
                                     </div>
@@ -5106,7 +5104,7 @@ export default function App() {
                                   <div className="flex items-center gap-2">
                                     <Sliders className="h-4 w-4 text-amber-500" />
                                     <h4 className="text-xs font-bold uppercase tracking-wider text-zinc-500">
-                                      {userLanguage === "id" ? "Suhu Kreativitas" : "Temperature Preset"}
+                                      {getTranslation("tempPresetHeader", userLanguage)}
                                     </h4>
                                   </div>
                                   <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-zinc-900 text-amber-400 border border-zinc-800">
@@ -5172,13 +5170,13 @@ export default function App() {
                           <div className="space-y-4 animate-fadeIn">
                             <div className={`rounded-2xl p-4 border ${isDark ? "bg-[#111b21] border-zinc-800" : "bg-white border-zinc-200 shadow-xs"}`}>
                               <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-500 mb-3">
-                                {userLanguage === "id" ? "Mode Tema" : "Theme Mode"}
+                                {getTranslation("selectStyleTheme", userLanguage)}
                               </h3>
                               <div className="space-y-2">
                                 {[
-                                  { id: "system", name: "System Preset", icon: Laptop },
-                                  { id: "dark", name: "Dark Mode", icon: Moon },
-                                  { id: "light", name: "Light Mode", icon: Sun },
+                                  { id: "system", name: getTranslation("systemSync", userLanguage), icon: Laptop },
+                                  { id: "dark", name: getTranslation("slateDark", userLanguage), icon: Moon },
+                                  { id: "light", name: getTranslation("pureLight", userLanguage), icon: Sun },
                                 ].map((t) => {
                                   const isSelected = themeMode === t.id;
                                   const IconComp = t.icon;
@@ -5208,10 +5206,10 @@ export default function App() {
 
                             <div className={`rounded-2xl p-4 border ${isDark ? "bg-[#111b21] border-zinc-800" : "bg-white border-zinc-200 shadow-xs"}`}>
                               <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-500 mb-2">
-                                {userLanguage === "id" ? "Riwayat Percakapan" : "Chat History"}
+                                {getTranslation("chatHistorySettings", userLanguage)}
                               </h3>
                               <div className="flex items-center justify-between">
-                                <p className="text-xs text-zinc-500">Tampilkan riwayat kemarin & lebih lama di sidebar.</p>
+                                <p className="text-xs text-zinc-500">{getTranslation("toggleYesterdayDesc", userLanguage)}</p>
                                 <button
                                   onClick={() => {
                                     const newVal = !showYesterdayHistory;
@@ -5241,11 +5239,11 @@ export default function App() {
                               <div className="flex items-center gap-2 mb-2">
                                 <Brain className="h-4 w-4 text-amber-500" />
                                 <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-500">
-                                  {userLanguage === "id" ? "Memori AI (Maksimal 5)" : "AI Memory (Max 5)"}
+                                  {getTranslation("injectMemory", userLanguage)}
                                 </h3>
                               </div>
                               <p className="text-xs text-zinc-500 mb-3 leading-relaxed">
-                                Konteks personal yang disimpan agar respon AI lebih relevan dan sesuai gaya Anda.
+                                {getTranslation("memorySubheader", userLanguage)}
                               </p>
 
                               <div className="flex gap-2">
@@ -5253,7 +5251,7 @@ export default function App() {
                                   type="text"
                                   value={memoryInput}
                                   onChange={(e) => setMemoryInput(e.target.value)}
-                                  placeholder={memories.length >= 5 ? "Batas maksimal tercapai" : "Tambah preferensi..."}
+                                  placeholder={memories.length >= 5 ? getTranslation("maxMemoryReached", userLanguage) : getTranslation("memoryPlaceholder", userLanguage)}
                                   disabled={memories.length >= 5}
                                   className={`flex-1 rounded-xl px-3 py-2 text-xs focus:outline-none border ${
                                     isDark ? "bg-[#202c33] border-zinc-700 text-zinc-100" : "bg-zinc-50 border-zinc-300 text-zinc-900"
@@ -5270,13 +5268,13 @@ export default function App() {
                                   disabled={!memoryInput.trim() || memories.length >= 5}
                                   className="px-4 py-2 rounded-xl text-xs font-bold bg-amber-500 text-zinc-950 disabled:opacity-40 cursor-pointer"
                                 >
-                                  Tambah
+                                  {getTranslation("saveMemory", userLanguage)}
                                 </button>
                               </div>
 
                               <div className="space-y-2 mt-3 pt-3 border-t border-zinc-200 dark:border-zinc-800">
                                 {memories.length === 0 ? (
-                                  <p className="text-center py-4 text-xs text-zinc-500 italic">Belum ada memori tersimpan.</p>
+                                  <p className="text-center py-4 text-xs text-zinc-500 italic">{getTranslation("noMemories", userLanguage)}</p>
                                 ) : (
                                   memories.map((mem, idx) => (
                                     <div key={idx} className="flex items-center justify-between gap-2 p-2.5 rounded-lg bg-zinc-500/5 border border-zinc-500/10 text-xs">
@@ -5321,7 +5319,7 @@ export default function App() {
                           </div>
                           <div>
                             <h2 className="text-base font-bold text-zinc-900 dark:text-zinc-100 tracking-tight leading-none">{getTranslation("settings", userLanguage)}</h2>
-                            <p className="text-[11px] text-zinc-500 dark:text-zinc-400 font-medium mt-1">{userLanguage === "id" ? "Pengaturan Aplikasi" : "Preferences & Account"}</p>
+                            <p className="text-[11px] text-zinc-500 dark:text-zinc-400 font-medium mt-1">{getTranslation("appPreferences", userLanguage)}</p>
                           </div>
                         </div>
 
@@ -7138,10 +7136,10 @@ export default function App() {
                     </div>
                     <div>
                       <h4 className="text-xs font-bold leading-tight">
-                        {userLanguage === "id" ? "Bantu kami meningkatkan ExeAi" : "Help us improve ExeAi"}
+                        {getTranslation("helpImprove", userLanguage)}
                       </h4>
                       <p className={`text-[11px] mt-0.5 ${isDark ? "text-zinc-400" : "text-zinc-500"}`}>
-                        {userLanguage === "id" ? "Mengapa tanggapan ini kurang membantu?" : "Why was this response unhelpful?"}
+                        {getTranslation("whyUnhelpful", userLanguage)}
                       </p>
                     </div>
                   </div>
@@ -7150,7 +7148,7 @@ export default function App() {
                     className={`p-1 rounded-lg transition-colors shrink-0 ${
                       isDark ? "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800" : "text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100"
                     }`}
-                    title="Dismiss"
+                    title={getTranslation("dismiss", userLanguage)}
                   >
                     <X className="h-3.5 w-3.5" />
                   </button>
@@ -7163,18 +7161,18 @@ export default function App() {
                     className="py-3 mt-2 text-center text-xs font-medium text-emerald-500 flex items-center justify-center gap-2 bg-emerald-500/10 rounded-xl border border-emerald-500/20"
                   >
                     <Check className="h-4 w-4" />
-                    <span>{userLanguage === "id" ? "Terima kasih atas umpan baliknya!" : "Thank you for your feedback!"}</span>
+                    <span>{getTranslation("thankFeedback", userLanguage)}</span>
                   </motion.div>
                 ) : (
                   <div className="space-y-2.5 mt-3">
                     {/* Quick Reasons Chips */}
                     <div className="flex flex-wrap gap-1.5">
                       {[
-                        userLanguage === "id" ? "Jawaban salah / Halusinasi" : "Inaccurate / Hallucination",
-                        userLanguage === "id" ? "Format / Coding cacat" : "Incorrect code or format",
-                        userLanguage === "id" ? "Terlalu singkat / Mengabaikan instruksi" : "Too brief / Ignored instructions",
-                        userLanguage === "id" ? "Chat lambat / Respon gantung" : "Slow chat / Stalled response",
-                        userLanguage === "id" ? "Penjelasan kurang jelas" : "Unclear explanation"
+                        getTranslation("inaccurate", userLanguage),
+                        getTranslation("incorrectFormat", userLanguage),
+                        getTranslation("tooBrief", userLanguage),
+                        getTranslation("slowChat", userLanguage),
+                        getTranslation("unclearExplanation", userLanguage)
                       ].map((preset) => (
                         <button
                           key={preset}
@@ -7197,7 +7195,7 @@ export default function App() {
                     <textarea
                       value={dislikeReason}
                       onChange={(e) => setDislikeReason(e.target.value)}
-                      placeholder={userLanguage === "id" ? "Tuliskan saran atau kendala (opsional)..." : "Add specific details (optional)..."}
+                      placeholder={getTranslation("addDetails", userLanguage)}
                       rows={2}
                       className={`w-full text-xs p-2.5 rounded-xl border transition-all focus:outline-none focus:ring-1 focus:ring-rose-500 resize-none ${
                         isDark
@@ -7220,9 +7218,7 @@ export default function App() {
                         <span className="flex items-center gap-1.5 truncate">
                           <Settings className="h-3.5 w-3.5 text-zinc-400 shrink-0" />
                           <span className="truncate">
-                            {userLanguage === "id"
-                              ? "Laporan lengkap & berkas di Settings"
-                              : "Detailed report & files in Settings"}
+                            {getTranslation("detailedReport", userLanguage)}
                           </span>
                         </span>
                         <ArrowRight className="h-3 w-3 text-zinc-400 shrink-0 ml-1" />
@@ -7235,7 +7231,7 @@ export default function App() {
                             isDark ? "text-zinc-400 hover:text-zinc-200" : "text-zinc-500 hover:text-zinc-800"
                           }`}
                         >
-                          {userLanguage === "id" ? "Lewati" : "Skip"}
+                          {getTranslation("skip", userLanguage)}
                         </button>
                         <button
                           onClick={handleSendDislikeFeedback}
@@ -7247,7 +7243,7 @@ export default function App() {
                           ) : (
                             <Send className="h-3.5 w-3.5" />
                           )}
-                          <span>{userLanguage === "id" ? "Kirim" : "Submit"}</span>
+                          <span>{getTranslation("submit", userLanguage)}</span>
                         </button>
                       </div>
                     </div>

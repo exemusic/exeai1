@@ -49,6 +49,7 @@ import { createClient } from "@supabase/supabase-js";
 import { MODEL_OPTIONS } from "../presets";
 import { motion, AnimatePresence } from "motion/react";
 import { MarkdownRenderer } from "./MarkdownRenderer";
+import { getTranslation } from "../translations";
 
 interface VirtualFile {
   path: string;
@@ -216,6 +217,7 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId, us
 
   // Realtime Sync & Multi-Project Manager States (Max 5 projects per user limit)
   const [appLanguage, setAppLanguage] = useState<string>("en");
+  const t = (key: string, params?: Record<string, string>) => getTranslation(key, appLanguage, params);
   const [realtimeStatus, setRealtimeStatus] = useState<"connected" | "connecting" | "disconnected">("disconnected");
   const [userProjects, setUserProjects] = useState<any[]>([]);
   const [defaultProjectName, setDefaultProjectName] = useState<string>(() => {
@@ -900,14 +902,13 @@ export function ExeCodeWorkspace({ isDark, curTheme, onClose, defaultModelId, us
   };
 
   const handleCreateNewProject = async () => {
-    const isEn = appLanguage === "en";
     if (!newProjInputName.trim()) {
-      triggerStatus(isEn ? "Please enter a name for the new project!" : "Masukkan nama proyek baru!", "error");
+      triggerStatus(t("projectNameRequired"), "error");
       return;
     }
 
     if (userProjects.length >= maxProjectLimit) {
-      triggerStatus(isEn ? `Maximum limit of ${maxProjectLimit} Projects per User reached! Delete an existing project first.` : `Batas Maksimum ${maxProjectLimit} Proyek per User telah tercapai! Harap hapus proyek lama terlebih dahulu.`, "error");
+      triggerStatus(t("maxProjectsReached"), "error");
       return;
     }
 
@@ -983,12 +984,12 @@ body {
 
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(data.error || (isEn ? "Failed to create project." : "Gagal membuat proyek baru."));
+        throw new Error(data.error || t("failedCreateProject"));
       }
 
       const createdProjId = data.project?.id || ("proj-" + Date.now());
 
-      triggerStatus(isEn ? `Project '${sanitized}' created successfully!` : `Proyek '${sanitized}' berhasil dibuat!`, "success");
+      triggerStatus(t("projectCreated", { name: sanitized }), "success");
       setUserProjects(data.projects || []);
       setNewProjInputName("");
       setIsProjectsModalOpen(false);
@@ -1005,15 +1006,13 @@ body {
       refreshPreview(freshProjectFiles);
       localStorage.setItem("execode_files", JSON.stringify(freshProjectFiles));
     } catch (err: any) {
-      triggerStatus(err.message || (appLanguage === "en" ? "Failed to create project." : "Gagal membuat proyek."), "error");
+      triggerStatus(err.message || t("failedCreateProject"), "error");
     } finally {
       setIsCreatingProj(false);
     }
   };
 
   const handleSwitchProject = async (targetName: string) => {
-    const isEn = appLanguage === "en";
-
     const targetProj = userProjects.find(p => p.name === targetName || p.id === targetName);
     const targetProjectName = targetProj ? targetProj.name : targetName;
     const targetProjectId = targetProj ? targetProj.id : targetName;
@@ -1071,7 +1070,7 @@ body {
       }
     ];
 
-    triggerStatus(isEn ? `Opening project '${targetProjectName}'...` : `Membuka proyek '${targetProjectName}'...`, "info");
+    triggerStatus(t("openingProject", { name: targetProjectName }), "info");
     try {
       const res = await fetch("/api/supabase/load", {
         method: "POST",
@@ -1084,14 +1083,14 @@ body {
         setActiveFilePath("index.html");
         refreshPreview(data.files);
         localStorage.setItem("execode_files", JSON.stringify(data.files));
-        triggerStatus(isEn ? `Project '${targetProjectName}' loaded successfully!` : `Proyek '${targetProjectName}' berhasil dimuat!`, "success");
+        triggerStatus(t("projectLoaded", { name: targetProjectName }), "success");
       } else {
         // Fallback to fresh starter files for target project
         setFiles(freshTargetFiles);
         setActiveFilePath("index.html");
         refreshPreview(freshTargetFiles);
         localStorage.setItem("execode_files", JSON.stringify(freshTargetFiles));
-        triggerStatus(isEn ? `Project '${targetProjectName}' opened.` : `Proyek '${targetProjectName}' dibuka.`, "success");
+        triggerStatus(t("projectOpened", { name: targetProjectName }), "success");
       }
     } catch (err) {
       console.warn("Failed to switch project:", err);
@@ -1103,9 +1102,8 @@ body {
   };
 
   const handleDeleteProjectFromManager = async (targetName: string) => {
-    const isEn = appLanguage === "en";
     if (targetName === defaultProjectName || userProjects.some(p => p.name === targetName && p.isDefault)) {
-      triggerStatus(isEn ? "Default user project cannot be deleted." : "Proyek default user tidak dapat dihapus.", "error");
+      triggerStatus(t("defaultCannotDelete"), "error");
       return;
     }
     try {
@@ -1119,9 +1117,9 @@ body {
         })
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || (isEn ? "Failed to delete project." : "Gagal menghapus proyek."));
+      if (!res.ok) throw new Error(data.error || t("failedDeleteProject"));
 
-      triggerStatus(isEn ? `Project '${targetName}' deleted successfully.` : `Proyek '${targetName}' berhasil dihapus.`, "success");
+      triggerStatus(t("projectDeleted", { name: targetName }), "success");
       setUserProjects(data.projects || []);
 
       if (projectName === targetName) {
@@ -1133,15 +1131,14 @@ body {
         }
       }
     } catch (err: any) {
-      triggerStatus(err.message || (appLanguage === "en" ? "Failed to delete project." : "Gagal menghapus proyek."), "error");
+      triggerStatus(err.message || t("failedDeleteProject"), "error");
     }
   };
 
   const handleRenameProjectInServer = async (oldName: string, newName: string) => {
-    const isEn = appLanguage === "en";
     const sanitized = newName.trim().replace(/[^a-zA-Z0-9-_]/g, "");
     if (!sanitized) {
-      triggerStatus(isEn ? "Project name cannot be empty!" : "Nama proyek tidak boleh kosong!", "error");
+      triggerStatus(t("projectNameRequired"), "error");
       setEditingProjectName(null);
       return;
     }
@@ -1162,7 +1159,7 @@ body {
         })
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || (isEn ? "Failed to rename project." : "Gagal mengubah nama proyek."));
+      if (!res.ok) throw new Error(data.error || t("failedRenameProject"));
 
       setUserProjects(data.projects || []);
       if (projectName === oldName) {
@@ -1171,9 +1168,9 @@ body {
         localStorage.setItem("execode_project_name", data.newName);
         window.history.replaceState(null, "", `/project/${data.newName}`);
       }
-      triggerStatus(isEn ? `Project renamed to '${data.newName}'!` : `Nama proyek diubah menjadi '${data.newName}'!`, "success");
+      triggerStatus(t("projectRenamed", { name: data.newName }), "success");
     } catch (err: any) {
-      triggerStatus(err.message || (isEn ? "Failed to rename project." : "Gagal mengubah nama proyek."), "error");
+      triggerStatus(err.message || t("failedRenameProject"), "error");
     } finally {
       setEditingProjectName(null);
     }
@@ -2824,7 +2821,7 @@ body {
                   ? "bg-zinc-900/60 border-transparent text-zinc-200 hover:bg-zinc-800" 
                   : "bg-white border-zinc-100 text-zinc-700 hover:bg-zinc-100"
               }`}
-              title={appLanguage === "en" ? "Manage Projects (Max 5 Projects per User)" : "Kelola Proyek (Maksimal 5 Proyek per User)"}
+              title={t("manageProjects", { max: String(maxProjectLimit) })}
             >
               <Folder className="h-3.5 w-3.5 text-amber-500 shrink-0" />
               <span className="max-w-[110px] truncate font-semibold">{projectName}</span>
@@ -2842,7 +2839,7 @@ body {
               <span className={`h-2 w-2 rounded-full ${
                 realtimeStatus === "connected" ? "bg-emerald-500 animate-pulse" : "bg-zinc-500"
               }`} />
-              <span>{realtimeStatus === "connected" ? "Realtime Sync" : "Connecting..."}</span>
+              <span>{realtimeStatus === "connected" ? t("realtimeSync") : t("connecting")}</span>
             </div>
           </div>
 
@@ -2861,7 +2858,7 @@ body {
                 }`}
               >
                 <span className="h-1.5 w-1.5 bg-current rounded-full" />
-                <span>Preview</span>
+                <span>{t("preview")}</span>
               </button>
               <button
                 onClick={() => setActiveRightTab("code")}
@@ -2871,7 +2868,7 @@ body {
                     : isDark ? "text-zinc-400 hover:text-zinc-200" : "text-zinc-500 hover:text-zinc-900"
                 }`}
               >
-                Code
+                {t("code")}
               </button>
             </div>
           </div>
@@ -2882,14 +2879,14 @@ body {
               <button
                 onClick={() => setDeviceMode("desktop")}
                 className={`p-1.5 rounded-md transition-all cursor-pointer ${deviceMode === "desktop" ? "bg-amber-500/10 text-amber-500" : isDark ? "text-zinc-400 hover:text-zinc-200" : "text-zinc-500 hover:text-zinc-800"}`}
-                title="Desktop Preview"
+                title={t("desktopPreview")}
               >
                 <Monitor className="h-3.5 w-3.5" />
               </button>
               <button
                 onClick={() => setDeviceMode("mobile")}
                 className={`p-1.5 rounded-md transition-all cursor-pointer ${deviceMode === "mobile" ? "bg-amber-500/10 text-amber-500" : isDark ? "text-zinc-400 hover:text-zinc-200" : "text-zinc-500 hover:text-zinc-800"}`}
-                title="Mobile Preview"
+                title={t("mobilePreview")}
               >
                 <Smartphone className="h-3.5 w-3.5" />
               </button>
@@ -3292,7 +3289,7 @@ body {
                         <button
                           onClick={() => setDeviceMode("desktop")}
                           className={`p-1.5 rounded-md transition-all ${deviceMode === "desktop" ? "bg-amber-500/10 text-amber-500" : "text-zinc-400 hover:text-zinc-200"}`}
-                          title="Desktop Preview"
+                          title={t("desktopPreview")}
                         >
                           <Monitor className="h-3.5 w-3.5" />
                         </button>
@@ -3911,10 +3908,10 @@ body {
                   </div>
                   <div>
                     <h3 className="text-base font-bold">
-                      {appLanguage === "en" ? "My Projects List" : "Daftar Proyek Saya"}
+                      {t("myProjects")}
                     </h3>
                     <p className="text-xs text-zinc-400">
-                      {appLanguage === "en" ? "Maximum 5 projects per user account" : "Maksimal 5 proyek per akun pengguna"}
+                      {t("maxProjects", { max: String(maxProjectLimit) })}
                     </p>
                   </div>
                 </div>
@@ -3930,14 +3927,14 @@ body {
               <div className="mb-5 p-3 rounded-xl bg-zinc-950/40 border border-zinc-800/40 flex flex-col gap-2">
                 <div className="flex items-center justify-between text-xs font-semibold">
                   <span className="text-zinc-400">
-                    {appLanguage === "en" ? "Project Quota Usage:" : "Penggunaan Kuota Proyek:"}
+                    {t("projectQuota")}
                   </span>
                   <span className={`px-2 py-0.5 rounded-full text-[11px] font-bold ${
                     userProjects.length >= 5
                       ? "bg-rose-500/10 text-rose-400 border border-rose-500/20"
                       : "bg-amber-500/10 text-amber-400 border border-amber-500/20"
                   }`}>
-                    {userProjects.length} / {maxProjectLimit} {appLanguage === "en" ? "Projects Used" : "Proyek Terpakai"}
+                    {userProjects.length} / {maxProjectLimit} {t("projectsUsed")}
                   </span>
                 </div>
                 <div className="w-full h-2 rounded-full bg-zinc-800 overflow-hidden">
@@ -3956,7 +3953,7 @@ body {
                   type="text"
                   value={newProjInputName}
                   onChange={(e) => setNewProjInputName(e.target.value)}
-                  placeholder={appLanguage === "en" ? "New project name (e.g. cashier_app)..." : "Nama proyek baru (contoh: app_kasir)..."}
+                  placeholder={t("newProjectPlaceholder")}
                   disabled={userProjects.length >= maxProjectLimit || isCreatingProj}
                   className={`flex-1 px-3.5 py-2 rounded-xl text-xs border outline-none transition-all ${
                     isDark 
@@ -3974,7 +3971,7 @@ body {
                   }`}
                 >
                   <Plus className="h-4 w-4" />
-                  <span>{appLanguage === "en" ? "Create" : "Buat"}</span>
+                  <span>{t("create")}</span>
                 </button>
               </div>
 
@@ -3982,9 +3979,7 @@ body {
                 <div className="mb-4 p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs flex items-center gap-2">
                   <AlertCircle className="h-4 w-4 shrink-0" />
                   <span>
-                    {appLanguage === "en" 
-                      ? "Maximum limit of 5 projects per user reached. Please delete an old project first." 
-                      : "Batas maksimum 5 proyek per user telah tercapai. Harap hapus proyek lama terlebih dahulu."}
+                    {t("maxProjectsReached")}
                   </span>
                 </div>
               )}
@@ -3993,9 +3988,7 @@ body {
               <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
                 {userProjects.length === 0 ? (
                   <div className="text-center py-6 text-xs text-zinc-500">
-                    {appLanguage === "en" 
-                      ? "No projects saved yet. Enter a name above and click 'Create'!" 
-                      : "Belum ada proyek tersimpan. Ketik nama di atas dan klik 'Buat'!"}
+                    {t("noProjects")}
                   </div>
                 ) : (
                   userProjects.map((p) => {
@@ -4031,14 +4024,14 @@ body {
                                 <button
                                   onClick={() => handleRenameProjectInServer(p.name, editingProjectValue)}
                                   className="p-1 rounded hover:bg-emerald-500/20 text-emerald-400 cursor-pointer"
-                                  title="Save name"
+                                  title={t("saveName")}
                                 >
                                   <Check className="h-3.5 w-3.5" />
                                 </button>
                                 <button
                                   onClick={() => setEditingProjectName(null)}
                                   className="p-1 rounded hover:bg-zinc-700/50 text-zinc-400 cursor-pointer"
-                                  title="Cancel"
+                                  title={getTranslation("cancel", appLanguage)}
                                 >
                                   <X className="h-3.5 w-3.5" />
                                 </button>
@@ -4048,7 +4041,7 @@ body {
                                 <span className="text-xs font-semibold truncate">{p.name}</span>
                                 {isDefault && (
                                   <span className="px-1.5 py-0.2 text-[9px] font-bold rounded bg-sky-500/15 text-sky-400 border border-sky-500/20 uppercase tracking-wide">
-                                    Default
+                                    {t("defaultProject")}
                                   </span>
                                 )}
                                 <button
@@ -4057,14 +4050,14 @@ body {
                                     setEditingProjectValue(p.name);
                                   }}
                                   className="p-1 text-zinc-400 hover:text-amber-400 transition-colors cursor-pointer"
-                                  title={appLanguage === "en" ? "Rename project" : "Ubah nama proyek"}
+                                  title={t("renameProject")}
                                 >
                                   <Pencil className="h-3 w-3" />
                                 </button>
                               </div>
                             )}
                             <span className="text-[10px] text-zinc-500">
-                              {p.fileCount || 3} {appLanguage === "en" ? "files" : "file"} • {appLanguage === "en" ? "Updated:" : "Perubahan:"} {new Date(p.updatedAt || Date.now()).toLocaleDateString()}
+                              {p.fileCount || 3} {t("filesLabel")} • {t("updated")} {new Date(p.updatedAt || Date.now()).toLocaleDateString()}
                             </span>
                           </div>
                         </div>
@@ -4078,18 +4071,18 @@ body {
                               }}
                               className="px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-amber-500/10 text-amber-400 hover:bg-amber-500 hover:text-white transition-all cursor-pointer"
                             >
-                              {appLanguage === "en" ? "Open" : "Buka"}
+                              {t("open")}
                             </button>
                           ) : (
                             <span className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-amber-500 text-white shadow-sm">
-                              {appLanguage === "en" ? "Active" : "Aktif"}
+                              {getTranslation("active", appLanguage)}
                             </span>
                           )}
 
                           {isDefault ? (
                             <span 
                               className="p-1 text-zinc-600 opacity-60 cursor-not-allowed" 
-                              title={appLanguage === "en" ? "Default user project cannot be deleted" : "Proyek default user tidak dapat dihapus"}
+                              title={t("defaultCannotDelete")}
                             >
                               <Lock className="h-3.5 w-3.5" />
                             </span>
@@ -4097,7 +4090,7 @@ body {
                             <button
                               onClick={() => handleDeleteProjectFromManager(p.name)}
                               className="p-1 rounded-lg hover:bg-rose-500/20 text-zinc-500 hover:text-rose-400 transition-colors cursor-pointer"
-                              title={appLanguage === "en" ? "Delete project" : "Hapus proyek"}
+                              title={t("deleteProject")}
                             >
                               <Trash2 className="h-3.5 w-3.5" />
                             </button>
