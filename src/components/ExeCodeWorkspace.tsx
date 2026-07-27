@@ -2528,21 +2528,9 @@ body {
                 file: file
               });
             });
-
-            actionSteps.push({
-              type: "verify",
-              text: "Verify build",
-              subtext: "Build verification:",
-              status: "succeeded"
-            });
-          } else {
-            actionSteps.push({
-              type: "verify",
-              text: "Evaluated prompt context",
-              subtext: "Response generated without file edits",
-              status: "succeeded"
-            });
           }
+
+          if (actionSteps.length === 0) return null;
 
           const isExpanded = expandedActions[msgId] !== false;
 

@@ -501,6 +501,38 @@ export default function App() {
   const [isMobile, setIsMobile] = useState(() => typeof window !== "undefined" && window.innerWidth < 768);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [isDesktopSidebarOpen, setIsDesktopSidebarOpen] = useState(false); 
+  const [sidebarWidth, setSidebarWidth] = useState<number>(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("exechat_sidebar_width");
+      if (saved) {
+        const parsed = parseInt(saved, 10);
+        if (!isNaN(parsed) && parsed >= 180 && parsed <= 450) return parsed;
+      }
+    }
+    return 260;
+  });
+  const [isResizingSidebar, setIsResizingSidebar] = useState(false);
+
+  const handleStartResizingSidebar = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsResizingSidebar(true);
+    
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      const newWidth = Math.max(180, Math.min(450, moveEvent.clientX));
+      setSidebarWidth(newWidth);
+      localStorage.setItem("exechat_sidebar_width", newWidth.toString());
+    };
+
+    const handleMouseUp = () => {
+      setIsResizingSidebar(false);
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", handleMouseUp);
+    };
+
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mouseup", handleMouseUp);
+  };
 
   useEffect(() => {
     const handleResize = () => {
@@ -3319,9 +3351,18 @@ export default function App() {
 
   const renderSidebarContent = (isMobile = false) => (
     <div className={`flex flex-col h-full w-full ${curTheme.sidebarBg} ${isDark ? "text-zinc-100" : "text-zinc-900"} select-none`}>
-      <div className={`p-5 border-b ${curTheme.border} flex items-center justify-between shrink-0`}>
-        <div className="flex items-center gap-3">
-          <ExeChatLogo className="h-5 w-5 shrink-0" size={20} />
+      <div className={`p-4 border-b ${curTheme.border} flex items-center justify-between shrink-0`}>
+        <div 
+          onClick={() => {
+            if (!isMobile) setIsDesktopSidebarOpen(false);
+          }}
+          className="group flex items-center gap-2.5 cursor-pointer py-1 px-1.5 rounded-xl hover:bg-zinc-500/10 transition-colors"
+          title="Collapse Sidebar"
+        >
+          <div className="relative h-6 w-6 flex items-center justify-center shrink-0">
+            <ExeChatLogo className="h-5 w-5 shrink-0 transition-opacity duration-200 group-hover:opacity-0 absolute" size={20} />
+            <PanelLeft className={`h-5 w-5 shrink-0 transition-opacity duration-200 opacity-0 group-hover:opacity-100 absolute ${isDark ? "text-zinc-300" : "text-zinc-700"}`} />
+          </div>
           <div>
             <h1 className={`font-display font-bold text-base tracking-tight flex items-center gap-1.5 ${isDark ? "text-zinc-100" : "text-zinc-900"}`}>
               ExeChat
@@ -3346,9 +3387,9 @@ export default function App() {
               className={`p-1.5 rounded-lg border border-transparent transition-all duration-200 cursor-pointer ${
                 isDark ? "border-transparent text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50" : "border-transparent text-zinc-600 hover:text-zinc-900 hover:bg-zinc-200/50"
               }`}
-              title="Close Chat History"
+              title="Collapse Sidebar"
             >
-              <ChevronLeft className="h-4 w-4" />
+              <PanelLeft className="h-4.5 w-4.5" />
             </button>
           )}
         </div>
@@ -3861,40 +3902,58 @@ export default function App() {
         {/* UNIFIED DESKTOP SIDEBAR (GEMINI-LIKE EXPANDED/COLLAPSED) */}
         <motion.aside 
           animate={{ 
-            width: isDesktopSidebarOpen ? 240 : 54
+            width: isDesktopSidebarOpen ? sidebarWidth : 54
           }}
-          transition={{ type: "spring", stiffness: 260, damping: 26 }}
-          className={`hidden md:flex flex-col h-full shrink-0 ${
+          transition={isResizingSidebar ? { duration: 0 } : { type: "spring", stiffness: 280, damping: 28 }}
+          className={`hidden md:flex flex-col h-full shrink-0 relative ${
             isDesktopSidebarOpen ? curTheme.sidebarBg : isDark ? "bg-black" : "bg-zinc-100"
           } select-none z-20 overflow-hidden border-r ${curTheme.border}`}
         >
           {isDesktopSidebarOpen ? (
-            <div className="w-[240px] h-full flex flex-col overflow-hidden">
+            <div style={{ width: `${sidebarWidth}px` }} className="h-full flex flex-col overflow-hidden">
               {renderSidebarContent(false)}
             </div>
           ) : (
-            <div className="flex flex-col items-center justify-between py-6 w-[54px] h-full shrink-0 overflow-hidden">
+            <div 
+              onClick={() => {
+                if (!isDesktopSidebarOpen) setIsDesktopSidebarOpen(true);
+              }}
+              className="flex flex-col items-center justify-between py-6 w-[54px] h-full shrink-0 overflow-hidden cursor-pointer"
+              title="Click to expand sidebar"
+            >
               {/* Top Section */}
               <div className="flex flex-col items-center gap-6 w-full">
-                {/* ExeChat Logo at the very top */}
-                <div className="p-1 hover:scale-105 transition-transform shrink-0 select-none">
-                  <ExeChatLogo className="h-6 w-6 shrink-0" size={24} />
-                </div>
-
-                {/* Menu Button to open */}
+                {/* ExeChat Logo / Toggle Button at the very top */}
                 <button
-                  onClick={() => setIsDesktopSidebarOpen(true)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setIsDesktopSidebarOpen(true);
+                  }}
+                  className="group p-2 rounded-xl hover:bg-zinc-500/10 transition-all duration-200 cursor-pointer flex items-center justify-center relative h-9 w-9 shrink-0 select-none"
+                  title="Expand Sidebar"
+                >
+                  <ExeChatLogo className="h-6 w-6 shrink-0 transition-opacity duration-200 group-hover:opacity-0 absolute" size={24} />
+                  <PanelLeft className={`h-5 w-5 shrink-0 transition-opacity duration-200 opacity-0 group-hover:opacity-100 absolute ${isDark ? "text-zinc-300" : "text-zinc-700"}`} />
+                </button>
+
+                {/* Sidebar Toggle Button */}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setIsDesktopSidebarOpen(true);
+                  }}
                   className={`p-2 rounded-xl transition-all duration-200 cursor-pointer ${
                     isDark ? "text-zinc-400 hover:text-white hover:bg-zinc-800/50" : "text-zinc-700 hover:text-zinc-900 hover:bg-zinc-200/50"
                   }`}
                   title="Expand Sidebar"
                 >
-                  <Menu className="h-5 w-5" />
+                  <PanelLeft className="h-5 w-5" />
                 </button>
 
                 {/* New Chat Icon Button */}
                 <button
-                  onClick={() => {
+                  onClick={(e) => {
+                    e.stopPropagation();
                     playNotifySound();
                     setCurrentSessionId(null);
                     setShowSettings(false);
@@ -3910,7 +3969,8 @@ export default function App() {
 
                 {/* Search Icon Button */}
                 <button
-                  onClick={() => {
+                  onClick={(e) => {
+                    e.stopPropagation();
                     setShowSearchModal(true);
                     playNotifySound();
                   }}
@@ -3927,7 +3987,8 @@ export default function App() {
               <div className="flex flex-col items-center gap-4 w-full">
                 {/* ExeCode Workspace Icon */}
                 <button
-                  onClick={() => {
+                  onClick={(e) => {
+                    e.stopPropagation();
                     setShowExeCode(prev => !prev);
                     setShowSettings(false);
                   }}
@@ -3944,7 +4005,8 @@ export default function App() {
                 {/* Admin Shield Icon */}
                 {isLoggedIn && userEmail?.toLowerCase() === "nairicintia@gmail.com" && (
                   <button
-                    onClick={() => {
+                    onClick={(e) => {
+                      e.stopPropagation();
                       setShowAdminPopup(true);
                       loadAdminFeedbacks();
                       playNotifySound();
@@ -3962,7 +4024,8 @@ export default function App() {
 
                 {/* Settings Icon */}
                 <button
-                  onClick={() => {
+                  onClick={(e) => {
+                    e.stopPropagation();
                     setShowSettings(prev => !prev);
                     setShowExeCode(false);
                   }}
@@ -3977,7 +4040,7 @@ export default function App() {
                 </button>
 
                 {/* Profile Photo / Avatar */}
-                <div className="relative">
+                <div className="relative" onClick={(e) => e.stopPropagation()}>
                   {isLoggedIn && userPhoto ? (
                     <img
                       onClick={() => setShowProfileMenu(prev => !prev)}
@@ -4047,6 +4110,20 @@ export default function App() {
               </div>
             </div>
           )}
+
+          {/* Resizable Sidebar Right Edge Handle */}
+          <div
+            onMouseDown={handleStartResizingSidebar}
+            onClick={(e) => e.stopPropagation()}
+            onDoubleClick={(e) => {
+              e.stopPropagation();
+              setIsDesktopSidebarOpen(!isDesktopSidebarOpen);
+            }}
+            className="absolute top-0 right-0 w-2 h-full cursor-ew-resize hover:bg-amber-500/30 active:bg-amber-500/60 z-30 transition-colors group/resizer"
+            title="Drag to resize / Double-click to toggle"
+          >
+            <div className="absolute top-1/2 -translate-y-1/2 right-0.5 w-1 h-8 rounded-full bg-zinc-500/30 group-hover/resizer:bg-amber-500 opacity-0 group-hover/resizer:opacity-100 transition-opacity" />
+          </div>
         </motion.aside>
 
         <AnimatePresence>
