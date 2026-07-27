@@ -501,38 +501,6 @@ export default function App() {
   const [isMobile, setIsMobile] = useState(() => typeof window !== "undefined" && window.innerWidth < 768);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [isDesktopSidebarOpen, setIsDesktopSidebarOpen] = useState(false); 
-  const [sidebarWidth, setSidebarWidth] = useState<number>(() => {
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("exechat_sidebar_width");
-      if (saved) {
-        const parsed = parseInt(saved, 10);
-        if (!isNaN(parsed) && parsed >= 180 && parsed <= 450) return parsed;
-      }
-    }
-    return 260;
-  });
-  const [isResizingSidebar, setIsResizingSidebar] = useState(false);
-
-  const handleStartResizingSidebar = (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsResizingSidebar(true);
-    
-    const handleMouseMove = (moveEvent: MouseEvent) => {
-      const newWidth = Math.max(180, Math.min(450, moveEvent.clientX));
-      setSidebarWidth(newWidth);
-      localStorage.setItem("exechat_sidebar_width", newWidth.toString());
-    };
-
-    const handleMouseUp = () => {
-      setIsResizingSidebar(false);
-      window.removeEventListener("mousemove", handleMouseMove);
-      window.removeEventListener("mouseup", handleMouseUp);
-    };
-
-    window.addEventListener("mousemove", handleMouseMove);
-    window.addEventListener("mouseup", handleMouseUp);
-  };
 
   useEffect(() => {
     const handleResize = () => {
@@ -3902,15 +3870,15 @@ export default function App() {
         {/* UNIFIED DESKTOP SIDEBAR (GEMINI-LIKE EXPANDED/COLLAPSED) */}
         <motion.aside 
           animate={{ 
-            width: isDesktopSidebarOpen ? sidebarWidth : 54
+            width: isDesktopSidebarOpen ? 240 : 54
           }}
-          transition={isResizingSidebar ? { duration: 0 } : { type: "spring", stiffness: 280, damping: 28 }}
+          transition={{ type: "spring", stiffness: 280, damping: 28 }}
           className={`hidden md:flex flex-col h-full shrink-0 relative ${
             isDesktopSidebarOpen ? curTheme.sidebarBg : isDark ? "bg-black" : "bg-zinc-100"
           } select-none z-20 overflow-hidden border-r ${curTheme.border}`}
         >
           {isDesktopSidebarOpen ? (
-            <div style={{ width: `${sidebarWidth}px` }} className="h-full flex flex-col overflow-hidden">
+            <div className="w-[240px] h-full flex flex-col overflow-hidden">
               {renderSidebarContent(false)}
             </div>
           ) : (
@@ -3923,7 +3891,7 @@ export default function App() {
             >
               {/* Top Section */}
               <div className="flex flex-col items-center gap-6 w-full">
-                {/* ExeChat Logo / Toggle Button at the very top */}
+                {/* ExeChat Logo / Expand Button at the very top */}
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
@@ -3934,20 +3902,6 @@ export default function App() {
                 >
                   <ExeChatLogo className="h-6 w-6 shrink-0 transition-opacity duration-200 group-hover:opacity-0 absolute" size={24} />
                   <PanelLeft className={`h-5 w-5 shrink-0 transition-opacity duration-200 opacity-0 group-hover:opacity-100 absolute ${isDark ? "text-zinc-300" : "text-zinc-700"}`} />
-                </button>
-
-                {/* Sidebar Toggle Button */}
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setIsDesktopSidebarOpen(true);
-                  }}
-                  className={`p-2 rounded-xl transition-all duration-200 cursor-pointer ${
-                    isDark ? "text-zinc-400 hover:text-white hover:bg-zinc-800/50" : "text-zinc-700 hover:text-zinc-900 hover:bg-zinc-200/50"
-                  }`}
-                  title="Expand Sidebar"
-                >
-                  <PanelLeft className="h-5 w-5" />
                 </button>
 
                 {/* New Chat Icon Button */}
@@ -4110,20 +4064,6 @@ export default function App() {
               </div>
             </div>
           )}
-
-          {/* Resizable Sidebar Right Edge Handle */}
-          <div
-            onMouseDown={handleStartResizingSidebar}
-            onClick={(e) => e.stopPropagation()}
-            onDoubleClick={(e) => {
-              e.stopPropagation();
-              setIsDesktopSidebarOpen(!isDesktopSidebarOpen);
-            }}
-            className="absolute top-0 right-0 w-2 h-full cursor-ew-resize hover:bg-amber-500/30 active:bg-amber-500/60 z-30 transition-colors group/resizer"
-            title="Drag to resize / Double-click to toggle"
-          >
-            <div className="absolute top-1/2 -translate-y-1/2 right-0.5 w-1 h-8 rounded-full bg-zinc-500/30 group-hover/resizer:bg-amber-500 opacity-0 group-hover/resizer:opacity-100 transition-opacity" />
-          </div>
         </motion.aside>
 
         <AnimatePresence>
