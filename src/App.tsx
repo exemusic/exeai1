@@ -1394,7 +1394,7 @@ export default function App() {
       textBase: "text-zinc-300",
       textTitle: "text-zinc-100",
       accentColor: "bg-zinc-900 hover:bg-zinc-800 text-white",
-      scrollbarClass: "scrollbar-thin scrollbar-thumb-zinc-900",
+      scrollbarClass: "scrollbar-thin",
       gradient: "from-black/40 via-transparent to-transparent",
     },
     light: {
@@ -1410,7 +1410,7 @@ export default function App() {
       textBase: "text-zinc-800",
       textTitle: "text-zinc-900",
       accentColor: "bg-zinc-900 hover:bg-zinc-800 text-white",
-      scrollbarClass: "scrollbar-thin scrollbar-thumb-zinc-300",
+      scrollbarClass: "scrollbar-thin",
       gradient: "from-zinc-100/25 via-transparent to-transparent",
     },
   };
