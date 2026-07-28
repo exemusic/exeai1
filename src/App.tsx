@@ -58,6 +58,7 @@ import {
   CheckCircle2,
   Filter,
   ArrowLeft,
+  ArrowDown,
   ExternalLink,
   Film,
   Image as ImageIcon
@@ -770,6 +771,9 @@ export default function App() {
   const [speakingMessageId, setSpeakingMessageId] = useState<string | null>(null);
 
   const chatBottomRef = useRef<HTMLDivElement>(null);
+  const chatScrollContainerRef = useRef<HTMLDivElement>(null);
+  const [userHasScrolledUp, setUserHasScrolledUp] = useState<boolean>(false);
+  const [showScrollToBottomButton, setShowScrollToBottomButton] = useState<boolean>(false);
   const abortControllerRef = useRef<AbortController | null>(null);
   const ttsSynthRef = useRef<SpeechSynthesis | null>(null);
   const notifyAudioRef = useRef<HTMLAudioElement | null>(null);
@@ -1301,9 +1305,29 @@ export default function App() {
     }, 80);
   };
 
+  const handleChatScroll = () => {
+    if (!chatScrollContainerRef.current) return;
+    const { scrollTop, scrollHeight, clientHeight } = chatScrollContainerRef.current;
+    const distanceFromBottom = scrollHeight - scrollTop - clientHeight;
+
+    if (distanceFromBottom > 100) {
+      setUserHasScrolledUp(true);
+      setShowScrollToBottomButton(true);
+    } else {
+      setUserHasScrolledUp(false);
+      setShowScrollToBottomButton(false);
+    }
+  };
+
+  const handleScrollToBottomClick = () => {
+    setUserHasScrolledUp(false);
+    setShowScrollToBottomButton(false);
+    scrollToBottom("smooth");
+  };
+
   const currentSession = sessions.find((s) => s.id === currentSessionId);
   useEffect(() => {
-    if (currentSession) {
+    if (currentSession && !userHasScrolledUp) {
       scrollToBottom("smooth");
     }
   }, [currentSession?.messages?.length, isGenerating]);
@@ -1529,7 +1553,7 @@ export default function App() {
     }
   };
 
-  const handleGoogleLoginSuccess = async (credentialResponse: any) => {
+  const handleGoogleLoginSuccess = (credentialResponse: any) => {
     if (!credentialResponse || !credentialResponse.credential) {
       setErrorText("Google sign-in failed: No credential returned.");
       return;
@@ -1545,99 +1569,81 @@ export default function App() {
       const name = decoded.name || decoded.given_name || email.split("@")[0] || "User";
       const picture = decoded.picture || null;
 
-      // Fetch user database from Supabase Storage to restore state
-      try {
-        const loadRes = await fetch("/api/db/load-all", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ uid, email, userEmail: email })
-        });
-        const loadData = await loadRes.json();
+      const hasRegistered = localStorage.getItem(`exechat_has_registered_${uid}`) === "true";
+      const storedUsername = localStorage.getItem("exechat_username") || name;
+      const storedDisplayName = localStorage.getItem("exechat_display_name") || name;
 
-        if (loadData.found && loadData.data) {
-          // USER EXISTS - RESTORE THEIR SESSIONS, USERNAME, ETC.
-          const userDb = loadData.data;
-          setUserId(uid);
-          setUserEmail(email);
-          setUserPhoto(picture);
-          setCredits(99999);
-          setErrorText(null);
-
-          const finalUsername = userDb.username || name;
-          const finalDisplayName = userDb.displayName || name;
-          setUserName(finalUsername);
-          setUserDisplayName(finalDisplayName);
-          
-          localStorage.setItem("exechat_username", finalUsername);
-          localStorage.setItem("exechat_display_name", finalDisplayName);
-
-          if (userDb.language) {
-            setUserLanguage(userDb.language);
-            localStorage.setItem("exechat_user_language", userDb.language);
-          }
-
-          if (userDb.sessions && Array.isArray(userDb.sessions)) {
-            setSessions(
-              userDb.sessions
-                .filter((s: any) => s && typeof s === "object")
-                .map((s: any) => ({
-                  ...s,
-                  messages: Array.isArray(s.messages) ? s.messages : [],
-                }))
-            );
-          }
-
-          localStorage.setItem(`exechat_has_registered_${uid}`, "true");
-          setIsLoggedIn(true);
-          playNotifySound();
-        } else {
-          // NEW USER - SHOW REGISTRATION MODAL
-          setUserId(uid);
-          setUserEmail(email);
-          setUserPhoto(picture);
-          setCredits(99999);
-          setErrorText(null);
-
-          setGoogleDefaultName(name);
-          setRegisterModalName(name);
-          setShowRegisterModal(true);
-
-          setUserName(name);
-          setUserDisplayName(name);
-          setIsLoggedIn(true);
-        }
-      } catch (dbErr) {
-        console.error("Failed to load user database from Supabase:", dbErr);
-        // Fallback to local storage checks if Supabase load fails
-        setUserId(uid);
-        setUserEmail(email);
-        setUserPhoto(picture);
-        setCredits(99999);
-        setErrorText(null);
-
-        const hasRegistered = localStorage.getItem(`exechat_has_registered_${uid}`) === "true";
-        if (!hasRegistered) {
-          setGoogleDefaultName(name);
-          setRegisterModalName(name);
-          setShowRegisterModal(true);
-
-          setUserName(name);
-          setUserDisplayName(name);
-          setIsLoggedIn(true);
-        } else {
-          const storedUsername = localStorage.getItem("exechat_username") || name;
-          const storedDisplayName = localStorage.getItem("exechat_display_name") || name;
-          setUserName(storedUsername);
-          setUserDisplayName(storedDisplayName);
-          setIsLoggedIn(true);
-          playNotifySound();
-        }
-      }
+      // 1. INSTANT LOCAL STATE UPDATE & TRANSITION
+      setUserId(uid);
+      setUserEmail(email);
+      setUserPhoto(picture);
+      setCredits(99999);
+      setErrorText(null);
+      setUserName(storedUsername);
+      setUserDisplayName(storedDisplayName);
 
       localStorage.setItem("exechat_logged_in", "true");
       localStorage.setItem("exechat_email", email);
       localStorage.setItem("exechat_user_id", uid);
       localStorage.setItem("exechat_user_photo", picture || "");
+      localStorage.setItem("exechat_username", storedUsername);
+      localStorage.setItem("exechat_display_name", storedDisplayName);
+
+      setIsLoggedIn(true);
+      playNotifySound();
+
+      if (!hasRegistered) {
+        setGoogleDefaultName(name);
+        setRegisterModalName(name);
+        setShowRegisterModal(true);
+      }
+
+      // 2. NON-BLOCKING BACKGROUND SYNC (with 3-second timeout)
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 3000);
+
+      fetch("/api/db/load-all", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ uid, email, userEmail: email }),
+        signal: controller.signal
+      })
+        .then((res) => res.json())
+        .then((loadData) => {
+          clearTimeout(timeoutId);
+          if (loadData.found && loadData.data) {
+            const userDb = loadData.data;
+            const finalUsername = userDb.username || storedUsername;
+            const finalDisplayName = userDb.displayName || storedDisplayName;
+            setUserName(finalUsername);
+            setUserDisplayName(finalDisplayName);
+
+            localStorage.setItem("exechat_username", finalUsername);
+            localStorage.setItem("exechat_display_name", finalDisplayName);
+
+            if (userDb.language) {
+              setUserLanguage(userDb.language);
+              localStorage.setItem("exechat_user_language", userDb.language);
+            }
+
+            if (userDb.sessions && Array.isArray(userDb.sessions) && userDb.sessions.length > 0) {
+              setSessions(
+                userDb.sessions
+                  .filter((s: any) => s && typeof s === "object")
+                  .map((s: any) => ({
+                    ...s,
+                    messages: Array.isArray(s.messages) ? s.messages : [],
+                  }))
+              );
+            }
+            localStorage.setItem(`exechat_has_registered_${uid}`, "true");
+          }
+        })
+        .catch((dbErr) => {
+          clearTimeout(timeoutId);
+          console.warn("Background user sync notice:", dbErr);
+        });
+
     } catch (error: any) {
       console.error("Google login decode error:", error);
       setErrorText(error?.message || "Google sign-in failed.");
@@ -2241,6 +2247,8 @@ export default function App() {
     thinkingStartTimesRef.current[assistantMsgId] = Date.now();
 
     setIsGenerating(true);
+    setUserHasScrolledUp(false);
+    setShowScrollToBottomButton(false);
     scrollToBottom("smooth");
 
     const activeSessionState = sessions.find((s) => s && s.id === targetSessionId);
@@ -4139,7 +4147,7 @@ export default function App() {
               </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto px-3.5 md:px-8 py-4 md:py-6 relative z-0 scrollbar-thin">
+            <div ref={chatScrollContainerRef} onScroll={handleChatScroll} className="flex-1 overflow-y-auto px-3.5 md:px-8 py-4 md:py-6 relative z-0 scrollbar-thin">
               <div className="max-w-3xl mx-auto h-full flex flex-col">
 
                 {!currentSession || currentSession.messages.length === 0 ? (
@@ -4679,6 +4687,27 @@ export default function App() {
                 isDark ? "border-zinc-900 bg-black/80" : "border-zinc-200 bg-white"
               }`}>
                 <div className="max-w-3xl mx-auto relative">
+                  {/* Floating Scroll to Bottom Button */}
+                  <AnimatePresence>
+                    {(showScrollToBottomButton || (isGenerating && userHasScrolledUp)) && (
+                      <motion.button
+                        key="scroll-to-bottom-btn"
+                        initial={{ opacity: 0, y: 10, scale: 0.85 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: 10, scale: 0.85 }}
+                        transition={{ duration: 0.2, ease: "easeOut" }}
+                        onClick={handleScrollToBottomClick}
+                        className={`absolute -top-12 left-1/2 -translate-x-1/2 z-30 h-9 w-9 rounded-full shadow-xl flex items-center justify-center transition-all duration-200 cursor-pointer hover:scale-110 active:scale-95 border ${
+                          isDark 
+                            ? "bg-zinc-900/90 text-zinc-100 border-zinc-700/80 hover:bg-zinc-800 backdrop-blur-md" 
+                            : "bg-white/95 text-zinc-800 border-zinc-300 hover:bg-zinc-100 shadow-md backdrop-blur-md"
+                        }`}
+                        title={getTranslation("scrollToBottom", userLanguage)}
+                      >
+                        <ArrowDown className="h-4 w-4 stroke-[2.5]" />
+                      </motion.button>
+                    )}
+                  </AnimatePresence>
 
                   {/* Input block */}
                   <div className={`relative rounded-[26px] md:rounded-[30px] border p-2 px-3 md:px-4 transition-all duration-300 flex flex-col ${
