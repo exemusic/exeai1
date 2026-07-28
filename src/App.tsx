@@ -4866,7 +4866,7 @@ export default function App() {
 
                   {/* Footnote instruction advice */}
                   <p className="text-[9px] md:text-[10px] text-zinc-600 text-center select-none mt-1.5 md:mt-2 font-sans">
-                    ExeChat can make mistakes.
+                    {getTranslation("exeChatDisclaimer", userLanguage)}
                   </p>
                 </div>
               </div>
