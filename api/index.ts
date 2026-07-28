@@ -658,6 +658,8 @@ app.post("/api/db/save-all", async (req, res) => {
       displayName,
       sessions,
       language,
+      registered: true,
+      hasCreatedName: true,
       updatedAt: Date.now()
     };
 

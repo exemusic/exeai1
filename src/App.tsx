@@ -1239,6 +1239,8 @@ export default function App() {
               const userDb = loadData.data;
               setUserName(userDb.username || localStorage.getItem("exechat_username") || "");
               setUserDisplayName(userDb.displayName || localStorage.getItem("exechat_display_name") || "");
+              markEmailAndUidAsRegistered(savedUserId, email);
+              setShowRegisterModal(false);
               if (userDb.language) {
                 setUserLanguage(userDb.language);
                 localStorage.setItem("exechat_user_language", userDb.language);
@@ -1553,6 +1555,45 @@ export default function App() {
     }
   };
 
+  const isEmailOrUidRegistered = (uid?: string | null, email?: string | null): boolean => {
+    if (!uid && !email) return false;
+    if (uid && localStorage.getItem(`exechat_has_registered_${uid}`) === "true") return true;
+    if (email) {
+      const cleanEmail = email.toLowerCase().trim();
+      if (localStorage.getItem(`exechat_has_registered_${cleanEmail}`) === "true") return true;
+      if (localStorage.getItem(`exechat_registered_email_${cleanEmail}`) === "true") return true;
+      try {
+        const list = JSON.parse(localStorage.getItem("exechat_registered_emails") || "[]");
+        if (Array.isArray(list) && list.includes(cleanEmail)) return true;
+      } catch (e) {}
+    }
+    return false;
+  };
+
+  const markEmailAndUidAsRegistered = (uid?: string | null, email?: string | null) => {
+    if (uid) {
+      localStorage.setItem(`exechat_has_registered_${uid}`, "true");
+    }
+    if (email) {
+      const cleanEmail = email.toLowerCase().trim();
+      localStorage.setItem(`exechat_has_registered_${cleanEmail}`, "true");
+      localStorage.setItem(`exechat_registered_email_${cleanEmail}`, "true");
+      try {
+        const list = JSON.parse(localStorage.getItem("exechat_registered_emails") || "[]");
+        if (Array.isArray(list)) {
+          if (!list.includes(cleanEmail)) {
+            list.push(cleanEmail);
+            localStorage.setItem("exechat_registered_emails", JSON.stringify(list));
+          }
+        } else {
+          localStorage.setItem("exechat_registered_emails", JSON.stringify([cleanEmail]));
+        }
+      } catch (e) {
+        localStorage.setItem("exechat_registered_emails", JSON.stringify([cleanEmail]));
+      }
+    }
+  };
+
   const handleGoogleLoginSuccess = (credentialResponse: any) => {
     if (!credentialResponse || !credentialResponse.credential) {
       setErrorText("Google sign-in failed: No credential returned.");
@@ -1569,7 +1610,7 @@ export default function App() {
       const name = decoded.name || decoded.given_name || email.split("@")[0] || "User";
       const picture = decoded.picture || null;
 
-      const hasRegistered = localStorage.getItem(`exechat_has_registered_${uid}`) === "true";
+      const hasRegistered = isEmailOrUidRegistered(uid, email);
       const storedUsername = localStorage.getItem("exechat_username") || name;
       const storedDisplayName = localStorage.getItem("exechat_display_name") || name;
 
@@ -1596,6 +1637,8 @@ export default function App() {
         setGoogleDefaultName(name);
         setRegisterModalName(name);
         setShowRegisterModal(true);
+      } else {
+        setShowRegisterModal(false);
       }
 
       // 2. NON-BLOCKING BACKGROUND SYNC (with 3-second timeout)
@@ -1621,6 +1664,9 @@ export default function App() {
             localStorage.setItem("exechat_username", finalUsername);
             localStorage.setItem("exechat_display_name", finalDisplayName);
 
+            markEmailAndUidAsRegistered(uid, email);
+            setShowRegisterModal(false);
+
             if (userDb.language) {
               setUserLanguage(userDb.language);
               localStorage.setItem("exechat_user_language", userDb.language);
@@ -1636,7 +1682,6 @@ export default function App() {
                   }))
               );
             }
-            localStorage.setItem(`exechat_has_registered_${uid}`, "true");
           }
         })
         .catch((dbErr) => {
@@ -2001,7 +2046,7 @@ export default function App() {
     localStorage.setItem("exechat_display_name", finalName);
 
     const activeUid = localStorage.getItem("exechat_user_id") || userId || "google-user";
-    localStorage.setItem(`exechat_has_registered_${activeUid}`, "true");
+    markEmailAndUidAsRegistered(activeUid, userEmail);
 
     setShowRegisterModal(false);
     playNotifySound();
@@ -2059,9 +2104,7 @@ export default function App() {
     localStorage.setItem("exechat_username", trimmed);
     localStorage.setItem("exechat_display_name", trimmed);
     const activeUid = userId || localStorage.getItem("exechat_user_id");
-    if (activeUid) {
-      localStorage.setItem(`exechat_has_registered_${activeUid}`, "true");
-    }
+    markEmailAndUidAsRegistered(activeUid, userEmail);
 
     setErrorText(null);
     setRedeemFeedback("Username successfully saved.");
