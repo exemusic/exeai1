@@ -1543,7 +1543,7 @@ export default function App() {
     } else if (isCodingKeyword) {
       return {
         routedModelId: "gpt-oss-120b",
-        routedModelName: "exeai-oss-120b",
+        routedModelName: "exeai-1.0-pro",
       };
     } else {
       return {
@@ -5116,7 +5116,14 @@ export default function App() {
                                       }`}
                                     >
                                       <div className="flex items-center justify-between mb-1">
-                                        <span className="text-sm font-bold">{m.name}</span>
+                                        <div className="flex items-center gap-2">
+                                          <span className="text-sm font-bold">{m.name}</span>
+                                          {m.badge && (
+                                            <span className="text-[9px] px-1.5 py-0.5 rounded-full font-mono font-semibold bg-blue-500/15 text-blue-400 border border-blue-500/20">
+                                              {m.badge}
+                                            </span>
+                                          )}
+                                        </div>
                                         {isSelected && <span className="text-[10px] px-2 py-0.5 rounded-full font-mono font-bold bg-amber-500/20 text-amber-500">{getTranslation("active", userLanguage)}</span>}
                                       </div>
                                       <p className="text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed">{m.description}</p>

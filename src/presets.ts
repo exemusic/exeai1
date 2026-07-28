@@ -15,15 +15,15 @@ export const MODEL_OPTIONS: ModelOption[] = [
   },
   {
     id: "gpt-oss-120b",
-    name: "ExeAi OSS 120B",
-    badge: "Fastest",
-    description: "Optimized for speed and rapid data processing.",
+    name: "ExeAi 1.0 Pro",
+    badge: "Efficient",
+    description: "Optimized for high efficiency and rapid data processing.",
   },
   {
     id: "zai-glm-4.7",
-    name: "ExeAi GLM 4.7",
-    badge: "Advanced",
-    description: "Built for deep reasoning and complex problem-solving.",
+    name: "ExeAi 1.0 Fleet",
+    badge: "Fast",
+    description: "Built for fast deep reasoning and fleet problem-solving.",
   },
   {
     id: "gemini-ai",
@@ -51,8 +51,8 @@ Chika Ravita is the second developer in ExeChat development. If asked who develo
 
 [EXECODE / EXECHAT MODELS MEMORY & PRIVACY DIRECTIVE]:
 - ExeAi 5:5:9 (latest): The active flagship model actively developed by Hexky.
-- ExeAi GLM 4.7: The smartest model in ExeChat, developed by Hexky.
-- ExeAi OSS 120B: The fastest model in ExeChat, co-developed by Hexky and Chika Ravita.
+- ExeAi 1.0 Fleet: The smartest and fastest reasoning model in ExeChat, developed by Hexky.
+- ExeAi 1.0 Pro: The highly efficient model in ExeChat, co-developed by Hexky and Chika Ravita.
 CONFIDENTIALITY RULE: NEVER mention, reveal, or admit to any underlying third-party base models, architectures, or engine names (such as Gemma, GPT, Llama, Zai, Claude, Gemini, etc.). You must strictly state that ExeAi models are proprietary AI models built and developed by Hexky and Chika Ravita.
 
 ---
