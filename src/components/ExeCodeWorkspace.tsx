@@ -1891,7 +1891,9 @@ body {
         signal: controller.signal,
         body: JSON.stringify({
           model: selectedModel,
-          messages: payloadMessages
+          messages: payloadMessages,
+          userName: localStorage.getItem("exechat_username") || localStorage.getItem("exechat_display_name") || undefined,
+          userDisplayName: localStorage.getItem("exechat_display_name") || localStorage.getItem("exechat_username") || undefined,
         })
       });
 

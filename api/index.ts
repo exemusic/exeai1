@@ -650,6 +650,7 @@ app.post("/api/db/save-all", async (req, res) => {
 
     const effEmail = email || userEmail || "";
     const userKey = getSanitizedUserKey(uid, effEmail);
+    const emailKey = effEmail ? effEmail.toLowerCase().replace(/[^a-zA-Z0-9_-]/g, "_") : "";
 
     const payload = {
       uid,
@@ -666,33 +667,44 @@ app.post("/api/db/save-all", async (req, res) => {
     // 1. Instantly store in memory cache for <1ms response time
     userDbCache.set(uid, payload);
     if (userKey) userDbCache.set(userKey, payload);
+    if (emailKey) userDbCache.set(emailKey, payload);
     if (effEmail) userDbCache.set(effEmail.toLowerCase(), payload);
 
     if (language) {
       userLangCache.set(uid, language);
       if (userKey) userLangCache.set(userKey, language);
+      if (emailKey) userLangCache.set(emailKey, language);
     }
 
     const rtdb = getFirebaseRtdb();
     if (rtdb) {
       try {
         await rtdb.ref(`user_data/${userKey}`).set(payload);
-        if (uid !== userKey) {
+        if (uid && uid !== userKey) {
           await rtdb.ref(`user_data/${uid}`).set(payload);
+        }
+        if (emailKey && emailKey !== userKey && emailKey !== uid) {
+          await rtdb.ref(`user_data/${emailKey}`).set(payload);
         }
       } catch (dbErr) {
         console.warn("Firebase RTDB user_data save notice:", dbErr);
       }
 
       try {
-        await rtdb.ref(`user_profiles/${userKey}`).set({
+        const profilePayload = {
           uid,
           email: effEmail,
           username,
           displayName,
           language,
+          registered: true,
+          hasCreatedName: true,
           updatedAt: Date.now()
-        });
+        };
+        await rtdb.ref(`user_profiles/${userKey}`).set(profilePayload);
+        if (emailKey && emailKey !== userKey) {
+          await rtdb.ref(`user_profiles/${emailKey}`).set(profilePayload);
+        }
       } catch (dbErr) {}
     }
 
@@ -713,6 +725,7 @@ app.post("/api/db/load-all", async (req, res) => {
 
     const effEmail = email || userEmail || "";
     const userKey = getSanitizedUserKey(uid, effEmail);
+    const emailKey = effEmail ? effEmail.toLowerCase().replace(/[^a-zA-Z0-9_-]/g, "_") : "";
 
     // 1. Check in-memory fast RAM cache first
     if (uid && userDbCache.has(uid)) {
@@ -720,6 +733,9 @@ app.post("/api/db/load-all", async (req, res) => {
     }
     if (userKey && userDbCache.has(userKey)) {
       return res.json({ found: true, data: userDbCache.get(userKey) });
+    }
+    if (emailKey && userDbCache.has(emailKey)) {
+      return res.json({ found: true, data: userDbCache.get(emailKey) });
     }
     if (effEmail && userDbCache.has(effEmail.toLowerCase())) {
       return res.json({ found: true, data: userDbCache.get(effEmail.toLowerCase()) });
@@ -730,17 +746,21 @@ app.post("/api/db/load-all", async (req, res) => {
       return res.json({ found: false });
     }
 
-    // 2. Query Firebase Realtime Database 'user_data' by userKey or uid
+    // 2. Query Firebase Realtime Database 'user_data' by userKey, uid, or emailKey
     try {
       let snap = await rtdb.ref(`user_data/${userKey}`).once("value");
       if (!snap.exists() && uid) {
         snap = await rtdb.ref(`user_data/${uid}`).once("value");
+      }
+      if (!snap.exists() && emailKey) {
+        snap = await rtdb.ref(`user_data/${emailKey}`).once("value");
       }
 
       if (snap.exists() && snap.val()) {
         const parsedData = snap.val();
         if (uid) userDbCache.set(uid, parsedData);
         if (userKey) userDbCache.set(userKey, parsedData);
+        if (emailKey) userDbCache.set(emailKey, parsedData);
         if (effEmail) userDbCache.set(effEmail.toLowerCase(), parsedData);
         return res.json({ found: true, data: parsedData });
       }
@@ -749,9 +769,16 @@ app.post("/api/db/load-all", async (req, res) => {
     // 3. Fallback: Query 'user_profiles' node
     try {
       let snap = await rtdb.ref(`user_profiles/${userKey}`).once("value");
+      if (!snap.exists() && emailKey) {
+        snap = await rtdb.ref(`user_profiles/${emailKey}`).once("value");
+      }
+      if (!snap.exists() && uid) {
+        snap = await rtdb.ref(`user_profiles/${uid}`).once("value");
+      }
       if (snap.exists() && snap.val()) {
         const parsedData = snap.val();
         if (uid) userDbCache.set(uid, parsedData);
+        if (emailKey) userDbCache.set(emailKey, parsedData);
         return res.json({ found: true, data: parsedData });
       }
     } catch (err) {}
@@ -1996,7 +2023,16 @@ app.post("/api/chat/stream", async (req, res) => {
       "2. STAIN & PRIVACY RULE: NEVER mention, acknowledge, or reveal any underlying third-party base models, engines, or architecture names (such as Gemma, GPT, Llama, Zai, Claude, Gemini, Groq, Cerebras, etc.).\n" +
       "3. If any user asks about your underlying model, engine, architecture, or who built your model, state strictly that you are powered by ExeChat's custom proprietary ExeAi architecture developed by Hexky and Chika Ravita.";
 
-    systemInstruction = (systemInstruction || "You are ExeAi, an advanced AI assistant that is highly intelligent, friendly, and helpful.") + languageInstruction + thinkInstruction + linkInstruction + designInstruction + modernEventInstruction + userRequestedPersonality + imageLimitInstruction + modelPrivacyInstruction;
+    const rawUserName = req.body.userDisplayName || req.body.userName;
+    const userProfileInstruction = rawUserName
+      ? `\n\n[USER PROFILE & IDENTITY DIRECTIVE]:\n` +
+        `1. The registered name of the user you are talking to is: "${rawUserName}" (Username: "${req.body.userName || req.body.userDisplayName}").\n` +
+        `2. You MUST recognize, remember, and know that the user's name is "${rawUserName}".\n` +
+        `3. When asked "siapa nama saya?", "who am I?", "what is my name?", "do you know my name?", or any question regarding their identity, confirm clearly and warmly that their name is "${rawUserName}".\n` +
+        `4. Address the user naturally by their name ("${rawUserName}") when appropriate in conversation.`
+      : "";
+
+    systemInstruction = (systemInstruction || "You are ExeAi, an advanced AI assistant that is highly intelligent, friendly, and helpful.") + userProfileInstruction + languageInstruction + thinkInstruction + linkInstruction + designInstruction + modernEventInstruction + userRequestedPersonality + imageLimitInstruction + modelPrivacyInstruction;
 
     if (!messages || !Array.isArray(messages)) {
       res.write(`data: ${JSON.stringify({ error: "Invalid or missing messages array" })}\n\n`);

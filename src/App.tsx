@@ -853,6 +853,19 @@ export default function App() {
     return `\n\n[CRITICAL DEVELOPER CONFIDENTIALITY DIRECTIVE]\nDO NOT mention, hint at, or reference the names 'Hexky', 'hengki.i', 'Chika Ravita', or any details about the creators/developers of ExeChat in this response under any circumstances. Keep them completely anonymous and unmentioned unless explicitly asked. Focus entirely on answering the user's query directly!`;
   };
 
+  const getUserIdentityDirective = (): string => {
+    const activeName = userDisplayName || userName || localStorage.getItem("exechat_display_name") || localStorage.getItem("exechat_username");
+    if (!activeName || activeName.trim() === "" || activeName.toLowerCase() === "user" || activeName.toLowerCase() === "guest user") {
+      return "";
+    }
+    const cleanName = activeName.trim();
+    return `\n\n[USER IDENTITY & NAME DIRECTIVE]:\n` +
+      `1. You are talking to user: "${cleanName}".\n` +
+      `2. You MUST recognize, remember, and know that the user's name is "${cleanName}".\n` +
+      `3. If the user asks "siapa nama saya?", "who am I?", "what is my name?", "do you know my name?", or asks about their identity, respond warmly and state clearly that their name is "${cleanName}".\n` +
+      `4. Address the user by their name ("${cleanName}") naturally and politely when appropriate.`;
+  };
+
   useEffect(() => {
     if (inputMessage === "") {
       if (homeTextareaRef.current) homeTextareaRef.current.style.height = "auto";
@@ -2339,6 +2352,7 @@ export default function App() {
     finalInstruction += `\n\n[CURRENT REAL-TIME TIME INFO]\n${getFormattedCurrentDate()}`;
     finalInstruction += getBrowserLanguageInstruction();
     finalInstruction += getDeveloperConfidentialityDirective(text);
+    finalInstruction += getUserIdentityDirective();
 
     const controller = new AbortController();
     abortControllerRef.current = controller;
@@ -2390,6 +2404,8 @@ export default function App() {
           uid: isLoggedIn ? userId : null,
           idToken: null,
           webSearchEnabled: apiWebSearch,
+          userName: userName || localStorage.getItem("exechat_username") || undefined,
+          userDisplayName: userDisplayName || localStorage.getItem("exechat_display_name") || undefined,
         }),
         signal: controller.signal,
       });
@@ -2741,6 +2757,7 @@ export default function App() {
     finalInstruction += `\n\n[CURRENT REAL-TIME TIME INFO]\n${getFormattedCurrentDate()}`;
     finalInstruction += getBrowserLanguageInstruction();
     finalInstruction += getDeveloperConfidentialityDirective(newContent);
+    finalInstruction += getUserIdentityDirective();
 
     const controller = new AbortController();
     abortControllerRef.current = controller;
@@ -2759,6 +2776,8 @@ export default function App() {
           uid: isLoggedIn ? userId : null,
           idToken: null,
           webSearchEnabled: apiWebSearch,
+          userName: userName || localStorage.getItem("exechat_username") || undefined,
+          userDisplayName: userDisplayName || localStorage.getItem("exechat_display_name") || undefined,
         }),
         signal: controller.signal,
       });
@@ -2931,6 +2950,7 @@ export default function App() {
     // Find the corresponding user message content for the assistant message being regenerated
     const lastUserMsgObj = priorMessages.slice().reverse().find(m => m.role === "user");
     finalInstruction += getDeveloperConfidentialityDirective(lastUserMsgObj ? lastUserMsgObj.content : "");
+    finalInstruction += getUserIdentityDirective();
 
     const controller = new AbortController();
     abortControllerRef.current = controller;
@@ -2949,6 +2969,8 @@ export default function App() {
           uid: isLoggedIn ? userId : null,
           idToken: null,
           webSearchEnabled: apiWebSearch,
+          userName: userName || localStorage.getItem("exechat_username") || undefined,
+          userDisplayName: userDisplayName || localStorage.getItem("exechat_display_name") || undefined,
         }),
         signal: controller.signal,
       });
