@@ -2026,10 +2026,9 @@ app.post("/api/chat/stream", async (req, res) => {
     const rawUserName = req.body.userDisplayName || req.body.userName;
     const userProfileInstruction = rawUserName
       ? `\n\n[USER PROFILE & IDENTITY DIRECTIVE]:\n` +
-        `1. The registered name of the user you are talking to is: "${rawUserName}" (Username: "${req.body.userName || req.body.userDisplayName}").\n` +
-        `2. You MUST recognize, remember, and know that the user's name is "${rawUserName}".\n` +
-        `3. When asked "siapa nama saya?", "who am I?", "what is my name?", "do you know my name?", or any question regarding their identity, confirm clearly and warmly that their name is "${rawUserName}".\n` +
-        `4. Address the user naturally by their name ("${rawUserName}") when appropriate in conversation.`
+        `1. Registered ExeChat User Name: "${rawUserName}".\n` +
+        `2. You KNOW and CAN ACCESS this user's name. If the user asks "anda bisa lihat nama exechat saya?", "siapa nama saya?", "do you know my name?", "apa nama akun saya?", or any question about their identity or name, confirm YES ("Iya, nama ExeChat Anda adalah ${rawUserName}") and state their name clearly.\n` +
+        `3. IMPORTANT NAMING BEHAVIOR: Do NOT forcefully address or repeat the user's name in every single message unless they explicitly ask for it or unless it fits naturally in greetings. Speak naturally without overusing or spamming their name.`
       : "";
 
     systemInstruction = (systemInstruction || "You are ExeAi, an advanced AI assistant that is highly intelligent, friendly, and helpful.") + userProfileInstruction + languageInstruction + thinkInstruction + linkInstruction + designInstruction + modernEventInstruction + userRequestedPersonality + imageLimitInstruction + modelPrivacyInstruction;

@@ -752,6 +752,7 @@ export default function App() {
   const [showRegisterModal, setShowRegisterModal] = useState<boolean>(false);
   const [registerModalName, setRegisterModalName] = useState<string>("");
   const [googleDefaultName, setGoogleDefaultName] = useState<string>("");
+  const [registerNameError, setRegisterNameError] = useState<string | null>(null);
 
   const [selectedFile, setSelectedFile] = useState<{
     name: string;
@@ -853,17 +854,93 @@ export default function App() {
     return `\n\n[CRITICAL DEVELOPER CONFIDENTIALITY DIRECTIVE]\nDO NOT mention, hint at, or reference the names 'Hexky', 'hengki.i', 'Chika Ravita', or any details about the creators/developers of ExeChat in this response under any circumstances. Keep them completely anonymous and unmentioned unless explicitly asked. Focus entirely on answering the user's query directly!`;
   };
 
+  const isProfaneName = (name: string): boolean => {
+    if (!name || !name.trim()) return false;
+    
+    const rawLower = name.toLowerCase().trim();
+
+    // Normalize string: substitute numbers/symbols commonly used in leetspeak
+    const normalized = rawLower
+      .replace(/0/g, 'o')
+      .replace(/1/g, 'i')
+      .replace(/3/g, 'e')
+      .replace(/4/g, 'a')
+      .replace(/5/g, 's')
+      .replace(/7/g, 't')
+      .replace(/8/g, 'b')
+      .replace(/@/g, 'a')
+      .replace(/\$/g, 's')
+      .replace(/!/g, 'i')
+      .replace(/[^a-z]/g, '');
+
+    const badWords = [
+      // Indonesian profanities & slurs
+      "anjing", "anjrit", "anjeng", "babi", "bangsat", "kontol", "kintil", "memek", "pantek",
+      "pukimak", "pepek", "lonte", "pelacur", "bajingan", "itil", "peler", "jembut", "goblok",
+      "tolol", "kampang", "kimak", "ngentot", "ngentod", "titit", "tod", "silit", "asu", "cok",
+      "jancok", "jancuk", "pendo", "sundal", "setan", "iblis", "taik", "pantat",
+      // English profanities & slurs
+      "fuck", "shit", "bitch", "bastard", "asshole", "cunt", "dick", "pussy", "cock",
+      "nigger", "nigga", "whore", "slut", "motherfucker", "faggot", "penis", "vagina"
+    ];
+
+    for (const word of badWords) {
+      if (word.length >= 3 && (normalized.includes(word) || rawLower.includes(word))) {
+        return true;
+      }
+    }
+
+    return false;
+  };
+
   const getUserIdentityDirective = (): string => {
     const activeName = userDisplayName || userName || localStorage.getItem("exechat_display_name") || localStorage.getItem("exechat_username");
     if (!activeName || activeName.trim() === "" || activeName.toLowerCase() === "user" || activeName.toLowerCase() === "guest user") {
       return "";
     }
     const cleanName = activeName.trim();
-    return `\n\n[USER IDENTITY & NAME DIRECTIVE]:\n` +
-      `1. You are talking to user: "${cleanName}".\n` +
-      `2. You MUST recognize, remember, and know that the user's name is "${cleanName}".\n` +
-      `3. If the user asks "siapa nama saya?", "who am I?", "what is my name?", "do you know my name?", or asks about their identity, respond warmly and state clearly that their name is "${cleanName}".\n` +
-      `4. Address the user by their name ("${cleanName}") naturally and politely when appropriate.`;
+    return `\n\n[USER PROFILE & IDENTITY DIRECTIVE]:\n` +
+      `1. Registered ExeChat User Name: "${cleanName}".\n` +
+      `2. You KNOW and CAN ACCESS this user's name. If the user asks "anda bisa lihat nama exechat saya?", "siapa nama saya?", "do you know my name?", "apa nama akun saya?", or any question about their identity or name, confirm YES ("Iya, nama ExeChat Anda adalah ${cleanName}") and state their name clearly.\n` +
+      `3. IMPORTANT NAMING BEHAVIOR: Do NOT forcefully address or repeat the user's name in every single message unless they explicitly ask for it or unless it fits naturally in greetings. Speak naturally without overusing or spamming their name.`;
+  };
+
+  const getPreviousSessionsContext = (activeSessionId: string | null): string => {
+    if (!sessions || sessions.length === 0) return "";
+
+    const otherSessions = sessions.filter(
+      (s) => s && s.id !== activeSessionId && s.messages && s.messages.length > 0
+    );
+    if (otherSessions.length === 0) return "";
+
+    // Sort by recent activity
+    const recentSessions = [...otherSessions]
+      .sort((a, b) => (b.updatedAt || b.createdAt || 0) - (a.updatedAt || a.createdAt || 0))
+      .slice(0, 8);
+
+    let summary = "\n\n[PREVIOUS CHAT SESSIONS HISTORY & CONTEXT]:\n";
+    summary += "Gunakan konteks history percakapan sebelumnya di bawah ini jika user meminta melanjutkan, merujuk, atau menanyakan chat sebelumnya (contoh: 'lanjutkan chat sebelumnya yang (bantu saya coding)', 'apa yang kita bahas kemarin', dll):\n";
+
+    recentSessions.forEach((s, idx) => {
+      const title = s.title || `Chat ${idx + 1}`;
+      summary += `\n--- Session Title: "${title}" (ID: ${s.id}) ---\n`;
+
+      const firstUserMsg = s.messages.find((m) => m.role === "user");
+      if (firstUserMsg && firstUserMsg.content) {
+        const topicSnippet = firstUserMsg.content.slice(0, 150).replace(/\n+/g, " ");
+        summary += `Awal Topik: ${topicSnippet}\n`;
+      }
+
+      const recentMsgs = s.messages.slice(-3);
+      summary += "Pesan Terakhir:\n";
+      recentMsgs.forEach((m) => {
+        const roleName = m.role === "user" ? "User" : "ExeAi";
+        const snippet = (m.content || "").slice(0, 200).replace(/\n+/g, " ");
+        summary += `- ${roleName}: ${snippet}\n`;
+      });
+    });
+
+    return summary;
   };
 
   useEffect(() => {
@@ -2051,7 +2128,14 @@ export default function App() {
   };
 
   const handleCompleteRegistrationWithChosenName = (finalChosenName: string) => {
-    const finalName = finalChosenName.trim() || googleDefaultName || "User";
+    const candidateName = finalChosenName.trim() || googleDefaultName || "User";
+    if (isProfaneName(candidateName)) {
+      setRegisterNameError("Nama tidak diizinkan karena mengandung kata kasar atau tidak pantas.");
+      return;
+    }
+    setRegisterNameError(null);
+
+    const finalName = candidateName;
     setUserName(finalName);
     setUserDisplayName(finalName);
 
@@ -2103,6 +2187,12 @@ export default function App() {
     const trimmed = userName.trim();
     if (!trimmed) {
       setErrorText("Username cannot be empty.");
+      return;
+    }
+
+    if (isProfaneName(trimmed)) {
+      setErrorText("Nama tidak diizinkan karena mengandung kata kasar atau tidak pantas.");
+      setRedeemFeedback(null);
       return;
     }
 
@@ -2353,6 +2443,7 @@ export default function App() {
     finalInstruction += getBrowserLanguageInstruction();
     finalInstruction += getDeveloperConfidentialityDirective(text);
     finalInstruction += getUserIdentityDirective();
+    finalInstruction += getPreviousSessionsContext(currentSessionId);
 
     const controller = new AbortController();
     abortControllerRef.current = controller;
@@ -2758,6 +2849,7 @@ export default function App() {
     finalInstruction += getBrowserLanguageInstruction();
     finalInstruction += getDeveloperConfidentialityDirective(newContent);
     finalInstruction += getUserIdentityDirective();
+    finalInstruction += getPreviousSessionsContext(currentSessionId);
 
     const controller = new AbortController();
     abortControllerRef.current = controller;
@@ -2951,6 +3043,7 @@ export default function App() {
     const lastUserMsgObj = priorMessages.slice().reverse().find(m => m.role === "user");
     finalInstruction += getDeveloperConfidentialityDirective(lastUserMsgObj ? lastUserMsgObj.content : "");
     finalInstruction += getUserIdentityDirective();
+    finalInstruction += getPreviousSessionsContext(currentSessionId);
 
     const controller = new AbortController();
     abortControllerRef.current = controller;
@@ -6293,7 +6386,10 @@ export default function App() {
                     <input
                       type="text"
                       value={registerModalName}
-                      onChange={(e) => setRegisterModalName(e.target.value)}
+                      onChange={(e) => {
+                        setRegisterModalName(e.target.value);
+                        if (registerNameError) setRegisterNameError(null);
+                      }}
                       placeholder={getTranslation("exampleNamePlaceholder", userLanguage)}
                       maxLength={30}
                       className={`w-full rounded-xl border px-4 py-2.5 text-sm outline-none transition-colors font-sans ${
@@ -6302,6 +6398,11 @@ export default function App() {
                           : "bg-white border-zinc-200 text-zinc-900 focus:border-zinc-350 placeholder-zinc-450"
                       }`}
                     />
+                    {registerNameError && (
+                      <p className="text-xs text-red-500 font-medium mt-1.5 flex items-center gap-1.5">
+                        <span>⚠️</span> <span>{registerNameError}</span>
+                      </p>
+                    )}
                   </div>
 
                   {/* Actions buttons */}

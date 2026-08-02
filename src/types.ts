@@ -25,6 +25,7 @@ export interface ChatSession {
   temperature: number;
   model: string;
   createdAt: number;
+  updatedAt?: number;
   webSearchEnabled?: boolean;
 }
 
