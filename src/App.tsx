@@ -363,39 +363,52 @@ export default function App() {
   const parseMessageThinking = (content: string) => {
     if (!content) return { thinking: null, actual: "", isThinking: false };
 
-    // Case-insensitive regex to find <think>...</think>
-    const thinkRegex = /<think>([\s\S]*?)<\/think>/gi;
-    const match = thinkRegex.exec(content);
+    const lowerContent = content.toLowerCase();
+    const closeIdx = lowerContent.indexOf("</think>");
 
-    if (match) {
-      const thinking = match[1].trim();
-      // Remove all <think>...</think> blocks from actual content to be absolutely sure they never leak
-      const actual = content.replace(thinkRegex, "").trim();
-      return { thinking: sanitizeAndShortenThought(thinking), actual, isThinking: false };
+    if (closeIdx !== -1) {
+      // Everything before </think> is part of the thinking process
+      const openIdx = lowerContent.indexOf("<think>");
+      let rawThinking = "";
+      if (openIdx !== -1 && openIdx < closeIdx) {
+        rawThinking = content.substring(openIdx + 7, closeIdx).trim();
+      } else {
+        // Missing opening <think> tag, take everything up to </think>
+        rawThinking = content.substring(0, closeIdx).trim();
+      }
+
+      // Actual user-visible response is strictly everything after </think>
+      let actual = content.substring(closeIdx + 8).trim();
+      actual = actual.replace(/<\/?think>/gi, "").trim();
+
+      return {
+        thinking: sanitizeAndShortenThought(rawThinking),
+        actual: actual,
+        isThinking: false
+      };
     }
 
-    // If there is an open <think> but no closing </think> (streaming)
-    const openThinkRegex = /<think>([\s\S]*?)$/i;
-    const openMatch = openThinkRegex.exec(content);
-    if (openMatch) {
-      const thinking = openMatch[1].trim();
-      const actual = content.replace(openThinkRegex, "").trim();
-      return { thinking: sanitizeAndShortenThought(thinking), actual, isThinking: true };
+    // If there is an open <think> but no closing </think> (streaming in progress)
+    const openIdx = lowerContent.indexOf("<think>");
+    if (openIdx !== -1) {
+      const rawThinking = content.substring(openIdx + 7).trim();
+      const actual = content.substring(0, openIdx).trim();
+      return {
+        thinking: sanitizeAndShortenThought(rawThinking),
+        actual: actual,
+        isThinking: true
+      };
     }
 
     // Check if the content starts or ends with a partial <think> tag (e.g. "<", "<t", "<th", etc.)
     const partialThinkRegex = /<(t(h(i(n(k)?)?)?)?)?$/i;
     if (partialThinkRegex.test(content) || /^<(t(h(i(n(k)?)?)?)?)?/i.test(content.trim())) {
-      if (!content.includes("</think>")) {
-        return { thinking: "", actual: "", isThinking: true };
-      }
+      return { thinking: "", actual: "", isThinking: true };
     }
 
-    // Just in case there is any stray/orphaned </think> or <think> in the text, clean them up
-    let cleaned = content;
-    cleaned = cleaned.replace(/<\/?think>/gi, "");
-
-    return { thinking: null, actual: cleaned.trim(), isThinking: false };
+    // Fallback: clean out any stray tags
+    let cleaned = content.replace(/<\/?think>/gi, "").trim();
+    return { thinking: null, actual: cleaned, isThinking: false };
   };
 
   const [sessions, setSessions] = useState<ChatSession[]>(() => {
@@ -3157,9 +3170,16 @@ export default function App() {
 
       // Filter out <think>...</think> blocks from voice synthesis
       let speakText = text || "";
-      speakText = speakText.replace(/<think>[\s\S]*?<\/think>/gi, "");
-      speakText = speakText.replace(/<think>[\s\S]*?$/gi, "");
-      speakText = speakText.replace(/<\/?think>/gi, "");
+      const closeIdx = speakText.toLowerCase().indexOf("</think>");
+      if (closeIdx !== -1) {
+        speakText = speakText.substring(closeIdx + 8);
+      } else {
+        const openIdx = speakText.toLowerCase().indexOf("<think>");
+        if (openIdx !== -1) {
+          speakText = speakText.substring(0, openIdx);
+        }
+      }
+      speakText = speakText.replace(/<\/?think>/gi, "").trim();
 
       const cleanText = speakText
         .replace(/```[\s\S]*?```/g, "") 

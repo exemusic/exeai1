@@ -1482,8 +1482,16 @@ body {
 
   const cleanDisplayContent = (text: string) => {
     if (!text) return "";
-    let cleaned = text.replace(/<think>[\s\S]*?<\/think>/gi, "");
-    cleaned = cleaned.replace(/<think>[\s\S]*$/gi, "");
+    let cleaned = text;
+    const closeIdx = cleaned.toLowerCase().indexOf("</think>");
+    if (closeIdx !== -1) {
+      cleaned = cleaned.substring(closeIdx + 8);
+    } else {
+      const openIdx = cleaned.toLowerCase().indexOf("<think>");
+      if (openIdx !== -1) {
+        cleaned = cleaned.substring(0, openIdx);
+      }
+    }
     cleaned = cleaned.replace(/<\/?think>/gi, "");
     cleaned = cleaned.replace(/```(?:json|javascript|js|html|css|typescript|ts)?[\s\S]*?(?:```|$)/gi, "");
     return cleaned.trim();
@@ -2367,26 +2375,30 @@ body {
       return { thinking: null, actual: "", isThinking: false };
     }
 
-    // Case-insensitive regex to find <think>...</think>
-    const thinkRegex = /<think>([\s\S]*?)<\/think>/gi;
-    const match = thinkRegex.exec(content);
+    const lowerContent = content.toLowerCase();
+    const closeIdx = lowerContent.indexOf("</think>");
 
-    if (match) {
-      const thinking = match[1].trim();
+    if (closeIdx !== -1) {
+      const openIdx = lowerContent.indexOf("<think>");
+      let rawThinking = "";
+      if (openIdx !== -1 && openIdx < closeIdx) {
+        rawThinking = content.substring(openIdx + 7, closeIdx).trim();
+      } else {
+        rawThinking = content.substring(0, closeIdx).trim();
+      }
+
       const actual = cleanDisplayContent(content);
-      return { thinking: sanitizeAndShortenThought(thinking), actual, isThinking: false };
+      return { thinking: sanitizeAndShortenThought(rawThinking), actual, isThinking: false };
     }
 
-    // If there is an open <think> but no closing </think> (streaming)
-    const openThinkRegex = /<think>([\s\S]*?)$/i;
-    const openMatch = openThinkRegex.exec(content);
-    if (openMatch) {
-      const thinking = openMatch[1].trim();
+    const openIdx = lowerContent.indexOf("<think>");
+    if (openIdx !== -1) {
+      const rawThinking = content.substring(openIdx + 7).trim();
       const actual = cleanDisplayContent(content);
-      return { thinking: sanitizeAndShortenThought(thinking), actual, isThinking: true };
+      return { thinking: sanitizeAndShortenThought(rawThinking), actual, isThinking: true };
     }
 
-    // Check if the content ends with a partial <think tag to prevent temporary flickering of partial tag
+    // Check if the content ends with a partial <think> tag
     const partialThinkRegex = /<t(h(i(n(k)?)?)?)?$/i;
     if (partialThinkRegex.test(content)) {
       const actual = cleanDisplayContent(content);
