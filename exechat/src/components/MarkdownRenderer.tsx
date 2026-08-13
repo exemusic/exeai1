@@ -1,0 +1,420 @@
+import React, { useState } from "react";
+import { Copy, Check, Terminal, Pencil, Save, X } from "lucide-react";
+import { motion } from "motion/react";
+
+interface MarkdownRendererProps {
+  content: string;
+}
+
+interface EditableCodeBlockProps {
+  initialCode: string;
+  language: string;
+  onCopy: (text: string) => void;
+  isCopied: boolean;
+}
+
+function EditableCodeBlock({ initialCode, language, onCopy, isCopied }: EditableCodeBlockProps) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [code, setCode] = useState(initialCode);
+  const [tempCode, setTempCode] = useState(initialCode);
+
+  const handleSave = () => {
+    setCode(tempCode);
+    setIsEditing(false);
+  };
+
+  const handleCancel = () => {
+    setTempCode(code);
+    setIsEditing(false);
+  };
+
+  return (
+    <div className="my-4 overflow-hidden rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-black font-mono text-sm shadow-lg shadow-black/40">
+      <div className="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800/80 bg-zinc-100/80 dark:bg-zinc-900/60 px-4 py-2 text-xs text-zinc-500 dark:text-zinc-400 select-none">
+        <div className="flex items-center gap-2">
+          <Terminal className="h-3.5 w-3.5 text-zinc-500" />
+          <span className="font-semibold text-zinc-600 dark:text-zinc-350">{language || "plaintext"}</span>
+          {code !== initialCode && (
+            <span className="text-[9px] bg-amber-500/15 text-amber-500 border border-amber-500/20 rounded px-1.5 py-0.5 font-sans font-semibold animate-pulse">
+              Edited by User
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-1.5">
+          {isEditing ? (
+            <>
+              <button
+                onClick={handleSave}
+                className="flex items-center gap-1 rounded-md px-2 py-1 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 font-sans font-semibold transition-all duration-200 cursor-pointer"
+                title="Save changes"
+              >
+                <Save className="h-3 w-3" />
+                <span>Save</span>
+              </button>
+              <button
+                onClick={handleCancel}
+                className="flex items-center gap-1 rounded-md px-2 py-1 bg-zinc-500/10 hover:bg-zinc-500/20 text-zinc-600 dark:text-zinc-400 font-sans font-semibold transition-all duration-200 cursor-pointer"
+                title="Cancel"
+              >
+                <X className="h-3 w-3" />
+                <span>Cancel</span>
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                onClick={() => setIsEditing(true)}
+                className="flex items-center gap-1 rounded-md px-2.5 py-1 hover:bg-zinc-200 dark:hover:bg-zinc-800 hover:text-zinc-700 dark:hover:text-zinc-200 font-sans font-medium transition-all duration-200 cursor-pointer"
+                title="Edit code"
+              >
+                <Pencil className="h-3 w-3 text-zinc-500 dark:text-zinc-400" />
+                <span>Edit</span>
+              </button>
+              <button
+                onClick={() => onCopy(code)}
+                className="flex items-center gap-1.5 rounded-md px-2 py-1 hover:bg-zinc-200 dark:hover:bg-zinc-800 hover:text-zinc-700 dark:hover:text-zinc-200 font-sans font-medium transition-all duration-200 cursor-pointer"
+              >
+                {isCopied ? (
+                  <>
+                    <Check className="h-3 w-3 text-emerald-400" />
+                    <span className="text-emerald-400 font-semibold">Copied!</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy className="h-3 w-3" />
+                    <span>Copy</span>
+                  </>
+                )}
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+
+      <div className="max-h-96 overflow-y-auto overflow-x-auto p-4 scrollbar-thin scrollbar-thumb-zinc-300 dark:scrollbar-thumb-zinc-850">
+        {isEditing ? (
+          <textarea
+            value={tempCode}
+            onChange={(e) => setTempCode(e.target.value)}
+            className="w-full bg-zinc-100 dark:bg-zinc-900/40 border border-zinc-200 dark:border-zinc-800/80 rounded-lg p-3 text-zinc-800 dark:text-zinc-200 font-mono text-xs md:text-sm leading-relaxed focus:outline-none focus:border-amber-500/50 resize-y min-h-[120px]"
+            rows={Math.min(code.split("\n").length + 1, 15)}
+          />
+        ) : (
+          <pre className="text-zinc-700 dark:text-zinc-300 leading-normal select-text">
+            <code>{code}</code>
+          </pre>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function preprocessMarkdown(text: string): string {
+  if (!text) return text;
+  
+  let processed = text;
+  const replacements: [RegExp, string][] = [
+    [/\\\(/g, "$"],
+    [/\\\)/g, "$"],
+    [/\\\[/g, "$$"],
+    [/\\\]/g, "$$"],
+    [/\\rightarrow/g, "→"],
+    [/\\to/g, "→"],
+    [/\\leftarrow/g, "←"],
+    [/\\uparrow/g, "↑"],
+    [/\\downarrow/g, "↓"],
+    [/\\leftrightarrow/g, "↔"],
+    [/\\implies/g, "⇒"],
+    [/\\impliedby/g, "⇐"],
+    [/\\iff/g, "⇔"],
+    [/\\geq/g, "≥"],
+    [/\\le/g, "≤"],
+    [/\\leq/g, "≤"],
+    [/\\geq/g, "≥"],
+    [/\\neq/g, "≠"],
+    [/\\ne/g, "≠"],
+    [/\\approx/g, "≈"],
+    [/\\times/g, "×"],
+    [/\\div/g, "÷"],
+    [/\\pm/g, "±"],
+    [/\\infty/g, "∞"],
+    [/\\in/g, "∈"],
+    [/\\notin/g, "∉"],
+    [/\\pi/g, "π"],
+    [/\\alpha/g, "α"],
+    [/\\beta/g, "β"],
+    [/\\gamma/g, "γ"],
+    [/\\delta/g, "δ"],
+    [/\\theta/g, "θ"],
+    [/\\lambda/g, "λ"],
+    [/\\sigma/g, "σ"],
+    [/\\omega/g, "ω"],
+    [/\\Delta/g, "Δ"],
+    [/\\Sigma/g, "Σ"],
+    [/\\Omega/g, "Ω"],
+  ];
+
+  for (const [pattern, replacement] of replacements) {
+    processed = processed.replace(pattern, replacement);
+  }
+
+  processed = processed.replace(/\$([^\$]+)\$/g, (match, p1) => {
+    return p1;
+  });
+
+  return processed;
+}
+
+export function MarkdownRenderer({ content }: MarkdownRendererProps) {
+  const [copiedText, setCopiedText] = useState<string | null>(null);
+
+  const handleCopy = (text: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedText(text);
+    setTimeout(() => setCopiedText(null), 2000);
+  };
+
+  if (!content) return null;
+
+  const preprocessedContent = preprocessMarkdown(content);
+  const parts = preprocessedContent.split(/(```[\s\S]*?```)/g);
+
+  return (
+    <div className="space-y-4 text-zinc-800 dark:text-zinc-100 font-sans leading-relaxed text-base md:text-[17px] min-w-0 max-w-full break-words [overflow-wrap:anywhere]">
+      {parts.map((part, index) => {
+
+        if (part.startsWith("```")) {
+          const match = part.match(/```(\w*)\n([\s\S]*?)```/);
+          const language = match ? match[1] : "code";
+          const code = match ? match[2] : part.slice(3, -3);
+          const isCopied = copiedText === code;
+
+          return (
+            <motion.div
+              key={index}
+              initial={{ opacity: 0, y: 3 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.2 }}
+            >
+              <EditableCodeBlock
+                initialCode={code}
+                language={language}
+                onCopy={handleCopy}
+                isCopied={isCopied}
+              />
+            </motion.div>
+          );
+        }
+
+        const lines = part.split("\n");
+        const renderedElements: React.ReactNode[] = [];
+        let listBuffer: { type: "ul" | "ol"; items: React.ReactNode[] } | null = null;
+
+        const flushListBuffer = (key: string | number) => {
+          if (!listBuffer) return;
+          if (listBuffer.type === "ul") {
+            renderedElements.push(
+              <ul key={`ul-${key}`} className="list-disc pl-6 my-3 space-y-1.5 text-zinc-700 dark:text-zinc-300">
+                {listBuffer.items}
+              </ul>
+            );
+          } else {
+            renderedElements.push(
+              <ol key={`ol-${key}`} className="list-decimal pl-6 my-3 space-y-1.5 text-zinc-700 dark:text-zinc-300">
+                {listBuffer.items}
+              </ol>
+            );
+          }
+          listBuffer = null;
+        };
+
+        const renderInlineStyles = (text: string): React.ReactNode[] => {
+          const inlineParts = text.split(/(\*\*.*?\*\*|\*.*?\*|`.*?`|\[.*?\]\(.*?\))/g);
+          return inlineParts.flatMap((inlinePart, subIdx) => {
+            if (inlinePart.startsWith("**") && inlinePart.endsWith("**")) {
+              return [
+                <strong key={subIdx} className="font-semibold text-zinc-900 dark:text-zinc-50">
+                  {inlinePart.slice(2, -2)}
+                </strong>
+              ];
+            }
+            if (inlinePart.startsWith("*") && inlinePart.endsWith("*")) {
+              return [
+                <em key={subIdx} className="italic text-zinc-650 dark:text-zinc-350">
+                  {inlinePart.slice(1, -1)}
+                </em>
+              ];
+            }
+            if (inlinePart.startsWith("`") && inlinePart.endsWith("`")) {
+              return [
+                <code
+                  key={subIdx}
+                  className="rounded bg-zinc-100 dark:bg-zinc-900/90 border border-zinc-200 dark:border-zinc-800 px-1.5 py-0.5 font-mono text-[13px] md:text-sm text-amber-600 dark:text-amber-400/90 break-words [overflow-wrap:anywhere]"
+                >
+                  {inlinePart.slice(1, -1)}
+                </code>
+              ];
+            }
+            if (inlinePart.startsWith("[") && inlinePart.includes("](")) {
+              const match = inlinePart.match(/\[(.*?)\]\((.*?)\)/);
+              if (match) {
+                const linkText = match[1];
+                let linkUrl = match[2];
+                
+                linkUrl = linkUrl.replace(/[…\.\s]+$/, "").trim();
+                if (linkUrl.endsWith("/…") || linkUrl.endsWith("/...")) {
+                  linkUrl = linkUrl.replace(/\/…$/, "").replace(/\/\.\.\.$/, "");
+                }
+                
+                return [
+                  <a
+                    key={subIdx}
+                    href={linkUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-amber-600 dark:text-amber-455 font-semibold hover:underline inline-flex items-center gap-0.5 transition-all duration-200 decoration-amber-500/40 hover:decoration-amber-500"
+                  >
+                    {linkText}
+                    <svg className="w-3.5 h-3.5 inline-block shrink-0" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                    </svg>
+                  </a>
+                ];
+              }
+            }
+            
+            const urlRegex = /(https?:\/\/[^\s]+)/g;
+            const segments = inlinePart.split(urlRegex);
+            return segments.map((seg, segIdx) => {
+              if (seg.match(/^https?:\/\//)) {
+                let cleanUrl = seg.replace(/[…\.\s]+$/, "").trim();
+                if (cleanUrl.endsWith("/…") || cleanUrl.endsWith("/...")) {
+                  cleanUrl = cleanUrl.replace(/\/…$/, "").replace(/\/\.\.\.$/, "");
+                }
+                return (
+                  <a
+                    key={`url-${subIdx}-${segIdx}`}
+                    href={cleanUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-amber-600 dark:text-amber-455 font-semibold hover:underline inline-flex items-center gap-0.5 transition-all duration-200 decoration-amber-500/40 hover:decoration-amber-500 break-all"
+                  >
+                    {cleanUrl}
+                    <svg className="w-3.5 h-3.5 inline-block shrink-0" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                    </svg>
+                  </a>
+                );
+              }
+              return seg;
+            });
+          });
+        };
+
+        lines.forEach((line, lineIdx) => {
+          const trimmed = line.trim();
+
+          if (trimmed === "---" || trimmed === "***" || trimmed === "___") {
+            flushListBuffer(lineIdx);
+            renderedElements.push(<hr key={lineIdx} className="my-5 border-zinc-850 border-t" />);
+            return;
+          }
+
+          if (trimmed.startsWith("### ")) {
+            flushListBuffer(lineIdx);
+            renderedElements.push(
+              <h4 key={lineIdx} className="text-lg md:text-[19px] font-semibold text-zinc-900 dark:text-zinc-50 tracking-tight mt-5 mb-2">
+                {renderInlineStyles(trimmed.slice(4))}
+              </h4>
+            );
+            return;
+          }
+          if (trimmed.startsWith("## ")) {
+            flushListBuffer(lineIdx);
+            renderedElements.push(
+              <h3 key={lineIdx} className="text-xl md:text-2xl font-semibold text-zinc-900 dark:text-zinc-50 tracking-tight mt-6 mb-2">
+                {renderInlineStyles(trimmed.slice(3))}
+              </h3>
+            );
+            return;
+          }
+          if (trimmed.startsWith("# ")) {
+            flushListBuffer(lineIdx);
+            renderedElements.push(
+              <h2 key={lineIdx} className="text-2xl md:text-3xl font-bold text-zinc-900 dark:text-zinc-50 tracking-tight mt-7 mb-3">
+                {renderInlineStyles(trimmed.slice(2))}
+              </h2>
+            );
+            return;
+          }
+
+          if (trimmed.startsWith("> ")) {
+            flushListBuffer(lineIdx);
+            renderedElements.push(
+              <blockquote
+                key={lineIdx}
+                className="my-3 border-l-4 border-zinc-450 dark:border-zinc-700 bg-zinc-100 dark:bg-zinc-900/30 px-4 py-2 italic text-zinc-650 dark:text-zinc-400 rounded-r-md"
+              >
+                {renderInlineStyles(trimmed.slice(2))}
+              </blockquote>
+            );
+            return;
+          }
+
+          const ulMatch = line.match(/^(\s*)([-*+])\s+(.*)/);
+          if (ulMatch) {
+            const listContent = ulMatch[3];
+            const liItem = <li key={`li-${lineIdx}`}>{renderInlineStyles(listContent)}</li>;
+
+            if (listBuffer && listBuffer.type === "ul") {
+              listBuffer.items.push(liItem);
+            } else {
+              flushListBuffer(lineIdx);
+              listBuffer = { type: "ul", items: [liItem] };
+            }
+            return;
+          }
+
+          const olMatch = line.match(/^(\s*)(\d+)\.\s+(.*)/);
+          if (olMatch) {
+            const listContent = olMatch[3];
+            const liItem = <li key={`li-${lineIdx}`}>{renderInlineStyles(listContent)}</li>;
+
+            if (listBuffer && listBuffer.type === "ol") {
+              listBuffer.items.push(liItem);
+            } else {
+              flushListBuffer(lineIdx);
+              listBuffer = { type: "ol", items: [liItem] };
+            }
+            return;
+          }
+
+          if (trimmed === "") {
+            flushListBuffer(lineIdx);
+            return;
+          }
+
+          flushListBuffer(lineIdx);
+          renderedElements.push(
+            <p key={lineIdx} className="text-zinc-700 dark:text-zinc-300 leading-relaxed mb-3 last:mb-0 break-words [overflow-wrap:anywhere]">
+              {renderInlineStyles(line)}
+            </p>
+          );
+        });
+
+        flushListBuffer(`end-${index}`);
+
+        return (
+          <motion.div
+            key={index}
+            initial={{ opacity: 0, y: 3 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.2 }}
+          >
+            {renderedElements}
+          </motion.div>
+        );
+      })}
+    </div>
+  );
+}
