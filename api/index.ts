@@ -1844,7 +1844,7 @@ function handleGeminiError(err: any, res: any) {
   res.write(`data: ${JSON.stringify({ error: errMsg })}\n\n`);
 }
 
-async function streamGroq(messages: any[], systemInstruction: string, temperature: number, res: any) {
+async function streamGroq(messages: any[], systemInstruction: string, temperature: number, res: any, modelName: string = "qwen/qwen3.8-27b") {
   const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) {
     res.write(`data: ${JSON.stringify({ error: "Groq API Key (GROQ_API_KEY) has not been configured on the server. Please contact admin or add it to .env." })}\n\n`);
@@ -1870,7 +1870,7 @@ async function streamGroq(messages: any[], systemInstruction: string, temperatur
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      model: "llama-3.1-8b-instant",
+      model: modelName,
       messages: allMessages,
       temperature: temperature !== undefined ? Number(temperature) : 0.7,
       stream: true,
@@ -2019,7 +2019,7 @@ app.post("/api/chat/stream", async (req, res) => {
       "5. Today's date is Thursday, July 23, 2026.";
 
     const modelPrivacyInstruction = "\n\n[CONFIDENTIALITY DIRECTIVE - PROPRIETARY MODEL ARCHITECTURE]:\n" +
-      "1. ExeAi models (ExeAi 5:5:9 latest, ExeAi 1.0 Fleet, ExeAi 1.0 Pro) are proprietary AI models built and developed by Hexky and Chika Ravita for ExeChat.\n" +
+      "1. ExeAi models (ExeAi 5:5:9 latest, ExeAi 1.0 Pro) are proprietary AI models built and developed by Hexky and Chika Ravita for ExeChat.\n" +
       "2. STAIN & PRIVACY RULE: NEVER mention, acknowledge, or reveal any underlying third-party base models, engines, or architecture names (such as Gemma, GPT, Llama, Zai, Claude, Gemini, Groq, Cerebras, etc.).\n" +
       "3. If any user asks about your underlying model, engine, architecture, or who built your model, state strictly that you are powered by ExeChat's custom proprietary ExeAi architecture developed by Hexky and Chika Ravita.";
 
@@ -2073,7 +2073,7 @@ app.post("/api/chat/stream", async (req, res) => {
       return res.end();
     }
 
-    if (activeModel === "llama-3.1-8b-instant") {
+    if (activeModel === "qwen/qwen3.8-27b" || activeModel === "llama-3.1-8b-instant") {
       const currentDateStr = new Date().toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
       const groqSpecialPrompt = `You are ExeChat, also known as ExeAI. You are a helpful, maximally truthful, and witty AI built to be fun to talk with.
 
@@ -2102,7 +2102,8 @@ Current date: ${currentDateStr} (use this when needed).
 Respond in the same language as the user.`;
 
       const groqSystemInstruction = groqSpecialPrompt + thinkInstruction + linkInstruction + designInstruction;
-      await streamGroq(messages, groqSystemInstruction, temperature, res);
+      const targetGroqModel = activeModel === "llama-3.1-8b-instant" ? "qwen/qwen3.8-27b" : activeModel;
+      await streamGroq(messages, groqSystemInstruction, temperature, res, targetGroqModel);
       res.write("data: [DONE]\n\n");
       return res.end();
     }
@@ -2125,6 +2126,8 @@ Respond in the same language as the user.`;
 
     const allMessages = [systemMessage, ...mappedMessages];
 
+    const cerebrasModel = activeModel === "gpt-oss-120b" ? "gpt-oss-120b" : "gemma-4-31b";
+
     const response = await fetch("https://api.cerebras.ai/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -2132,7 +2135,7 @@ Respond in the same language as the user.`;
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model,
+        model: cerebrasModel,
         messages: allMessages,
         temperature: temperature !== undefined ? Number(temperature) : 0.7,
         stream: true,

@@ -108,6 +108,9 @@ interface TypewriterMessageProps {
   parseMessageThinking: (content: string) => { thinking: string | null; actual: string; isThinking: boolean };
   thinkingDuration?: number;
   language: string;
+  isError?: boolean;
+  errorMessage?: string;
+  onRetry?: () => void;
 }
 
 function TypewriterMessage({
@@ -120,7 +123,10 @@ function TypewriterMessage({
   setExpandedThoughts,
   parseMessageThinking,
   thinkingDuration,
-  language
+  language,
+  isError,
+  errorMessage,
+  onRetry
 }: TypewriterMessageProps) {
   const [displayedContent, setDisplayedContent] = useState(() => {
     return (isLatest && isGenerating) ? "" : content;
@@ -129,7 +135,7 @@ function TypewriterMessage({
   const pauseCounterRef = useRef(0);
 
   useEffect(() => {
-    if (!isLatest || !isGenerating) {
+    if (!isLatest || !isGenerating || isError) {
       setDisplayedContent(content);
       currentIdxRef.current = content.length;
       return;
@@ -189,17 +195,50 @@ function TypewriterMessage({
 
     animationFrameId = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(animationFrameId);
-  }, [content, isLatest, isGenerating]);
+  }, [content, isLatest, isGenerating, isError]);
 
   useEffect(() => {
-    if (!isLatest) {
+    if (!isLatest || isError) {
       setDisplayedContent(content);
     }
-  }, [content, isLatest]);
+  }, [content, isLatest, isError]);
+
+  // If message explicitly encountered an error
+  if (isError) {
+    const errorTextToShow = errorMessage || content || getTranslation("noResponseGenerated", language);
+    return (
+      <div className="rounded-2xl border border-red-500/20 bg-red-500/10 dark:bg-red-950/30 p-4 text-xs sm:text-sm text-red-700 dark:text-red-300 font-sans flex flex-col gap-3 w-full max-w-lg shadow-sm">
+        <div className="flex items-start gap-3">
+          <div className="p-2 rounded-xl bg-red-500/20 text-red-600 dark:text-red-400 shrink-0">
+            <AlertCircle className="h-4 w-4" />
+          </div>
+          <div className="flex flex-col gap-1 min-w-0">
+            <span className="font-semibold text-red-900 dark:text-red-100 text-sm">
+              {language === "id" ? "Gagal Memproses Respons" : "Generation Error"}
+            </span>
+            <p className="text-xs text-red-700/90 dark:text-red-300/90 leading-relaxed break-words">
+              {errorTextToShow}
+            </p>
+          </div>
+        </div>
+        {onRetry && (
+          <div className="flex items-center gap-2 pt-2 border-t border-red-500/20">
+            <button
+              onClick={onRetry}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-red-600 hover:bg-red-700 text-white font-medium text-xs cursor-pointer shadow-sm transition-all active:scale-95"
+            >
+              <RotateCw className="h-3.5 w-3.5" />
+              <span>{language === "id" ? "Coba Lagi" : "Retry"}</span>
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  }
 
   const fullParsed = parseMessageThinking(content);
   const { thinking, actual, isThinking } = parseMessageThinking(displayedContent);
-  const effectiveIsThinking = isThinking || (fullParsed.isThinking && !actual);
+  const effectiveIsThinking = isGenerating && (isThinking || (fullParsed.isThinking && !actual));
   const effectiveThinking = thinking || fullParsed.thinking;
   const duration = thinkingDuration || 2;
 
@@ -2576,11 +2615,18 @@ export default function App() {
             break;
           }
 
+          let parsed: any = null;
           try {
-            const parsed = JSON.parse(dataString);
+            parsed = JSON.parse(dataString);
+          } catch (parseErr) {
+            continue;
+          }
+
+          if (parsed) {
             if (parsed.error) {
               throw new Error(parsed.error);
             }
+
             if (parsed.text) {
               if (!thinkingStartTimesRef.current[assistantMsgId]) {
                 thinkingStartTimesRef.current[assistantMsgId] = Date.now();
@@ -2612,7 +2658,9 @@ export default function App() {
                           return {
                             ...m,
                             content: newContent,
-                            thinkingDuration
+                            thinkingDuration,
+                            isError: false,
+                            errorMessage: undefined
                           };
                         }
                         if (m && m.isPending) {
@@ -2625,32 +2673,6 @@ export default function App() {
                   return s;
                 })
               );
-            }
-          } catch (e: any) {
-            const messageLower = (dataString || "").toLowerCase();
-            const errMsg = (e && e.message) ? e.message.toLowerCase() : "";
-
-            if (errMsg.includes("cerebras") || messageLower.includes("too_many_requests") || messageLower.includes("queue_exceeded") || errMsg.includes("queue_exceeded") || errMsg.includes("too_many_requests")) {
-
-              setSessions((prev) =>
-                (prev || []).map((s) => {
-                  if (s && s.id === targetSessionId) {
-                    const msgs = Array.isArray(s.messages) ? s.messages : [];
-                    return {
-                      ...s,
-                      messages: msgs.map((m) =>
-                        m && m.id === assistantMsgId
-                          ? { ...m, content: (m.content || "") + "\n\nServer is busy at this time. Please try again later." }
-                          : m
-                      ),
-                    };
-                  }
-                  return s;
-                })
-              );
-              console.warn("Cerebras busy/rate-limited — user notified.");
-            } else {
-              console.warn("Error parsing stream chunk:", e);
             }
           }
         }
@@ -2676,48 +2698,41 @@ export default function App() {
       if (err.name === "AbortError") {
         console.log("Stream generation aborted by user.");
       } else {
-        const msg = (err && err.message) ? err.message.toLowerCase() : "";
-        if (msg.includes("cerebras") || msg.includes("too_many_requests") || msg.includes("queue_exceeded") || msg.includes("429")) {
-
-          setErrorText("Server is busy. Please try again later.");
-          setSessions((prev) =>
-            (prev || []).map((s) => {
-              if (s && s.id === targetSessionId) {
-                const msgs = Array.isArray(s.messages) ? s.messages : [];
-                return {
-                  ...s,
-                  messages: msgs.map((m) =>
-                    m && m.id === assistantMsgId && m.content === ""
-                      ? { ...m, content: "Server is busy at this time. Please try again later." }
-                      : m
-                  ),
-                };
-              }
-              return s;
-            })
-          );
-          console.warn("Cerebras busy/rate-limited — user notified.");
-        } else {
-          console.error("Stream reader error:", err);
-          setErrorText(err.message || "An error occurred while processing the response.");
-
-          setSessions((prev) =>
-            (prev || []).map((s) => {
-              if (s && s.id === targetSessionId) {
-                const msgs = Array.isArray(s.messages) ? s.messages : [];
-                return {
-                  ...s,
-                  messages: msgs.map((m) =>
-                    m && m.id === assistantMsgId && m.content === ""
-                      ? { ...m, content: "A connection error or API Key configuration issue occurred. Please refresh the page if the issue persists." }
-                      : m
-                  ),
-                };
-              }
-              return s;
-            })
-          );
+        const msg = (err && err.message) ? err.message : "";
+        const msgLower = msg.toLowerCase();
+        let errorDisplayMsg = msg || "A connection error occurred while generating the response.";
+        if (msgLower.includes("cerebras") || msgLower.includes("too_many_requests") || msgLower.includes("queue_exceeded") || msgLower.includes("429")) {
+          errorDisplayMsg = userLanguage === "id" ? "Server sedang sibuk. Silakan coba beberapa saat lagi." : "Server is busy at this time. Please try again later.";
         }
+
+        setErrorText(errorDisplayMsg);
+
+        setSessions((prev) =>
+          (prev || []).map((s) => {
+            if (s && s.id === targetSessionId) {
+              const msgs = Array.isArray(s.messages) ? s.messages : [];
+              return {
+                ...s,
+                messages: msgs.map((m) => {
+                  if (m && m.id === assistantMsgId) {
+                    const parsed = parseMessageThinking(m.content || "");
+                    if (!parsed.actual) {
+                      return {
+                        ...m,
+                        content: "",
+                        isError: true,
+                        errorMessage: errorDisplayMsg,
+                        isPending: false
+                      };
+                    }
+                  }
+                  return m;
+                }),
+              };
+            }
+            return s;
+          })
+        );
       }
     } finally {
       setIsGenerating(false);
@@ -2912,8 +2927,18 @@ export default function App() {
         for (const line of lines) {
           const trimmed = line.trim();
           if (trimmed.startsWith("data:")) {
+            let parsed: any = null;
             try {
-              const parsed = JSON.parse(trimmed.substring(5));
+              parsed = JSON.parse(trimmed.substring(5).trim());
+            } catch (err) {
+              continue;
+            }
+
+            if (parsed) {
+              if (parsed.error) {
+                throw new Error(parsed.error);
+              }
+
               if (parsed.text) {
                 if (!thinkingStartTimesRef.current[assistantMsgId]) {
                   thinkingStartTimesRef.current[assistantMsgId] = Date.now();
@@ -2939,7 +2964,13 @@ export default function App() {
                               thinkingDuration = Math.max(0.1, Number(((Date.now() - startTime) / 1000).toFixed(1)));
                             }
                           }
-                          return { ...m, content: accumulatedText, thinkingDuration };
+                          return {
+                            ...m,
+                            content: accumulatedText,
+                            thinkingDuration,
+                            isError: false,
+                            errorMessage: undefined
+                          };
                         }
                         return m;
                       });
@@ -2949,14 +2980,47 @@ export default function App() {
                   })
                 );
               }
-            } catch (err) {
             }
           }
         }
       }
     } catch (err: any) {
       if (err.name !== "AbortError") {
-        setErrorText("An error occurred during response generation: " + err.message);
+        const msg = (err && err.message) ? err.message : "";
+        const msgLower = msg.toLowerCase();
+        let errorDisplayMsg = msg || "An error occurred during response generation.";
+        if (msgLower.includes("cerebras") || msgLower.includes("too_many_requests") || msgLower.includes("queue_exceeded") || msgLower.includes("429")) {
+          errorDisplayMsg = userLanguage === "id" ? "Server sedang sibuk. Silakan coba beberapa saat lagi." : "Server is busy at this time. Please try again later.";
+        }
+
+        setErrorText(errorDisplayMsg);
+
+        setSessions((prev) =>
+          (prev || []).map((s) => {
+            if (s && s.id === currentSessionId) {
+              const msgs = Array.isArray(s.messages) ? s.messages : [];
+              return {
+                ...s,
+                messages: msgs.map((m) => {
+                  if (m && m.id === assistantMsgId) {
+                    const parsed = parseMessageThinking(m.content || "");
+                    if (!parsed.actual) {
+                      return {
+                        ...m,
+                        content: "",
+                        isError: true,
+                        errorMessage: errorDisplayMsg,
+                        isPending: false
+                      };
+                    }
+                  }
+                  return m;
+                }),
+              };
+            }
+            return s;
+          })
+        );
       }
     } finally {
       setIsGenerating(false);
@@ -3106,8 +3170,18 @@ export default function App() {
         for (const line of lines) {
           const trimmed = line.trim();
           if (trimmed.startsWith("data:")) {
+            let parsed: any = null;
             try {
-              const parsed = JSON.parse(trimmed.substring(5));
+              parsed = JSON.parse(trimmed.substring(5).trim());
+            } catch (err) {
+              continue;
+            }
+
+            if (parsed) {
+              if (parsed.error) {
+                throw new Error(parsed.error);
+              }
+
               if (parsed.text) {
                 if (!thinkingStartTimesRef.current[assistantMsgId]) {
                   thinkingStartTimesRef.current[assistantMsgId] = Date.now();
@@ -3133,7 +3207,13 @@ export default function App() {
                               thinkingDuration = Math.max(0.1, Number(((Date.now() - startTime) / 1000).toFixed(1)));
                             }
                           }
-                          return { ...m, content: accumulatedText, thinkingDuration };
+                          return {
+                            ...m,
+                            content: accumulatedText,
+                            thinkingDuration,
+                            isError: false,
+                            errorMessage: undefined
+                          };
                         }
                         return m;
                       });
@@ -3143,15 +3223,47 @@ export default function App() {
                   })
                 );
               }
-            } catch (err) {
-
             }
           }
         }
       }
     } catch (err: any) {
       if (err.name !== "AbortError") {
-        setErrorText("An error occurred during response regeneration: " + err.message);
+        const msg = (err && err.message) ? err.message : "";
+        const msgLower = msg.toLowerCase();
+        let errorDisplayMsg = msg || "An error occurred during response regeneration.";
+        if (msgLower.includes("cerebras") || msgLower.includes("too_many_requests") || msgLower.includes("queue_exceeded") || msgLower.includes("429")) {
+          errorDisplayMsg = userLanguage === "id" ? "Server sedang sibuk. Silakan coba beberapa saat lagi." : "Server is busy at this time. Please try again later.";
+        }
+
+        setErrorText(errorDisplayMsg);
+
+        setSessions((prev) =>
+          (prev || []).map((s) => {
+            if (s && s.id === currentSessionId) {
+              const msgs = Array.isArray(s.messages) ? s.messages : [];
+              return {
+                ...s,
+                messages: msgs.map((m) => {
+                  if (m && m.id === assistantMsgId) {
+                    const parsed = parseMessageThinking(m.content || "");
+                    if (!parsed.actual) {
+                      return {
+                        ...m,
+                        content: "",
+                        isError: true,
+                        errorMessage: errorDisplayMsg,
+                        isPending: false
+                      };
+                    }
+                  }
+                  return m;
+                }),
+              };
+            }
+            return s;
+          })
+        );
       }
     } finally {
       setIsGenerating(false);
@@ -4703,6 +4815,9 @@ export default function App() {
                                     parseMessageThinking={parseMessageThinking}
                                     thinkingDuration={msg.thinkingDuration}
                                     language={userLanguage}
+                                    isError={msg.isError}
+                                    errorMessage={msg.errorMessage}
+                                    onRetry={() => handleRegenerateMessage(msg.id)}
                                   />
 
                                   {isSpeaking && (
@@ -4715,7 +4830,7 @@ export default function App() {
                               )
                             )}
 
-                            {!isUser && msg.content !== "" && !(isGenerating && index === currentSession.messages.length - 1) && (
+                            {!isUser && !msg.isError && msg.content !== "" && !(isGenerating && index === currentSession.messages.length - 1) && (
                               <div className="flex items-center gap-1 sm:gap-2 mt-3 select-none text-zinc-400 dark:text-zinc-500">
                                 <button
                                   onClick={() => {

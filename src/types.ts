@@ -5,6 +5,8 @@ export interface Message {
   timestamp: number;
   thinkingDuration?: number;
   isPending?: boolean;
+  isError?: boolean;
+  errorMessage?: string;
   routedModelId?: string;
   attachment?: {
     type: "audio" | "image" | "file";
