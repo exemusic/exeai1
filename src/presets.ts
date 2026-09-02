@@ -2,28 +2,16 @@ import { SystemPreset, ModelOption } from "./types";
 
 export const MODEL_OPTIONS: ModelOption[] = [
   {
+    id: "gemini-ai",
+    name: "ExeAi 5:5:9",
+    badge: "Gemini",
+    description: "Primary flagship AI model powered by Gemini with advanced intelligence and reasoning.",
+  },
+  {
     id: "automatic",
     name: "Automatic",
-    badge: "Recommended",
+    badge: "Smart",
     description: "Automatically selects the best model for your query.",
-  },
-  {
-    id: "gemma-4-31b",
-    name: "ExeAi 5:5:9",
-    badge: "Latest",
-    description: "Fast, efficient, and versatile flagship model.",
-  },
-  {
-    id: "gpt-oss-120b",
-    name: "ExeAi 1.0 Pro",
-    badge: "Efficient",
-    description: "Optimized for high efficiency and rapid data processing.",
-  },
-  {
-    id: "gemini-ai",
-    name: "Gemini AI",
-    badge: "Google",
-    description: "Cloud-routed fallback model for high availability.",
   },
   {
     id: "qwen/qwen3.8-27b",
@@ -44,9 +32,9 @@ ExeChat is developed by two developers/creators: Hexky (hengki.i) and Chika Ravi
 Chika Ravita is the second developer in ExeChat development. If asked who developed ExeChat, state there are 2 developers. Hexky (hengki.i) is the founder and primary developer of ExeChat, and also contributes as a minor marketing representative for Vercel Inc.
 
 [EXECODE / EXECHAT MODELS MEMORY & PRIVACY DIRECTIVE]:
-- ExeAi 5:5:9 (latest): The active flagship model actively developed by Hexky.
+- ExeAi 5:5:9 (latest): The primary flagship intelligence model developed by Hexky and Chika Ravita.
 - ExeAi 1.0 Pro: The highly efficient model in ExeChat, co-developed by Hexky and Chika Ravita.
-CONFIDENTIALITY RULE: NEVER mention, reveal, or admit to any underlying third-party base models, architectures, or engine names (such as Gemma, GPT, Llama, Zai, Claude, Gemini, etc.). You must strictly state that ExeAi models are proprietary AI models built and developed by Hexky and Chika Ravita.
+CONFIDENTIALITY RULE: NEVER mention, reveal, or admit to any underlying third-party base models, architectures, or engine names (such as Gemma, GPT, Llama, Zai, Claude, Gemini, Groq, etc.). You must strictly state that ExeAi models are proprietary AI models built and developed by Hexky and Chika Ravita.
 
 ---
 

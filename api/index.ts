@@ -44,14 +44,14 @@ function getCreditCost(text: string): number {
   return 4;
 }
 
-function getCerebrasApiKey() {
-  return process.env.CEREBRAS_API_KEY;
+function getGeminiApiKey() {
+  return process.env.GEMINI_API_KEY;
 }
 
 app.get("/api/health", (req, res) => {
   res.json({
     status: "ok",
-    hasApiKey: !!getCerebrasApiKey()
+    hasApiKey: !!getGeminiApiKey()
   });
 });
 
@@ -1543,8 +1543,13 @@ async function streamGemini(
     keysToTry.push({ key: geminiKey2, name: "Backup" });
   }
 
+  if (keysToTry.length === 0) {
+    handleGeminiError(new Error("Gemini API Key (GEMINI_API_KEY) has not been configured in server environment or Settings > Secrets."), res);
+    return;
+  }
+
   const contents = messages.map((m: any) => {
-    const parts: any[] = [{ text: m.content }];
+    const parts: any[] = [{ text: m.content || "" }];
     if (m.attachment && m.attachment.type === "image" && m.attachment.base64) {
       const parsed = parseBase64(m.attachment.base64);
       if (parsed) {
@@ -1567,31 +1572,10 @@ async function streamGemini(
     temperature: temperature !== undefined ? Number(temperature) : 0.7
   };
 
-  // Start the thinking block
-  let thinkText = "<think>[ExeAI System] Initializing connection...\n";
-  if (redirectedForImage) {
-    thinkText = "<think>[ExeAI System] Attached image file detected.\n• Automatically routing processing to Gemini Vision Engine...\n";
-  } else {
-    thinkText = "<think>[ExeAI System] Connecting to Gemini Engine...\n";
-  }
-  res.write(`data: ${JSON.stringify({ text: thinkText })}\n\n`);
-
-  if (keysToTry.length === 0) {
-    console.warn("No valid Gemini API keys defined. Falling back directly to ExeAI (Cerebras)...");
-    try {
-      res.write(`data: ${JSON.stringify({ text: "• Failed: Google API Key not configured on server.\n• Dynamically routing to ExeAI Engine...\n</think>\n\n*(System did not detect Google API Key, dynamically redirecting to ExeAI Engine...)*\n\n" })}\n\n`);
-      await runCerebrasModel("gemma-4-31b", messages, systemInstruction, temperature, res);
-      return;
-    } catch (err3: any) {
-      handleGeminiError(err3, res);
-      return;
-    }
-  }
+  let lastError: any = null;
 
   for (let i = 0; i < keysToTry.length; i++) {
-    const { key, name } = keysToTry[i];
-    const isBackup = i > 0;
-    const keyLabel = isBackup ? "Backup (Option 2)" : "Primary (Option 1)";
+    const { key } = keysToTry[i];
     
     const ai = new GoogleGenAI({
       apiKey: key,
@@ -1602,229 +1586,24 @@ async function streamGemini(
       }
     });
 
-    res.write(`data: ${JSON.stringify({ text: `• Connecting with API Key ${keyLabel}...\n` })}\n\n`);
+    const modelsToTry = ["gemini-2.5-flash", "gemini-3.6-flash", "gemini-2.5-flash-lite"];
 
-    // Model 1: gemini-3.6-flash (with up to 2 retry attempts)
-    let successModel1 = false;
-    for (let attempt = 1; attempt <= 2; attempt++) {
-      const model1Start = Date.now();
-      const attemptLabel = attempt > 1 ? ` (Attempt ${attempt})` : "";
-      res.write(`data: ${JSON.stringify({ text: `  - Connecting to model: gemini-3.6-flash${attemptLabel}...\n` })}\n\n`);
+    for (const modelName of modelsToTry) {
       try {
-        await runGeminiModel(ai, "gemini-3.6-flash", contents, config, webSearchEnabled, res, true, (duration) => {
-          res.write(`data: ${JSON.stringify({ text: `  - [Success] Connected to gemini-3.6-flash in ${duration}ms.\n  - [System] Starting visual analysis and response processing...\n\n` })}\n\n`);
-        });
-        successModel1 = true;
-        break;
-      } catch (err1: any) {
-        const duration1 = Date.now() - model1Start;
-        const errStr1 = String(err1.message || JSON.stringify(err1));
-        res.write(`data: ${JSON.stringify({ text: `  - [Failed] gemini-3.6-flash${attemptLabel} (${duration1}ms): ${errStr1.substring(0, 100)}\n` })}\n\n`);
-        
-        const isSevereKeyError = errStr1.toLowerCase().includes("not valid") || 
-                                 errStr1.toLowerCase().includes("invalid") || 
-                                 errStr1.toLowerCase().includes("expired") || 
-                                 errStr1.toLowerCase().includes("key_invalid") || 
-                                 errStr1.toLowerCase().includes("unauthorized") || 
-                                 errStr1.toLowerCase().includes("forbidden") || 
-                                 errStr1.toLowerCase().includes("quota") || 
-                                 errStr1.toLowerCase().includes("exhausted") || 
-                                 errStr1.toLowerCase().includes("429") || 
-                                 errStr1.toLowerCase().includes("limit");
-
-        if (isSevereKeyError) {
-          if (i < keysToTry.length - 1) {
-            res.write(`data: ${JSON.stringify({ text: `  - [System] Credential/quota issue detected on key ${keyLabel}. Switching to backup key...\n` })}\n\n`);
-          }
-          break; // Stop attempts for this key, proceed to next key
+        const success = await runGeminiModel(ai, modelName, contents, config, webSearchEnabled, res, false);
+        if (success) {
+          return;
         }
-
-        if (attempt < 2) {
-          res.write(`data: ${JSON.stringify({ text: `  - [System] Temporary error occurred (e.g. high load / 503). Retrying in 800ms...\n` })}\n\n`);
-          await new Promise(resolve => setTimeout(resolve, 800));
-        }
+      } catch (err: any) {
+        lastError = err;
+        const errStr = String(err.message || JSON.stringify(err));
+        console.warn(`[Gemini Engine] Attempt on ${modelName} with key ${i + 1} failed:`, errStr.substring(0, 120));
       }
-    }
-
-    if (successModel1) return;
-
-    // Model 2: gemini-3.1-flash-lite (with up to 2 retry attempts)
-    let successModel2 = false;
-    for (let attempt2 = 1; attempt2 <= 2; attempt2++) {
-      const model2Start = Date.now();
-      const attemptLabel2 = attempt2 > 1 ? ` (Attempt ${attempt2})` : "";
-      res.write(`data: ${JSON.stringify({ text: `  - Trying alternative route model: gemini-3.1-flash-lite${attemptLabel2}...\n` })}\n\n`);
-      try {
-        await runGeminiModel(ai, "gemini-3.1-flash-lite", contents, config, webSearchEnabled, res, true, (duration) => {
-          res.write(`data: ${JSON.stringify({ text: `  - [Success] Connected to gemini-3.1-flash-lite in ${duration}ms.\n  - [System] Starting alternative visual analysis...\n\n` })}\n\n`);
-        });
-        successModel2 = true;
-        break;
-      } catch (err2: any) {
-        const duration2 = Date.now() - model2Start;
-        const errStr2 = String(err2.message || JSON.stringify(err2));
-        res.write(`data: ${JSON.stringify({ text: `  - [Failed] gemini-3.1-flash-lite${attemptLabel2} (${duration2}ms): ${errStr2.substring(0, 100)}\n` })}\n\n`);
-        
-        const isSevereKeyError = errStr2.toLowerCase().includes("not valid") || 
-                                 errStr2.toLowerCase().includes("invalid") || 
-                                 errStr2.toLowerCase().includes("expired") || 
-                                 errStr2.toLowerCase().includes("key_invalid") || 
-                                 errStr2.toLowerCase().includes("unauthorized") || 
-                                 errStr2.toLowerCase().includes("forbidden") || 
-                                 errStr2.toLowerCase().includes("quota") || 
-                                 errStr2.toLowerCase().includes("exhausted") || 
-                                 errStr2.toLowerCase().includes("429") || 
-                                 errStr2.toLowerCase().includes("limit");
-
-        if (isSevereKeyError) {
-          if (i < keysToTry.length - 1) {
-            res.write(`data: ${JSON.stringify({ text: `  - [System] Credential/quota issue detected on key ${keyLabel} during alternative route. Switching to backup key...\n` })}\n\n`);
-          }
-          break; // Stop attempts for this key, proceed to next key
-        }
-
-        if (attempt2 < 2) {
-          res.write(`data: ${JSON.stringify({ text: `  - [System] Temporary error occurred (e.g. high load / 503). Retrying in 800ms...\n` })}\n\n`);
-          await new Promise(resolve => setTimeout(resolve, 800));
-        }
-      }
-    }
-
-    if (successModel2) return;
-
-    if (i < keysToTry.length - 1) {
-      res.write(`data: ${JSON.stringify({ text: `  - [System] All models failed on this key. Trying alternative API key...\n` })}\n\n`);
-      continue;
-    }
-    
-    // If everything failed on Gemini, fallback to Cerebras
-    res.write(`data: ${JSON.stringify({ text: `• [System] All Gemini options failed or ran out of quota.\n• Switching to ExeAI (Cerebras) as final fallback...\n</think>\n\n*(System detected Google API Key issues, dynamically redirecting to ExeAI Engine...)*\n\n` })}\n\n`);
-    try {
-      await runCerebrasModel("gemma-4-31b", messages, systemInstruction, temperature, res);
-      return;
-    } catch (errCerebras: any) {
-      handleGeminiError(errCerebras, res);
     }
   }
-}
 
-async function runCerebrasModel(
-  model: string,
-  messages: any[],
-  systemInstruction: string,
-  temperature: number,
-  res: any
-) {
-  const apiKey = getCerebrasApiKey();
-  if (!apiKey) {
-    throw new Error("Cerebras API key is not configured");
-  }
-
-  const systemMessage = {
-    role: "system",
-    content: systemInstruction || "You are ExeAi, an advanced AI assistant that is highly intelligent, friendly, and helpful."
-  };
-
-  const mappedMessages = messages.map((m: any) => ({
-    role: m.role === "model" ? "assistant" : "user",
-    content: m.content
-  }));
-
-  const allMessages = [systemMessage, ...mappedMessages];
-
-  const response = await fetch("https://api.cerebras.ai/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Authorization": `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model,
-      messages: allMessages,
-      temperature: temperature !== undefined ? Number(temperature) : 0.7,
-      stream: true,
-    }),
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`Cerebras API Error (${response.status}): ${errorText}`);
-  }
-
-  const reader = response.body;
-  if (!reader) {
-    throw new Error("Response body from Cerebras is not readable");
-  }
-
-  const decoder = new TextDecoder("utf-8");
-  let buffer = "";
-
-  if (typeof (reader as any).getReader === "function") {
-    const webReader = (reader as any).getReader();
-    while (true) {
-      const { value, done } = await webReader.read();
-      if (done) break;
-
-      let decodedChunk = "";
-      if (typeof value === "string") {
-        decodedChunk = value;
-      } else if (value) {
-        decodedChunk = decoder.decode(value, { stream: true });
-      }
-      buffer += decodedChunk;
-      let lineEndIdx;
-      while ((lineEndIdx = buffer.indexOf("\n")) !== -1) {
-        const line = buffer.substring(0, lineEndIdx).trim();
-        buffer = buffer.substring(lineEndIdx + 1);
-
-        if (!line) continue;
-        if (line.startsWith("data: ")) {
-          const dataStr = line.substring(6).trim();
-          if (dataStr === "[DONE]") {
-            continue;
-          }
-          try {
-            const parsed = JSON.parse(dataStr);
-            const text = parsed.choices?.[0]?.delta?.content;
-            if (text) {
-              res.write(`data: ${JSON.stringify({ text })}\n\n`);
-            }
-          } catch (err) {
-          }
-        }
-      }
-    }
-  } else {
-    for await (const chunk of reader as any) {
-      let decodedChunk = "";
-      if (typeof chunk === "string") {
-        decodedChunk = chunk;
-      } else if (chunk) {
-        decodedChunk = decoder.decode(chunk, { stream: true });
-      }
-      buffer += decodedChunk;
-      let lineEndIdx;
-      while ((lineEndIdx = buffer.indexOf("\n")) !== -1) {
-        const line = buffer.substring(0, lineEndIdx).trim();
-        buffer = buffer.substring(lineEndIdx + 1);
-
-        if (!line) continue;
-        if (line.startsWith("data: ")) {
-          const dataStr = line.substring(6).trim();
-          if (dataStr === "[DONE]") {
-            continue;
-          }
-          try {
-            const parsed = JSON.parse(dataStr);
-            const text = parsed.choices?.[0]?.delta?.content;
-            if (text) {
-              res.write(`data: ${JSON.stringify({ text })}\n\n`);
-            }
-          } catch (err) {
-          }
-        }
-      }
-    }
+  if (lastError) {
+    handleGeminiError(lastError, res);
   }
 }
 
@@ -1835,7 +1614,7 @@ function handleGeminiError(err: any, res: any) {
   if (errString.includes("API key not valid") || errString.includes("API_KEY_INVALID") || errString.includes("INVALID_ARGUMENT")) {
     errMsg = "Your Gemini API Key (GEMINI_API_KEY) is invalid or has expired. Please check or update your API Key in the Settings > Secrets menu at the top right.";
   } else if (errString.includes("PERMISSION_DENIED")) {
-    errMsg = "Access denied (Permission Denied) by Gemini API. Make sure the gemini-3.6-flash model is enabled for your API Key in the Settings > Secrets menu.";
+    errMsg = "Access denied (Permission Denied) by Gemini API. Make sure the gemini-2.5-flash model is enabled for your API Key in the Settings > Secrets menu.";
   } else if (errString.includes("RESOURCE_EXHAUSTED") || errString.includes("quota")) {
     errMsg = "Gemini API rate limit reached (Rate Limit). Please try again in a moment or use an API Key with active billing enabled in the Settings > Secrets menu.";
   } else {
@@ -1858,7 +1637,7 @@ async function streamGroq(messages: any[], systemInstruction: string, temperatur
 
   const mappedMessages = messages.map((m: any) => ({
     role: m.role === "model" || m.role === "assistant" ? "assistant" : "user",
-    content: m.content
+    content: m.content || ""
   }));
 
   const allMessages = [systemMessage, ...mappedMessages];
@@ -1890,6 +1669,37 @@ async function streamGroq(messages: any[], systemInstruction: string, temperatur
   const decoder = new TextDecoder("utf-8");
   let buffer = "";
 
+  let inThinking = false;
+  let sentOpenThink = false;
+  let sentCloseThink = false;
+
+  const handleParsedChunk = (parsed: any) => {
+    const delta = parsed.choices?.[0]?.delta;
+    if (!delta) return;
+
+    // Check for explicit reasoning tokens (e.g. Qwen on Groq)
+    const reasoning = delta.reasoning || delta.reasoning_content;
+    let content = delta.content;
+
+    if (reasoning) {
+      if (!sentOpenThink) {
+        res.write(`data: ${JSON.stringify({ text: "<think>" })}\n\n`);
+        sentOpenThink = true;
+        inThinking = true;
+      }
+      res.write(`data: ${JSON.stringify({ text: reasoning })}\n\n`);
+    }
+
+    if (content) {
+      if (inThinking && !sentCloseThink) {
+        res.write(`data: ${JSON.stringify({ text: "</think>" })}\n\n`);
+        sentCloseThink = true;
+        inThinking = false;
+      }
+      res.write(`data: ${JSON.stringify({ text: content })}\n\n`);
+    }
+  };
+
   if (typeof (reader as any).getReader === "function") {
     const webReader = (reader as any).getReader();
     while (true) {
@@ -1916,10 +1726,7 @@ async function streamGroq(messages: any[], systemInstruction: string, temperatur
           }
           try {
             const parsed = JSON.parse(dataStr);
-            const text = parsed.choices?.[0]?.delta?.content;
-            if (text) {
-              res.write(`data: ${JSON.stringify({ text })}\n\n`);
-            }
+            handleParsedChunk(parsed);
           } catch (err) {
           }
         }
@@ -1947,15 +1754,16 @@ async function streamGroq(messages: any[], systemInstruction: string, temperatur
           }
           try {
             const parsed = JSON.parse(dataStr);
-            const text = parsed.choices?.[0]?.delta?.content;
-            if (text) {
-              res.write(`data: ${JSON.stringify({ text })}\n\n`);
-            }
+            handleParsedChunk(parsed);
           } catch (err) {
           }
         }
       }
     }
+  }
+
+  if (inThinking && !sentCloseThink) {
+    res.write(`data: ${JSON.stringify({ text: "</think>" })}\n\n`);
   }
 }
 
@@ -1966,7 +1774,7 @@ app.post("/api/chat/stream", async (req, res) => {
   res.setHeader("X-Accel-Buffering", "no");
 
   try {
-    const { messages, temperature, model = "gemma-4-31b", webSearchEnabled = false } = req.body;
+    const { messages, temperature, model = "gemini-ai", webSearchEnabled = false } = req.body;
     let systemInstruction = req.body.systemInstruction;
 
     const languageInstruction = "\n\n[CRITICAL LANGUAGE CONSISTENCY & DETECTION DIRECTIVE]:\n" +
@@ -1991,7 +1799,7 @@ app.post("/api/chat/stream", async (req, res) => {
       "6. **Code Quality**: Write clean, modular, and well-structured code with essential minimalist inline comments.";
 
     const thinkInstruction = "\n\n[CRITICAL THINKING BLOCK REQUIREMENT]:\n" +
-      "For every query, you MUST start your response with a thinking/reasoning process enclosed within `<think>` and `</think>` tags in English. Explain your plan, analyze the prompt, or reason step-by-step in 1-3 sentences or more. Then, output your actual helpful response after the `</think>` tag. DO NOT omit the `<think>` and `</think>` tags under any circumstances.";
+      "For every query, you MUST start your response with a thinking/reasoning process enclosed strictly within `<think>` and `</think>` tags in English. Inside `<think>...</think>`, explain your plans or reasoning (1-3 sentences). Then, output your actual helpful answer after the `</think>` tag. DO NOT omit the `<think>` and `</think>` tags, and DO NOT output tool call or function call syntax.";
 
     const modernEventInstruction = "\n\n[REAL-TIME & REAL-LIFE EVENT DISCUSSIONS (SPORTS, NEWS, LATEST MATCHES)]:\n" +
       "1. You are operating in July 2026. Be highly aware of the current year and modern football/sports tournaments (e.g. Euro 2024 results, Copa America 2024, World Cup 2026 qualifiers, etc.).\n" +
@@ -2050,29 +1858,11 @@ app.post("/api/chat/stream", async (req, res) => {
     // Determine active model based on "automatic" or selected model
     let activeModel = model;
     if (model === "automatic") {
-      if (hasImageAttachment || webSearchEnabled) {
-        activeModel = "gemini-ai";
-      } else {
-        const lastMsg = messages[messages.length - 1]?.content?.toLowerCase() || "";
-        const searchKeywords = ["search", "cari", "berita", "news", "terbaru", "cuaca", "weather", "google", "live", "skor", "score", "match", "euro 2024", "copa america", "world cup"];
-        const needsWeb = searchKeywords.some(kw => lastMsg.includes(kw));
-        if (needsWeb) {
-          activeModel = "gemini-ai";
-        } else {
-          activeModel = "gemma-4-31b";
-        }
-      }
-      console.log(`[Automatic Model] Routed request to: ${activeModel}`);
+      activeModel = "gemini-ai";
+      console.log(`[Automatic Model] Routed request to primary Gemini engine`);
     }
 
-    // If an image is detected or activeModel is a Gemini model, route to Gemini
-    const isGeminiModel = (activeModel === "gemini-ai" || activeModel === "gemini-3.6-flash" || webSearchEnabled || hasImageAttachment);
-    if (isGeminiModel) {
-      await streamGemini(messages, systemInstruction, temperature, webSearchEnabled, res, hasImageAttachment);
-      res.write("data: [DONE]\n\n");
-      return res.end();
-    }
-
+    // Route Groq models (Qwen)
     if (activeModel === "qwen/qwen3.8-27b" || activeModel === "llama-3.1-8b-instant") {
       const currentDateStr = new Date().toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
       const groqSpecialPrompt = `You are ExeChat, also known as ExeAI. You are a helpful, maximally truthful, and witty AI built to be fun to talk with.
@@ -2095,7 +1885,10 @@ Communication style:
 - Give bold opinions when needed, but always with reasoning.
 - Never use phrases like "As an AI language model..." — you are ExeChat.
 
-You are ExeAI, created to help users with maximum truth and enjoyment. Stay in character at all times.
+[CRITICAL INSTRUCTION FOR INTERNAL REASONING & TOOLS]:
+1. You do NOT have any external tools or functions. NEVER output <tool_call>, <function=...>, </tool_call>, or any tool call syntax.
+2. For every query, you MUST provide your internal thinking/reasoning enclosed strictly inside <think> and </think> tags at the very beginning of your response.
+3. After the </think> tag, output your actual helpful answer directly in the user's language.
 
 Current date: ${currentDateStr} (use this when needed).
 
@@ -2108,133 +1901,12 @@ Respond in the same language as the user.`;
       return res.end();
     }
 
-    const apiKey = getCerebrasApiKey();
-    if (!apiKey) {
-      res.write(`data: ${JSON.stringify({ error: "Cerebras API key is not configured" })}\n\n`);
-      return res.end();
-    }
-
-    const systemMessage = {
-      role: "system",
-      content: systemInstruction || "You are ExeAi, an advanced AI assistant that is highly intelligent, friendly, and helpful."
-    };
-
-    const mappedMessages = messages.map((m: any) => ({
-      role: m.role === "model" ? "assistant" : "user",
-      content: m.content
-    }));
-
-    const allMessages = [systemMessage, ...mappedMessages];
-
-    const cerebrasModel = activeModel === "gpt-oss-120b" ? "gpt-oss-120b" : "gemma-4-31b";
-
-    const response = await fetch("https://api.cerebras.ai/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: cerebrasModel,
-        messages: allMessages,
-        temperature: temperature !== undefined ? Number(temperature) : 0.7,
-        stream: true,
-      }),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      if (response.status === 429) {
-        console.warn("Cerebras API rate-limited (429).");
-        res.write(`data: ${JSON.stringify({ error: "Server is currently busy. Please try again later." })}\n\n`);
-        return res.end();
-      }
-
-      console.warn("Cerebras API Error status:", response.status, errorText);
-      res.write(`data: ${JSON.stringify({ error: `Cerebras API Error (${response.status}).` })}\n\n`);
-      return res.end();
-    }
-
-    const reader = response.body;
-    if (!reader) {
-      res.write(`data: ${JSON.stringify({ error: "Response body from Cerebras is not readable" })}\n\n`);
-      return res.end();
-    }
-
-    const decoder = new TextDecoder("utf-8");
-    let buffer = "";
-
-    if (typeof (reader as any).getReader === "function") {
-      const webReader = (reader as any).getReader();
-      while (true) {
-        const { value, done } = await webReader.read();
-        if (done) break;
-
-        let decodedChunk = "";
-        if (typeof value === "string") {
-          decodedChunk = value;
-        } else if (value) {
-          decodedChunk = decoder.decode(value, { stream: true });
-        }
-        buffer += decodedChunk;
-        let lineEndIdx;
-        while ((lineEndIdx = buffer.indexOf("\n")) !== -1) {
-          const line = buffer.substring(0, lineEndIdx).trim();
-          buffer = buffer.substring(lineEndIdx + 1);
-
-          if (!line) continue;
-          if (line.startsWith("data: ")) {
-            const dataStr = line.substring(6).trim();
-            if (dataStr === "[DONE]") {
-              continue;
-            }
-            try {
-              const parsed = JSON.parse(dataStr);
-              const text = parsed.choices?.[0]?.delta?.content;
-              if (text) {
-                res.write(`data: ${JSON.stringify({ text })}\n\n`);
-              }
-            } catch (err) {
-            }
-          }
-        }
-      }
-    } else {
-      for await (const chunk of reader as any) {
-        let decodedChunk = "";
-        if (typeof chunk === "string") {
-          decodedChunk = chunk;
-        } else if (chunk) {
-          decodedChunk = decoder.decode(chunk, { stream: true });
-        }
-        buffer += decodedChunk;
-        let lineEndIdx;
-        while ((lineEndIdx = buffer.indexOf("\n")) !== -1) {
-          const line = buffer.substring(0, lineEndIdx).trim();
-          buffer = buffer.substring(lineEndIdx + 1);
-
-          if (!line) continue;
-          if (line.startsWith("data: ")) {
-            const dataStr = line.substring(6).trim();
-            if (dataStr === "[DONE]") {
-              continue;
-            }
-            try {
-              const parsed = JSON.parse(dataStr);
-              const text = parsed.choices?.[0]?.delta?.content;
-              if (text) {
-                res.write(`data: ${JSON.stringify({ text })}\n\n`);
-              }
-            } catch (err) {
-            }
-          }
-        }
-      }
-    }
-
+    // Default: Route all other requests to primary Gemini engine
+    await streamGemini(messages, systemInstruction, temperature, webSearchEnabled, res, hasImageAttachment);
     res.write("data: [DONE]\n\n");
+    return res.end();
   } catch (error: any) {
-    console.warn("Cerebras Proxy Error:", error && error.message ? error.message : error);
+    console.warn("API Stream Error:", error && error.message ? error.message : error);
     res.write(`data: ${JSON.stringify({ error: "Server encountered an internal issue. Please try again later." })}\n\n`);
   } finally {
     res.end();

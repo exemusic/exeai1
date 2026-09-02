@@ -1492,7 +1492,12 @@ body {
         cleaned = cleaned.substring(0, openIdx);
       }
     }
+    cleaned = cleaned.replace(/<think>[\s\S]*?<\/think>/gi, "");
+    cleaned = cleaned.replace(/<think>[\s\S]*$/gi, "");
     cleaned = cleaned.replace(/<\/?think>/gi, "");
+    cleaned = cleaned.replace(/<tool_call>[\s\S]*?<\/tool_call>/gi, "");
+    cleaned = cleaned.replace(/<tool_call>[\s\S]*$/gi, "");
+    cleaned = cleaned.replace(/<\/?tool_call>/gi, "");
     cleaned = cleaned.replace(/```(?:json|javascript|js|html|css|typescript|ts)?[\s\S]*?(?:```|$)/gi, "");
     return cleaned.trim();
   };
@@ -2398,9 +2403,9 @@ body {
       return { thinking: sanitizeAndShortenThought(rawThinking), actual, isThinking: true };
     }
 
-    // Check if the content ends with a partial <think> tag
+    // Check if the content ends with or contains a partial <think> tag
     const partialThinkRegex = /<t(h(i(n(k)?)?)?)?$/i;
-    if (partialThinkRegex.test(content)) {
+    if (partialThinkRegex.test(content) || /^<t(h(i(n(k)?)?)?)?/i.test(content.trim())) {
       const actual = cleanDisplayContent(content);
       return { thinking: "Reviewing project context and prompt...", actual, isThinking: true };
     }

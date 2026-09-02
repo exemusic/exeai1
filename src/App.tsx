@@ -418,7 +418,16 @@ export default function App() {
 
       // Actual user-visible response is strictly everything after </think>
       let actual = content.substring(closeIdx + 8).trim();
+      
+      // Strip any extra/stray <think>...</think> or unclosed <think> blocks in the rest of the text
+      actual = actual.replace(/<think>[\s\S]*?<\/think>/gi, "");
+      actual = actual.replace(/<think>[\s\S]*$/gi, "");
       actual = actual.replace(/<\/?think>/gi, "").trim();
+
+      // Clean tool/function call leakages
+      actual = actual.replace(/<tool_call>[\s\S]*?<\/tool_call>/gi, "");
+      actual = actual.replace(/<tool_call>[\s\S]*$/gi, "");
+      actual = actual.replace(/<\/?tool_call>/gi, "").trim();
 
       return {
         thinking: sanitizeAndShortenThought(rawThinking),
@@ -427,11 +436,12 @@ export default function App() {
       };
     }
 
-    // If there is an open <think> but no closing </think> (streaming in progress)
+    // If there is an open <think> but no closing </think> (streaming in progress or unclosed think tag)
     const openIdx = lowerContent.indexOf("<think>");
     if (openIdx !== -1) {
       const rawThinking = content.substring(openIdx + 7).trim();
-      const actual = content.substring(0, openIdx).trim();
+      let actual = content.substring(0, openIdx).trim();
+      actual = actual.replace(/<\/?think>/gi, "").trim();
       return {
         thinking: sanitizeAndShortenThought(rawThinking),
         actual: actual,
@@ -439,14 +449,21 @@ export default function App() {
       };
     }
 
-    // Check if the content starts or ends with a partial <think> tag (e.g. "<", "<t", "<th", etc.)
-    const partialThinkRegex = /<(t(h(i(n(k)?)?)?)?)?$/i;
-    if (partialThinkRegex.test(content) || /^<(t(h(i(n(k)?)?)?)?)?/i.test(content.trim())) {
-      return { thinking: "", actual: "", isThinking: true };
+    // Check if the content starts with or contains a partial or trailing think tag (e.g. "<", "<t", "<th", etc.)
+    const partialThinkRegex = /<t(h(i(n(k)?)?)?)?$/i;
+    if (partialThinkRegex.test(content) || /^<t(h(i(n(k)?)?)?)?/i.test(content.trim())) {
+      let cleaned = content.replace(/^<t(h(i(n(k)?)?)?)?/i, "").replace(/<t(h(i(n(k)?)?)?)?$/i, "").trim();
+      return { thinking: "", actual: cleaned, isThinking: true };
     }
 
     // Fallback: clean out any stray tags
-    let cleaned = content.replace(/<\/?think>/gi, "").trim();
+    let cleaned = content.replace(/<think>[\s\S]*?<\/think>/gi, "");
+    cleaned = cleaned.replace(/<think>[\s\S]*$/gi, "");
+    cleaned = cleaned.replace(/<\/?think>/gi, "");
+    cleaned = cleaned.replace(/<tool_call>[\s\S]*?<\/tool_call>/gi, "");
+    cleaned = cleaned.replace(/<tool_call>[\s\S]*$/gi, "");
+    cleaned = cleaned.replace(/<\/?tool_call>/gi, "").trim();
+
     return { thinking: null, actual: cleaned, isThinking: false };
   };
 
