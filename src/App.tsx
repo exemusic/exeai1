@@ -68,8 +68,7 @@ import { Message, ChatSession, SystemPreset, ModelOption } from "./types";
 import { MarkdownRenderer } from "./components/MarkdownRenderer";
 import { GoogleOAuthProvider, GoogleLogin } from "@react-oauth/google";
 import { jwtDecode } from "jwt-decode";
-import { MODEL_OPTIONS, SYSTEM_PRESETS, SUGGESTED_PROMPTS, GEMMA_TEMP_PRESETS } from "./presets";
-import { ExeCodeWorkspace } from "./components/ExeCodeWorkspace";
+import { MODEL_OPTIONS, SYSTEM_PRESETS, SUGGESTED_PROMPTS, AI_TEMP_PRESETS } from "./presets";
 import { PublicProjectView } from "./components/PublicProjectView";
 import { getTranslation } from "./translations";
 
@@ -475,10 +474,26 @@ export default function App() {
         if (Array.isArray(parsed)) {
           return parsed
             .filter((s: any) => s && typeof s === "object")
-            .map((s: any) => ({
-              ...s,
-              messages: Array.isArray(s.messages) ? s.messages : [],
-            }));
+            .map((s: any) => {
+              const cleanModel = (s.model === "gemma-4-31b" || s.model === "gpt-oss-120b" || s.model === "cerebras")
+                ? "gemini-ai"
+                : (s.model || "automatic");
+              const msgs = Array.isArray(s.messages) ? s.messages : [];
+              return {
+                ...s,
+                model: cleanModel,
+                messages: msgs.map((m: any) => {
+                  if (m && (m.modelId === "gemma-4-31b" || m.modelId === "gpt-oss-120b" || m.routedModelId === "gemma-4-31b" || m.routedModelId === "gpt-oss-120b")) {
+                    return {
+                      ...m,
+                      modelId: "gemini-ai",
+                      routedModelId: "gemini-ai",
+                    };
+                  }
+                  return m;
+                }),
+              };
+            });
         }
       } catch (e) {
         console.error("Failed to parse sessions", e);
@@ -558,9 +573,6 @@ export default function App() {
   const [globalWebSearchEnabled, setGlobalWebSearchEnabled] = useState(false);
   const [temperature, setTemperature] = useState(0.7);
   const [showSettings, setShowSettings] = useState(false);
-  const [showExeCode, setShowExeCode] = useState(() => {
-    return typeof window !== "undefined" && window.location.pathname.startsWith("/project/") && window.innerWidth >= 768;
-  });
   const [settingsTab, setSettingsTab] = useState<"akun" | "model" | "tampilan" | "ingatan" | "feedback">("akun");
   const [cookieConsent, setCookieConsent] = useState<string | null>(() => {
     return localStorage.getItem("exechat_cookie_consent") || null;
@@ -1691,27 +1703,11 @@ export default function App() {
       };
     }
 
-    // Automatic routing rules
-    const isImage = attachment && attachment.type === "image";
-    const isSearchKeyword = /googling|search|internet|berita|cuaca|news|live|realtime/i.test(text);
-    const isCodingKeyword = /script|code|coding|function|class|pawn|mysql|database|schema/i.test(text);
-
-    if (isImage || isSearchKeyword) {
-      return {
-        routedModelId: "gemini-ai",
-        routedModelName: "Gemini AI",
-      };
-    } else if (isCodingKeyword) {
-      return {
-        routedModelId: "gpt-oss-120b",
-        routedModelName: "exeai-1.0-pro",
-      };
-    } else {
-      return {
-        routedModelId: "gemma-4-31b",
-        routedModelName: "exeai-e5:5:9",
-      };
-    }
+    // Automatic routing rules (strictly Gemini and Groq)
+    return {
+      routedModelId: "gemini-ai",
+      routedModelName: "ExeAi 5:5:9",
+    };
   };
 
   const isEmailOrUidRegistered = (uid?: string | null, email?: string | null): boolean => {
@@ -2474,7 +2470,7 @@ export default function App() {
       (p) => p.id === (activeSessionState ? activeSessionState.systemInstructionId : selectedPresetId)
     ) || SYSTEM_PRESETS[0];
     const apiTemp = activeSessionState ? activeSessionState.temperature : temperature;
-    const apiWebSearch = apiModel === "gemini-ai";
+    const apiWebSearch = apiModel === "gemini-ai" || apiModel === "gemini-3.8-flash";
 
     const updatedSession = sessions.find((s) => s && s.id === targetSessionId);
     const conversationHistory = updatedSession && Array.isArray(updatedSession.messages)
@@ -2718,7 +2714,7 @@ export default function App() {
         const msg = (err && err.message) ? err.message : "";
         const msgLower = msg.toLowerCase();
         let errorDisplayMsg = msg || "A connection error occurred while generating the response.";
-        if (msgLower.includes("cerebras") || msgLower.includes("too_many_requests") || msgLower.includes("queue_exceeded") || msgLower.includes("429")) {
+        if (msgLower.includes("too_many_requests") || msgLower.includes("queue_exceeded") || msgLower.includes("429") || msgLower.includes("rate limit") || msgLower.includes("quota")) {
           errorDisplayMsg = userLanguage === "id" ? "Server sedang sibuk. Silakan coba beberapa saat lagi." : "Server is busy at this time. Please try again later.";
         }
 
@@ -2861,7 +2857,7 @@ export default function App() {
       (p) => p.id === (activeSessionObj.systemInstructionId || selectedPresetId)
     ) || SYSTEM_PRESETS[0];
     const apiTemp = activeSessionObj.temperature || temperature;
-    const apiWebSearch = apiModel === "gemini-ai";
+    const apiWebSearch = apiModel === "gemini-ai" || apiModel === "gemini-3.8-flash";
 
     const formattedHistory = truncatedMessages.map((m) => {
       let content = m.content;
@@ -3006,7 +3002,7 @@ export default function App() {
         const msg = (err && err.message) ? err.message : "";
         const msgLower = msg.toLowerCase();
         let errorDisplayMsg = msg || "An error occurred during response generation.";
-        if (msgLower.includes("cerebras") || msgLower.includes("too_many_requests") || msgLower.includes("queue_exceeded") || msgLower.includes("429")) {
+        if (msgLower.includes("too_many_requests") || msgLower.includes("queue_exceeded") || msgLower.includes("429") || msgLower.includes("rate limit") || msgLower.includes("quota")) {
           errorDisplayMsg = userLanguage === "id" ? "Server sedang sibuk. Silakan coba beberapa saat lagi." : "Server is busy at this time. Please try again later.";
         }
 
@@ -3101,7 +3097,7 @@ export default function App() {
       (p) => p.id === (activeSessionObj.systemInstructionId || selectedPresetId)
     ) || SYSTEM_PRESETS[0];
     const apiTemp = activeSessionObj.temperature || temperature;
-    const apiWebSearch = apiModel === "gemini-ai";
+    const apiWebSearch = apiModel === "gemini-ai" || apiModel === "gemini-3.8-flash";
 
     const formattedHistory = priorMessages.map((m) => {
       let content = m.content;
@@ -3249,7 +3245,7 @@ export default function App() {
         const msg = (err && err.message) ? err.message : "";
         const msgLower = msg.toLowerCase();
         let errorDisplayMsg = msg || "An error occurred during response regeneration.";
-        if (msgLower.includes("cerebras") || msgLower.includes("too_many_requests") || msgLower.includes("queue_exceeded") || msgLower.includes("429")) {
+        if (msgLower.includes("too_many_requests") || msgLower.includes("queue_exceeded") || msgLower.includes("429") || msgLower.includes("rate limit") || msgLower.includes("quota")) {
           errorDisplayMsg = userLanguage === "id" ? "Server sedang sibuk. Silakan coba beberapa saat lagi." : "Server is busy at this time. Please try again later.";
         }
 
@@ -3686,7 +3682,6 @@ export default function App() {
             playNotifySound();
             setCurrentSessionId(null);
             setShowSettings(false);
-            setShowExeCode(false);
             if (isMobile) setIsMobileSidebarOpen(false);
           }}
           className={`w-full flex items-center justify-center gap-2 rounded-xl font-semibold py-3 px-4 transition-all duration-200 text-sm tracking-wide border ${
@@ -3697,25 +3692,6 @@ export default function App() {
         >
           <Plus className="h-4 w-4 stroke-[2.5]" />
           <span>{getTranslation("newChat", userLanguage)}</span>
-        </button>
-
-        <button
-          onClick={() => {
-            playNotifySound();
-            setShowExeCode(true);
-            setShowSettings(false);
-            if (isMobile) setIsMobileSidebarOpen(false);
-          }}
-          className={`hidden md:flex w-full items-center justify-center gap-2 rounded-xl font-semibold py-3 px-4 transition-all duration-205 text-sm tracking-wide border ${
-            showExeCode
-              ? "bg-amber-500/20 text-amber-500 border-amber-500/40"
-              : isDark 
-                ? "bg-zinc-900 hover:bg-zinc-800 text-zinc-200 border-zinc-800" 
-                : "bg-white hover:bg-zinc-50 text-zinc-800 border-zinc-200"
-          }`}
-        >
-          <Code className="h-4 w-4 text-amber-500" />
-          <span>{getTranslation("workstation", userLanguage)}</span>
         </button>
       </div>
 
@@ -3997,7 +3973,6 @@ export default function App() {
               <button
                 onClick={() => {
                   setShowSettings(!showSettings);
-                  setShowExeCode(false);
                   if (isMobile) {
                     setIsMobileSidebarOpen(false);
                   }
@@ -4026,7 +4001,6 @@ export default function App() {
             <button
               onClick={() => {
                 setShowSettings(!showSettings);
-                setShowExeCode(false);
                 if (isMobile) {
                   setIsMobileSidebarOpen(false);
                 }
@@ -4228,7 +4202,6 @@ export default function App() {
                     playNotifySound();
                     setCurrentSessionId(null);
                     setShowSettings(false);
-                    setShowExeCode(false);
                   }}
                   className={`p-2 rounded-xl hover:bg-zinc-500/10 transition-all duration-200 cursor-pointer ${
                     isDark ? "text-zinc-400 hover:text-white" : "text-zinc-700 hover:text-zinc-900"
@@ -4256,23 +4229,6 @@ export default function App() {
 
               {/* Bottom Section */}
               <div className="flex flex-col items-center gap-4 w-full">
-                {/* ExeCode Workspace Icon */}
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setShowExeCode(prev => !prev);
-                    setShowSettings(false);
-                  }}
-                  className={`hidden md:flex p-2 rounded-xl transition-all duration-200 cursor-pointer ${
-                    showExeCode 
-                      ? "bg-amber-500/10 text-amber-500" 
-                      : `hover:bg-zinc-500/10 ${isDark ? "text-zinc-400 hover:text-white" : "text-zinc-700 hover:text-zinc-900"}`
-                  }`}
-                  title="ExeCode Workspace"
-                >
-                  <Code className="h-5 w-5" />
-                </button>
-
                 {/* Admin Shield Icon */}
                 {isLoggedIn && userEmail?.toLowerCase() === "nairicintia@gmail.com" && (
                   <button
@@ -4298,7 +4254,6 @@ export default function App() {
                   onClick={(e) => {
                     e.stopPropagation();
                     setShowSettings(prev => !prev);
-                    setShowExeCode(false);
                   }}
                   className={`p-2 rounded-xl transition-all duration-200 cursor-pointer ${
                     showSettings 
@@ -5443,8 +5398,8 @@ export default function App() {
                               </div>
                             </div>
 
-                            {/* TEMPERATURE SETTINGS FOR GEMMA-4 MOBILE */}
-                            {((currentSession ? currentSession.model : selectedModelId) === "gemma-4-31b") && (
+                            {/* TEMPERATURE SETTINGS FOR EXEAI MOBILE */}
+                            {((currentSession ? currentSession.model : selectedModelId) === "gemini-3.8-flash" || (currentSession ? currentSession.model : selectedModelId) === "gemini-ai" || (currentSession ? currentSession.model : selectedModelId) === "automatic") && (
                               <div className={`p-4 rounded-xl border space-y-3 ${isDark ? "bg-[#111b21] border-zinc-800" : "bg-white border-zinc-200 shadow-xs"}`}>
                                 <div className="flex items-center justify-between gap-2">
                                   <div className="flex items-center gap-2">
@@ -5476,7 +5431,7 @@ export default function App() {
                                 />
 
                                 <div className="space-y-1.5 pt-1">
-                                  {GEMMA_TEMP_PRESETS.map((p) => {
+                                  {AI_TEMP_PRESETS.map((p) => {
                                     const [minStr, maxStr] = p.range.split("–");
                                     const minVal = parseFloat(minStr);
                                     const maxVal = parseFloat(maxStr);
@@ -5990,13 +5945,13 @@ export default function App() {
                               </div>
                             </div>
 
-                            {/* Temperature Box for Gemma-4 */}
-                            {((currentSession ? currentSession.model : selectedModelId) === "gemma-4-31b") && (
+                            {/* Temperature Box for ExeAi / Gemini */}
+                            {((currentSession ? currentSession.model : selectedModelId) === "gemini-3.8-flash" || (currentSession ? currentSession.model : selectedModelId) === "gemini-ai" || (currentSession ? currentSession.model : selectedModelId) === "automatic") && (
                               <div className="border border-zinc-200 dark:border-zinc-800 rounded-xl overflow-hidden bg-white dark:bg-[#161b22] shadow-xs">
                                 <div className="bg-zinc-50/80 dark:bg-[#1c2128] px-5 py-3 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between">
                                   <h4 className="text-xs font-bold uppercase tracking-wider text-zinc-700 dark:text-zinc-300 flex items-center gap-2">
                                     <Sliders className="h-4 w-4 text-amber-500" />
-                                    <span>Gemma-4 Temperature Presets</span>
+                                    <span>Gemini / ExeAi Temperature Presets</span>
                                   </h4>
                                   <span className="text-xs font-mono font-bold px-2 py-0.5 rounded bg-zinc-900 text-amber-400 border border-zinc-800">
                                     {activeTemp.toFixed(2)}
@@ -6021,7 +5976,7 @@ export default function App() {
                                   />
 
                                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                    {GEMMA_TEMP_PRESETS.map((p) => {
+                                    {AI_TEMP_PRESETS.map((p) => {
                                       const [minStr, maxStr] = p.range.split("–");
                                       const minVal = parseFloat(minStr);
                                       const maxVal = parseFloat(maxStr);
@@ -6255,23 +6210,6 @@ export default function App() {
                   </div>
                 </div>
               </motion.div>
-            )}
-          </AnimatePresence>
-
-          {/* EXECODE WORKSPACE COMPONENT OVERLAY (DESKTOP ONLY) */}
-          <AnimatePresence>
-            {showExeCode && !isMobile && (
-              <div className="hidden md:block">
-                <ExeCodeWorkspace
-                  isDark={isDark}
-                  curTheme={curTheme}
-                  onClose={() => setShowExeCode(false)}
-                  defaultModelId={selectedModelId}
-                  userEmail={userEmail}
-                  userId={userId}
-                  appLanguage={userLanguage}
-                />
-              </div>
             )}
           </AnimatePresence>
 

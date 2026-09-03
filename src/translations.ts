@@ -1,7 +1,7 @@
 export interface TranslationDict {
   // General & Nav
   newChat: string;
-  workstation: string;
+  workstation?: string;
   settings: string;
   recentConversations: string;
   searchChats: string;

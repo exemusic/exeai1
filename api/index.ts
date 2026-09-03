@@ -1492,30 +1492,33 @@ async function analyzeImageWithGemini(base64DataUrl: string): Promise<string> {
   if (!parsed) {
     return "[Failed to analyze image: Invalid Base64 format]";
   }
-  try {
-    const ai = new GoogleGenAI({ apiKey: geminiKey });
-    const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
-      contents: [
-        {
-          role: "user",
-          parts: [
-            { text: "Provide a detailed description of this image for a text AI assistant. Explain all objects, text, colors, layout, and important context in depth." },
-            {
-              inlineData: {
-                mimeType: parsed.mimeType,
-                data: parsed.data
+  const modelsToTry = ["gemini-3.8-flash", "gemini-2.5-flash"];
+  for (const modelName of modelsToTry) {
+    try {
+      const ai = new GoogleGenAI({ apiKey: geminiKey });
+      const response = await ai.models.generateContent({
+        model: modelName,
+        contents: [
+          {
+            role: "user",
+            parts: [
+              { text: "Provide a detailed description of this image for a text AI assistant. Explain all objects, text, colors, layout, and important context in depth." },
+              {
+                inlineData: {
+                  mimeType: parsed.mimeType,
+                  data: parsed.data
+                }
               }
-            }
-          ]
-        }
-      ]
-    });
-    return response.text || "[Attached image is empty or unreadable]";
-  } catch (err: any) {
-    console.warn("Error analyzing image with Gemini:", err);
-    return `[Failed to analyze image: ${err.message || err}]`;
+            ]
+          }
+        ]
+      });
+      return response.text || "[Attached image is empty or unreadable]";
+    } catch (err: any) {
+      console.warn(`Error analyzing image with model ${modelName}:`, err);
+    }
   }
+  return "[Failed to analyze image: all model attempts failed]";
 }
 
 async function streamGemini(
@@ -1524,7 +1527,8 @@ async function streamGemini(
   temperature: number,
   webSearchEnabled: boolean,
   res: any,
-  redirectedForImage: boolean = false
+  redirectedForImage: boolean = false,
+  selectedModel: string = "gemini-3.8-flash"
 ) {
   const geminiKey = process.env.GEMINI_API_KEY;
   const geminiKey2 = process.env.GEMINI2_API_KEY || process.env.GEMINI_API_KEY2 || process.env.GEMINI_API_KEY_2 || process.env.BACKUP_GEMINI_API_KEY;
@@ -1586,7 +1590,9 @@ async function streamGemini(
       }
     });
 
-    const modelsToTry = ["gemini-2.5-flash", "gemini-3.6-flash", "gemini-2.5-flash-lite"];
+    const modelsToTry = selectedModel === "gemini-3.8-flash"
+      ? ["gemini-3.8-flash", "gemini-2.5-flash", "gemini-3.6-flash", "gemini-2.5-flash-lite"]
+      : ["gemini-2.5-flash", "gemini-3.8-flash", "gemini-3.6-flash", "gemini-2.5-flash-lite"];
 
     for (const modelName of modelsToTry) {
       try {
@@ -1857,9 +1863,9 @@ app.post("/api/chat/stream", async (req, res) => {
 
     // Determine active model based on "automatic" or selected model
     let activeModel = model;
-    if (model === "automatic") {
+    if (model === "automatic" || model === "gemma-4-31b" || model === "gpt-oss-120b" || !model) {
       activeModel = "gemini-ai";
-      console.log(`[Automatic Model] Routed request to primary Gemini engine`);
+      console.log(`[Model Routing] Routed request to primary Gemini engine`);
     }
 
     // Route Groq models (Qwen)
@@ -1902,7 +1908,7 @@ Respond in the same language as the user.`;
     }
 
     // Default: Route all other requests to primary Gemini engine
-    await streamGemini(messages, systemInstruction, temperature, webSearchEnabled, res, hasImageAttachment);
+    await streamGemini(messages, systemInstruction, temperature, webSearchEnabled, res, hasImageAttachment, activeModel);
     res.write("data: [DONE]\n\n");
     return res.end();
   } catch (error: any) {

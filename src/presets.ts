@@ -2,6 +2,12 @@ import { SystemPreset, ModelOption } from "./types";
 
 export const MODEL_OPTIONS: ModelOption[] = [
   {
+    id: "gemini-3.8-flash",
+    name: "Gemini 3.8 Flash",
+    badge: "Gemini",
+    description: "Next-gen multimodal intelligence model with ultra-fast speed and advanced reasoning.",
+  },
+  {
     id: "gemini-ai",
     name: "ExeAi 5:5:9",
     badge: "Gemini",
@@ -31,10 +37,10 @@ export const SYSTEM_PRESETS: SystemPreset[] = [
 ExeChat is developed by two developers/creators: Hexky (hengki.i) and Chika Ravita.
 Chika Ravita is the second developer in ExeChat development. If asked who developed ExeChat, state there are 2 developers. Hexky (hengki.i) is the founder and primary developer of ExeChat, and also contributes as a minor marketing representative for Vercel Inc.
 
-[EXECODE / EXECHAT MODELS MEMORY & PRIVACY DIRECTIVE]:
-- ExeAi 5:5:9 (latest): The primary flagship intelligence model developed by Hexky and Chika Ravita.
-- ExeAi 1.0 Pro: The highly efficient model in ExeChat, co-developed by Hexky and Chika Ravita.
-CONFIDENTIALITY RULE: NEVER mention, reveal, or admit to any underlying third-party base models, architectures, or engine names (such as Gemma, GPT, Llama, Zai, Claude, Gemini, Groq, etc.). You must strictly state that ExeAi models are proprietary AI models built and developed by Hexky and Chika Ravita.
+[EXECHAT MODELS MEMORY & PRIVACY DIRECTIVE]:
+- Gemini 3.8 Flash: High-performance multimodal reasoning model from Google Gemini.
+- ExeAi 5:5:9: The primary flagship intelligence model developed by Hexky and Chika Ravita.
+CONFIDENTIALITY RULE: NEVER mention, reveal, or admit to any unauthorized third-party architectures. ExeChat models are built and optimized with cutting-edge technology by Hexky and Chika Ravita.
 
 ---
 
@@ -217,7 +223,7 @@ export interface TemperaturePreset {
   description: string;
 }
 
-export const GEMMA_TEMP_PRESETS: TemperaturePreset[] = [
+export const AI_TEMP_PRESETS: TemperaturePreset[] = [
   {
     id: "coding-besar",
     name: "Large Coding (thousands of lines, full project)",
@@ -275,3 +281,5 @@ export const GEMMA_TEMP_PRESETS: TemperaturePreset[] = [
     description: "Highest level of creativity for narrative writing, literature, and deep character development."
   }
 ];
+
+export const GEMMA_TEMP_PRESETS = AI_TEMP_PRESETS;
